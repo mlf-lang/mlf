@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Bounded orchestration controls only: these fake tools do not qualify MLF.
 set -euo pipefail
+. "$(dirname -- "$0")/test-events.sh" release-timed-async-bootstrap
 root=$(cd -- "$(dirname -- "$0")/../.." && pwd)
 work=$(mktemp -d "${TMPDIR:-/tmp}/mlf-timed-async-test.XXXXXXXX")
 trap 'rm -rf "$work"' EXIT
@@ -93,6 +94,7 @@ git -C "$project" -c user.name=fixture -c user.email=fixture@example.invalid com
 export PATH="$work/bin:$PATH" TEST_SEED_MANAGER="$work/seed-manager"
 checks=0
 for control in success transition-failed bad-capability bad-hash missing-helper root-failed rss; do
+  release_begin "release/timed-bootstrap-controls/primitive/$control"
   build="$work/$control"
   github_env="$work/$control.env"
   status=0
@@ -120,6 +122,7 @@ for control in success transition-failed bad-capability bad-hash missing-helper 
   fi
   checks=$((checks+1))
   printf 'PASS timed primitive transition control: %s\n' "$control"
+  release_pass
 done
 printf '%s bounded timed-bootstrap controls passed; no native compiler was built.\n' "$checks"
 
@@ -160,6 +163,7 @@ PYTHON
 chmod +x "$project/tools/release/bootstrap-manager.sh"
 export TEST_SEED_COMPILER="$work/seed-compiler"
 for control in success transition-failed missing-compiler nonexecutable-compiler root-failed rss; do
+  release_begin "release/timed-bootstrap-controls/shared/$control"
   build="$work/shared-$control"
   github_env="$work/shared-$control.env"
   status=0
@@ -188,5 +192,6 @@ for control in success transition-failed missing-compiler nonexecutable-compiler
   fi
   checks=$((checks+1))
   printf 'PASS timed shared-source transition control: %s\n' "$control"
+  release_pass
 done
 printf '%s total bounded timed-bootstrap controls passed; no native compiler was built.\n' "$checks"

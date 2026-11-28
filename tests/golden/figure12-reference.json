@@ -1,0 +1,752 @@
+{
+  "schema_version": 1,
+  "origin": {
+    "revision": "720dd649627fbf8b19c7447493a4fdf6fd05eb39",
+    "description": "Independent Figure 12 reference data from the pre-migration suite. Equivalent to the reviewed semantic data at 171717ad5bd025ee977d4ca9fd8f93abcbc68612. Maintained suite implementation and helper spelling are not part of this corpus.",
+    "sources": [
+      "tests/Tests/Figure12.emlf",
+      "tests/Tests/Figure12Suite.emlf"
+    ]
+  },
+  "signatures": [
+    [
+      "id",
+      "forall a. a -> a"
+    ],
+    [
+      "choose",
+      "forall a. a -> a -> a"
+    ],
+    [
+      "nil",
+      "forall p. [] p"
+    ],
+    [
+      "ids",
+      "[] (forall a. a -> a)"
+    ],
+    [
+      "auto",
+      "(forall a. a -> a) -> (forall a. a -> a)"
+    ],
+    [
+      "auto'",
+      "forall b. (forall a. a -> a) -> b -> b"
+    ],
+    [
+      "poly",
+      "(forall a. a -> a) -> (,) Int Bool"
+    ],
+    [
+      "app",
+      "forall a b. (a -> b) -> a -> b"
+    ],
+    [
+      "revapp",
+      "forall a b. a -> (a -> b) -> b"
+    ],
+    [
+      "runST",
+      "forall d. (forall s. ST s d) -> d"
+    ],
+    [
+      "argST",
+      "forall s. ST s Int"
+    ],
+    [
+      "length",
+      "forall p. [] p -> Int"
+    ],
+    [
+      "tail",
+      "forall p. [] p -> [] p"
+    ],
+    [
+      "head",
+      "forall p. [] p -> p"
+    ],
+    [
+      "single",
+      "forall p. p -> [] p"
+    ],
+    [
+      "cons",
+      "forall p. p -> [] p -> [] p"
+    ],
+    [
+      "append",
+      "forall p. [] p -> [] p -> [] p"
+    ],
+    [
+      "inc",
+      "Int -> Int"
+    ],
+    [
+      "map",
+      "forall p q. (p -> q) -> [] p -> [] q"
+    ],
+    [
+      "compose",
+      "forall a b c. (b -> c) -> (a -> b) -> a -> c"
+    ],
+    [
+      "pair",
+      "forall a b. a -> b -> (,) a b"
+    ]
+  ],
+  "cases": [
+    {
+      "id": "A1",
+      "expression": "\\x y -> y",
+      "paper_acceptance": true,
+      "expected_acceptance": true,
+      "local_signatures": []
+    },
+    {
+      "id": "A2",
+      "expression": "choose id",
+      "paper_acceptance": true,
+      "expected_acceptance": true,
+      "local_signatures": []
+    },
+    {
+      "id": "A3",
+      "expression": "choose nil ids",
+      "paper_acceptance": true,
+      "expected_acceptance": true,
+      "local_signatures": []
+    },
+    {
+      "id": "A4",
+      "expression": "\\(x : forall a. a -> a) -> x x",
+      "paper_acceptance": true,
+      "expected_acceptance": true,
+      "local_signatures": []
+    },
+    {
+      "id": "A5",
+      "expression": "id auto",
+      "paper_acceptance": true,
+      "expected_acceptance": true,
+      "local_signatures": []
+    },
+    {
+      "id": "A6",
+      "expression": "id auto'",
+      "paper_acceptance": true,
+      "expected_acceptance": true,
+      "local_signatures": []
+    },
+    {
+      "id": "A7",
+      "expression": "choose id auto",
+      "paper_acceptance": true,
+      "expected_acceptance": true,
+      "local_signatures": []
+    },
+    {
+      "id": "A8",
+      "expression": "choose id auto'",
+      "paper_acceptance": true,
+      "expected_acceptance": false,
+      "local_signatures": []
+    },
+    {
+      "id": "A9",
+      "expression": "f (choose id) ids",
+      "paper_acceptance": true,
+      "expected_acceptance": true,
+      "local_signatures": [
+        [
+          "f",
+          "forall a. (a -> a) -> [] a -> a"
+        ]
+      ]
+    },
+    {
+      "id": "A10.1",
+      "expression": "poly id",
+      "paper_acceptance": true,
+      "expected_acceptance": true,
+      "local_signatures": []
+    },
+    {
+      "id": "A10.2",
+      "expression": "poly (\\x -> x)",
+      "paper_acceptance": true,
+      "expected_acceptance": true,
+      "local_signatures": []
+    },
+    {
+      "id": "A10.3",
+      "expression": "id poly (\\x -> x)",
+      "paper_acceptance": true,
+      "expected_acceptance": true,
+      "local_signatures": []
+    },
+    {
+      "id": "A11",
+      "expression": "k (\\f -> pair (f 1) (f True)) xs",
+      "paper_acceptance": false,
+      "expected_acceptance": false,
+      "local_signatures": [
+        [
+          "k",
+          "forall a. a -> [] a -> Int"
+        ],
+        [
+          "xs",
+          "[] ((forall a. a -> a) -> (,) Int Bool)"
+        ]
+      ]
+    },
+    {
+      "id": "A12.1",
+      "expression": "poly id",
+      "paper_acceptance": true,
+      "expected_acceptance": true,
+      "local_signatures": []
+    },
+    {
+      "id": "A12.2",
+      "expression": "app poly id",
+      "paper_acceptance": true,
+      "expected_acceptance": true,
+      "local_signatures": []
+    },
+    {
+      "id": "A12.3",
+      "expression": "revapp id poly",
+      "paper_acceptance": true,
+      "expected_acceptance": true,
+      "local_signatures": []
+    },
+    {
+      "id": "A13.1",
+      "expression": "app runST argST",
+      "paper_acceptance": true,
+      "expected_acceptance": true,
+      "local_signatures": []
+    },
+    {
+      "id": "A13.2",
+      "expression": "revapp argST runST",
+      "paper_acceptance": true,
+      "expected_acceptance": true,
+      "local_signatures": []
+    },
+    {
+      "id": "B1.1",
+      "expression": "length ids",
+      "paper_acceptance": true,
+      "expected_acceptance": true,
+      "local_signatures": []
+    },
+    {
+      "id": "B1.2",
+      "expression": "tail ids",
+      "paper_acceptance": true,
+      "expected_acceptance": true,
+      "local_signatures": []
+    },
+    {
+      "id": "B1.3",
+      "expression": "head ids",
+      "paper_acceptance": true,
+      "expected_acceptance": true,
+      "local_signatures": []
+    },
+    {
+      "id": "B1.4",
+      "expression": "single id",
+      "paper_acceptance": true,
+      "expected_acceptance": true,
+      "local_signatures": []
+    },
+    {
+      "id": "B2",
+      "expression": "cons id ids",
+      "paper_acceptance": true,
+      "expected_acceptance": true,
+      "local_signatures": []
+    },
+    {
+      "id": "B3",
+      "expression": "cons (\\x -> x) ids",
+      "paper_acceptance": true,
+      "expected_acceptance": true,
+      "local_signatures": []
+    },
+    {
+      "id": "B4",
+      "expression": "append (single inc) (single id)",
+      "paper_acceptance": true,
+      "expected_acceptance": true,
+      "local_signatures": []
+    },
+    {
+      "id": "B5",
+      "expression": "append (single id) ids",
+      "paper_acceptance": true,
+      "expected_acceptance": true,
+      "local_signatures": []
+    },
+    {
+      "id": "B6",
+      "expression": "map poly (single id)",
+      "paper_acceptance": true,
+      "expected_acceptance": true,
+      "local_signatures": []
+    },
+    {
+      "id": "B7.1",
+      "expression": "map head (single ids)",
+      "paper_acceptance": true,
+      "expected_acceptance": true,
+      "local_signatures": []
+    },
+    {
+      "id": "B7.2",
+      "expression": "head ids True",
+      "paper_acceptance": true,
+      "expected_acceptance": true,
+      "local_signatures": []
+    },
+    {
+      "id": "C1a",
+      "expression": "\\f -> pair (f 1) (f True)",
+      "paper_acceptance": false,
+      "expected_acceptance": false,
+      "local_signatures": []
+    },
+    {
+      "id": "C1b",
+      "expression": "\\(f : forall a. a -> a) -> pair (f 1) (f True)",
+      "paper_acceptance": true,
+      "expected_acceptance": true,
+      "local_signatures": []
+    },
+    {
+      "id": "C1c",
+      "expression": "g (\\f -> pair (f 1) (f True))",
+      "paper_acceptance": false,
+      "expected_acceptance": false,
+      "local_signatures": [
+        [
+          "g",
+          "((forall a. a -> a) -> (,) Int Bool) -> Char"
+        ]
+      ]
+    },
+    {
+      "id": "C2",
+      "expression": "r (\\x y -> y)",
+      "paper_acceptance": true,
+      "expected_acceptance": true,
+      "local_signatures": [
+        [
+          "r",
+          "(forall a. a -> (forall b. b -> b)) -> Int"
+        ]
+      ]
+    },
+    {
+      "id": "E1a",
+      "expression": "k h lst",
+      "paper_acceptance": false,
+      "expected_acceptance": false,
+      "local_signatures": [
+        [
+          "k",
+          "forall a. a -> [] a -> a"
+        ],
+        [
+          "h",
+          "Int -> (forall a. a -> a)"
+        ],
+        [
+          "lst",
+          "[] (forall a. Int -> a -> a)"
+        ]
+      ]
+    },
+    {
+      "id": "E1b",
+      "expression": "k (\\x -> h x) lst",
+      "paper_acceptance": true,
+      "expected_acceptance": true,
+      "local_signatures": [
+        [
+          "k",
+          "forall a. a -> [] a -> a"
+        ],
+        [
+          "h",
+          "Int -> (forall a. a -> a)"
+        ],
+        [
+          "lst",
+          "[] (forall a. Int -> a -> a)"
+        ]
+      ]
+    },
+    {
+      "id": "E2a",
+      "expression": "\\x -> poly x",
+      "paper_acceptance": true,
+      "expected_acceptance": true,
+      "local_signatures": []
+    },
+    {
+      "id": "E2b",
+      "expression": "(\\x -> poly x) : (forall a. a -> a) -> (,) Int Bool",
+      "paper_acceptance": true,
+      "expected_acceptance": true,
+      "local_signatures": []
+    },
+    {
+      "id": "E3a",
+      "expression": "app poly id",
+      "paper_acceptance": true,
+      "expected_acceptance": true,
+      "local_signatures": []
+    },
+    {
+      "id": "E3b",
+      "expression": "app (\\x -> poly x) id",
+      "paper_acceptance": true,
+      "expected_acceptance": true,
+      "local_signatures": []
+    },
+    {
+      "id": "E4a",
+      "expression": "map poly ids",
+      "paper_acceptance": true,
+      "expected_acceptance": true,
+      "local_signatures": []
+    },
+    {
+      "id": "E4b",
+      "expression": "map (\\x -> poly x) ids",
+      "paper_acceptance": true,
+      "expected_acceptance": true,
+      "local_signatures": []
+    },
+    {
+      "id": "E5a",
+      "expression": "compose poly head",
+      "paper_acceptance": true,
+      "expected_acceptance": true,
+      "local_signatures": []
+    },
+    {
+      "id": "E5b",
+      "expression": "\\xs -> poly (head xs)",
+      "paper_acceptance": true,
+      "expected_acceptance": true,
+      "local_signatures": []
+    }
+  ],
+  "type_checks": [
+    {
+      "id": "A1-principal",
+      "label": "A1 principal type",
+      "source": "\\x y -> y",
+      "expected": [
+        "XForall",
+        [
+          "XTyVar",
+          1
+        ],
+        [
+          "XBot"
+        ],
+        [
+          "XForall",
+          [
+            "XTyVar",
+            2
+          ],
+          [
+            "XForall",
+            [
+              "XTyVar",
+              0
+            ],
+            [
+              "XBot"
+            ],
+            [
+              "XArrow",
+              [
+                "XVar",
+                [
+                  "XTyVar",
+                  0
+                ]
+              ],
+              [
+                "XVar",
+                [
+                  "XTyVar",
+                  0
+                ]
+              ]
+            ]
+          ],
+          [
+            "XArrow",
+            [
+              "XVar",
+              [
+                "XTyVar",
+                1
+              ]
+            ],
+            [
+              "XVar",
+              [
+                "XTyVar",
+                2
+              ]
+            ]
+          ]
+        ]
+      ]
+    },
+    {
+      "id": "A2-principal",
+      "label": "A2 principal type",
+      "source": "let choose = ((\\x y -> x) : forall a. a -> a -> a) in let id = \\x -> x in choose id",
+      "expected": [
+        "XForall",
+        [
+          "XTyVar",
+          1
+        ],
+        [
+          "XForall",
+          [
+            "XTyVar",
+            0
+          ],
+          [
+            "XBot"
+          ],
+          [
+            "XArrow",
+            [
+              "XVar",
+              [
+                "XTyVar",
+                0
+              ]
+            ],
+            [
+              "XVar",
+              [
+                "XTyVar",
+                0
+              ]
+            ]
+          ]
+        ],
+        [
+          "XArrow",
+          [
+            "XVar",
+            [
+              "XTyVar",
+              1
+            ]
+          ],
+          [
+            "XVar",
+            [
+              "XTyVar",
+              1
+            ]
+          ]
+        ]
+      ]
+    },
+    {
+      "id": "A4-result",
+      "label": "A4 inferred result bound",
+      "source": "\\(x : forall a. a -> a) -> x x",
+      "expected": [
+        "XForall",
+        [
+          "XTyVar",
+          1
+        ],
+        [
+          "XForall",
+          [
+            "XTyVar",
+            0
+          ],
+          [
+            "XBot"
+          ],
+          [
+            "XArrow",
+            [
+              "XVar",
+              [
+                "XTyVar",
+                0
+              ]
+            ],
+            [
+              "XVar",
+              [
+                "XTyVar",
+                0
+              ]
+            ]
+          ]
+        ],
+        [
+          "XArrow",
+          [
+            "XForall",
+            [
+              "XTyVar",
+              0
+            ],
+            [
+              "XBot"
+            ],
+            [
+              "XArrow",
+              [
+                "XVar",
+                [
+                  "XTyVar",
+                  0
+                ]
+              ],
+              [
+                "XVar",
+                [
+                  "XTyVar",
+                  0
+                ]
+              ]
+            ]
+          ],
+          [
+            "XVar",
+            [
+              "XTyVar",
+              1
+            ]
+          ]
+        ]
+      ]
+    },
+    {
+      "id": "A4-signature",
+      "label": "A4 admits paper signature",
+      "source": "(\\(x : forall a. a -> a) -> x x) : (forall a. a -> a) -> (forall a. a -> a)",
+      "expected": [
+        "XArrow",
+        [
+          "XForall",
+          [
+            "XTyVar",
+            0
+          ],
+          [
+            "XBot"
+          ],
+          [
+            "XArrow",
+            [
+              "XVar",
+              [
+                "XTyVar",
+                0
+              ]
+            ],
+            [
+              "XVar",
+              [
+                "XTyVar",
+                0
+              ]
+            ]
+          ]
+        ],
+        [
+          "XForall",
+          [
+            "XTyVar",
+            0
+          ],
+          [
+            "XBot"
+          ],
+          [
+            "XArrow",
+            [
+              "XVar",
+              [
+                "XTyVar",
+                0
+              ]
+            ],
+            [
+              "XVar",
+              [
+                "XTyVar",
+                0
+              ]
+            ]
+          ]
+        ]
+      ]
+    }
+  ],
+  "repairs": [
+    {
+      "id": "A11",
+      "expression": "k (\\(f : forall a. a -> a) -> pair (f 1) (f True)) xs",
+      "paper_acceptance": false,
+      "expected_acceptance": true,
+      "local_signatures": [
+        [
+          "k",
+          "forall a. a -> [] a -> Int"
+        ],
+        [
+          "xs",
+          "[] ((forall a. a -> a) -> (,) Int Bool)"
+        ]
+      ],
+      "label": "A11 explicit annotation control"
+    },
+    {
+      "id": "C1a",
+      "expression": "\\(f : forall a. a -> a) -> pair (f 1) (f True)",
+      "paper_acceptance": false,
+      "expected_acceptance": true,
+      "local_signatures": [],
+      "label": "C1a explicit annotation control"
+    },
+    {
+      "id": "C1c",
+      "expression": "g (\\(f : forall a. a -> a) -> pair (f 1) (f True))",
+      "paper_acceptance": false,
+      "expected_acceptance": true,
+      "local_signatures": [
+        [
+          "g",
+          "((forall a. a -> a) -> (,) Int Bool) -> Char"
+        ]
+      ],
+      "label": "C1c explicit annotation control"
+    }
+  ]
+}

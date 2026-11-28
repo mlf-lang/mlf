@@ -1,0 +1,41 @@
+name: Verified GHC 9.14.1 Linux bindist
+description: Restore or download the official archive and verify it before installation
+runs:
+  using: composite
+  steps:
+    - id: pin
+      shell: bash
+      run: |
+        set -euo pipefail
+        test "$RUNNER_OS/$RUNNER_ARCH" = Linux/X64
+        digest=60f7ab75f28df892729fbaff3a54f58ee3ad7e731929f1b2f3eb0208f73de841
+        echo "digest=$digest" >> "$GITHUB_OUTPUT"
+        echo "key=ghc-bindist-v1-ubuntu-24.04-$RUNNER_OS-$RUNNER_ARCH-$RUNNER_TEMP/ghc-$digest" >> "$GITHUB_OUTPUT"
+    - id: restore
+      continue-on-error: true
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        key: ${{ steps.pin.outputs.key }}
+        path: ${{ runner.temp }}/ghc-9.14.1.tar.xz
+    - name: Verify the archive
+      shell: bash
+      env:
+        EXPECTED_SHA256: ${{ steps.pin.outputs.digest }}
+      run: |
+        set -euo pipefail
+        archive="$RUNNER_TEMP/ghc-9.14.1.tar.xz"
+        verify() { printf '%s  %s\n' "$EXPECTED_SHA256" "$1" | sha256sum --check --status; }
+        if [[ ! -f "$archive" || -L "$archive" ]] || ! verify "$archive"; then
+          download=$(mktemp "$RUNNER_TEMP/ghc-download.XXXXXXXX")
+          trap 'rm -f -- "$download"' EXIT
+          curl --fail --silent --show-error --location --retry 3 https://downloads.haskell.org/~ghc/9.14.1/ghc-9.14.1-x86_64-deb12-linux.tar.xz -o "$download"
+          verify "$download"
+          mv -T -- "$download" "$archive"
+        fi
+    # Save while the verified original still exists. Installation removes its inputs.
+    - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      if: steps.restore.outputs.cache-hit != 'true'
+      continue-on-error: true
+      with:
+        key: ${{ steps.pin.outputs.key }}
+        path: ${{ runner.temp }}/ghc-9.14.1.tar.xz

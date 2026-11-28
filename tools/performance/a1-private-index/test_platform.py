@@ -1,17 +1,13 @@
 #!/usr/bin/env python3
-"""Cheap transport regressions with a Darwin zombie-only group check.
-
-These mocks check dispatch, units, limits and historical reproduction pins.
-They do not qualify a real Mach-O closure, measure peak RSS, run the nine-leg
-campaign, or establish that its historical candidate is the current checkout.
-"""
+"""Test current toolchain discovery, resource accounting, and POSIX session cleanup."""
 from __future__ import annotations
 
 from contextlib import ExitStack
-import hashlib
 import json
+import os
 from pathlib import Path
 import resource
+import select
 import signal
 import subprocess
 import sys
@@ -33,96 +29,7 @@ def source_module(path, name):
 
 
 HELPER = source_module(HERE / 'helper.py', 'a1_platform_helper')
-with mock.patch.dict(sys.modules, {'helper': HELPER}):
-    REPRO = source_module(HERE / 'reproduce.py', 'a1_platform_reproduction')
 BUILDER = source_module(ROOT / 'tools/shared/build.py', 'a1_platform_builder')
-
-
-def digest(value):
-    return hashlib.sha256(value).hexdigest()
-
-
-class PinContracts(unittest.TestCase):
-    def setUp(self):
-        self.temporary = tempfile.TemporaryDirectory()
-        self.addCleanup(self.temporary.cleanup)
-        root = Path(self.temporary.name).resolve()
-        self.source = root / 'snapshot'
-        self.here = root / 'runner/tools/performance/a1-private-index'
-        self.here.mkdir(parents=True)
-        self.source_file = 'libraries/Fixture.hs'
-        self.builder_file = 'tools/shared/build.py'
-        for relative, content in [(self.source_file, b'module Fixture where\n'),
-                                  (self.builder_file, b'original builder\n')]:
-            path = self.source / relative
-            path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_bytes(content)
-        adapter = self.here.parents[2] / self.builder_file
-        adapter.parent.mkdir(parents=True)
-        adapter.write_bytes(b'platform adapter\n')
-        self.adapter = adapter.read_bytes()
-        pins = {path: HELPER.sha(self.source / path)
-                for path in [self.source_file, self.builder_file]}
-        self.data = {'implementation_pins': {'base': pins, 'candidate': pins},
-                     'implementation_module_counts': {'base': 1, 'candidate': 1}}
-        self.manifest = {'modules': [{'path': self.source_file}], 'host_only': []}
-
-    def implementation(self, platform, side='A1'):
-        builder = types.SimpleNamespace(load_manifest=lambda: self.manifest)
-        with mock.patch.object(REPRO.sys, 'platform', platform), \
-             mock.patch.object(REPRO, 'HERE', self.here), \
-             mock.patch.object(REPRO, 'module', return_value=builder):
-            return REPRO.implementation(self.source, self.data, side)
-
-    def test_linux_accepts_original_builder_on_both_sides(self):
-        self.assertEqual(self.implementation('linux', 'P3'), self.implementation('linux', 'A1'))
-
-    def test_linux_never_exempts_builder_pin(self):
-        (self.source / self.builder_file).write_bytes(self.adapter)
-        for side in ['P3', 'A1']:
-            with self.subTest(side=side), self.assertRaisesRegex(RuntimeError, 'implementation pin'):
-                self.implementation('linux', side)
-
-    def test_darwin_accepts_only_same_current_adapter_on_both_sides(self):
-        (self.source / self.builder_file).write_bytes(self.adapter)
-        left, right = self.implementation('darwin', 'P3'), self.implementation('darwin', 'A1')
-        self.assertEqual(left, right)
-        self.assertEqual(left[str(self.source / self.builder_file)], digest(self.adapter))
-
-    def test_darwin_rejects_a_different_builder(self):
-        (self.source / self.builder_file).write_bytes(b'other adapter\n')
-        with self.assertRaisesRegex(RuntimeError, 'platform builder patch mismatch'):
-            self.implementation('darwin')
-
-    def test_darwin_does_not_exempt_implementation_sources(self):
-        (self.source / self.builder_file).write_bytes(self.adapter)
-        (self.source / self.source_file).write_bytes(b'changed source\n')
-        with self.assertRaisesRegex(RuntimeError, 'implementation pin'):
-            self.implementation('darwin')
-
-    def test_unpinned_module_or_host_input_is_rejected(self):
-        for field, value in [('modules', [{'path': 'libraries/Unpinned.hs'}]),
-                             ('host_only', ['host/Unpinned.hs'])]:
-            with self.subTest(field=field):
-                prior = self.manifest[field]
-                self.manifest[field] = value
-                with self.assertRaisesRegex(RuntimeError, 'unpinned registered'):
-                    self.implementation('linux')
-                self.manifest[field] = prior
-
-    def test_cli_defaults_are_historical_not_head(self):
-        # main() really parses its defaults, but no preparation or host probe runs.
-        with mock.patch.object(sys, 'argv', ['reproduce.py', '--work-dir', '/unused/a1', '--prepare-only']), \
-             mock.patch.object(REPRO, 'host', return_value={}), \
-             mock.patch.object(REPRO, 'fixture_contract', return_value=({}, {})), \
-             mock.patch.object(REPRO, 'prepare', return_value=Path('/unused/receipt.json')) as prepare, \
-             mock.patch.object(REPRO, 'campaign') as campaign:
-            REPRO.main()
-        args = prepare.call_args.args[0]
-        self.assertEqual(args.candidate_ref, '5a89143ecbcaaef152a7e88331583660192e106d')
-        self.assertEqual(args.base_ref, '875e483de49655030c4ffba1995b60610a50273a')
-        self.assertEqual(args.source_checkout, ROOT)
-        campaign.assert_not_called()
 
 
 class ToolchainDispatch(unittest.TestCase):
@@ -188,99 +95,6 @@ class ToolchainDispatch(unittest.TestCase):
             self.invoke('unsupported')
 
 
-class PreparationTransport(unittest.TestCase):
-    def preparation(self, platform):
-        """Run prepare's orchestration, with all compiler/host work replaced."""
-        with tempfile.TemporaryDirectory() as directory, ExitStack() as stack:
-            root = Path(directory).resolve()
-            repo, work = root / 'repo', root / 'work'
-            repo.mkdir()
-            here = root / 'runner/tools/performance/a1-private-index'
-            here.mkdir(parents=True)
-            adapter = here.parents[2] / 'tools/shared/build.py'
-            adapter.parent.mkdir(parents=True)
-            adapter.write_bytes(b'platform-only builder fixture\n')
-            (here / 'run_controls.py').write_bytes(b'unchanged literal controls runner fixture\n')
-            ghc, cc = root / 'ghc-fixture', root / 'cc-fixture'
-            ghc.write_bytes(b'not executed')
-            cc.write_bytes(b'not executed')
-            original = b'original fixed builder fixture\n'
-            source_bytes = {'tools/shared/build.py': original,
-                            'libraries/Fixture.hs': b'module Fixture where\n',
-                            'tools/performance/a1-private-index/run_controls.py': (here / 'run_controls.py').read_bytes()}
-            pins = {path: digest(value) for path, value in source_bytes.items()}
-            data = {'implementation_pins': {'base': pins, 'candidate': pins},
-                    'implementation_module_counts': {'base': 1, 'candidate': 1}}
-            args = types.SimpleNamespace(work_dir=work, source_checkout=repo, ghc=ghc, cc=cc,
-                                         base_ref='a' * 40, candidate_ref='b' * 40, rss_mib=5120,
-                                         address_space_mib=6144, host_available_mib=3072,
-                                         disk_free_mib=4096, max_work_gib=16, command_timeout=21600)
-            builds = []
-            def snapshot(repository, ref, destination, runner, output):
-                for relative, content in source_bytes.items():
-                    path = destination / relative
-                    path.parent.mkdir(parents=True, exist_ok=True)
-                    path.write_bytes(content)
-                return ref
-            def receipt(folder):
-                folder.mkdir(parents=True)
-                (folder / 'receipt.json').write_text('{}\n')
-            class Runner:
-                def __init__(self, *unused):
-                    pass
-                def run(self, argv, cwd, output):
-                    if '--build-dir' in argv:
-                        producer = Path(argv[argv.index('--build-dir') + 1])
-                        builds.append((producer.name, (Path(cwd) / 'tools/shared/build.py').read_bytes()))
-                        receipt(producer)
-                    else:
-                        receipt(Path(argv[argv.index('--output') + 1]))
-                    return {'complete': True}
-            def dependencies(*unused):
-                receipt(work / 'dependencies')
-                return {'builtin_prefix': str(work / 'builtin'), 'artifacts': {}}
-            identity = {key: 'same installed fixture' for key in
-                        ['ghc', 'cc', 'ghc_settings', 'toolchain', 'installed_dependencies']}
-            stack.enter_context(mock.patch.object(REPRO.sys, 'platform', platform))
-            stack.enter_context(mock.patch.object(REPRO, 'HERE', here))
-            # Do not print a mocked preparation as if it were real evidence.
-            stack.enter_context(mock.patch.object(REPRO, 'print', create=True))
-            stack.enter_context(mock.patch.object(REPRO, 'host', return_value={'mocked': True}))
-            stack.enter_context(mock.patch.object(REPRO, 'Runner', Runner))
-            stack.enter_context(mock.patch.object(REPRO.subprocess, 'check_output', return_value='9.14.1\n'))
-            stack.enter_context(mock.patch.object(REPRO, 'git_snapshot', side_effect=snapshot))
-            stack.enter_context(mock.patch.object(REPRO, 'module', return_value=types.SimpleNamespace(
-                load_manifest=lambda: {'modules': [{'path': 'libraries/Fixture.hs'}], 'host_only': []})))
-            stack.enter_context(mock.patch.object(REPRO, 'authenticate', return_value=identity))
-            stack.enter_context(mock.patch.object(REPRO, 'prepare_dependencies', side_effect=dependencies))
-            stack.enter_context(mock.patch.object(REPRO, 'validate_dependencies', side_effect=lambda *unused: receipt(work / 'dependency-validation')))
-            stack.enter_context(mock.patch.object(REPRO, 'prepare_ghc', side_effect=lambda *unused: receipt(work / 'ghc-dependencies')))
-            controls = stack.enter_context(mock.patch.object(REPRO, 'verify_controls'))
-            result = REPRO.prepare(args, data, {})
-            record = json.loads(result.read_text())
-            controls.assert_called_once_with(work / 'focused-controls/receipt.json')
-            return record, builds, digest(original), digest(adapter.read_bytes())
-
-    def test_darwin_prepare_records_same_overlay_for_both_real_loop_iterations(self):
-        record, builds, original, adapted = self.preparation('darwin')
-        self.assertTrue(record['complete'])
-        self.assertEqual([side for side, _ in builds], ['P3', 'A1'])
-        self.assertEqual({digest(value) for _, value in builds}, {adapted})
-        self.assertEqual(set(record['platform_patches']), {'P3', 'A1'})
-        for row in record['platform_patches'].values():
-            self.assertEqual(row['original_sha256'], original)
-            self.assertEqual(row['adapted_sha256'], adapted)
-        self.assertFalse(record['native_bootstrap'])
-        self.assertFalse(record['local_full_qualification'])
-
-    def test_linux_prepare_keeps_both_fixed_builders_unmodified(self):
-        record, builds, original, _ = self.preparation('linux')
-        self.assertTrue(record['complete'])
-        self.assertEqual([side for side, _ in builds], ['P3', 'A1'])
-        self.assertEqual({digest(value) for _, value in builds}, {original})
-        self.assertNotIn('platform_patches', record)
-
-
 class MemoryAndProcessUnits(unittest.TestCase):
     def test_linux_memavailable_is_kib_and_never_calls_vm_stat(self):
         with mock.patch.object(HELPER.sys, 'platform', 'linux'), \
@@ -303,17 +117,19 @@ class MemoryAndProcessUnits(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, 'vm_stat memory fields missing'):
                 HELPER.memory_available()
 
-    def test_darwin_process_rss_is_kib_and_group_filter_is_explicit(self):
-        output = '101 1 41 0 R+ 12\n102 101 41 0 Z+ 3\n103 1 42 0 S 9\n'
+    def test_darwin_process_rss_includes_workers_in_separate_groups(self):
+        output = '101 41 R+ 12\n102 41 Z+ 3\n103 103 S 9\n104 104 R 6\n105 105 R 5\n'
         with mock.patch.object(HELPER.sys, 'platform', 'darwin'), \
-             mock.patch.object(HELPER.subprocess, 'check_output', return_value=output) as command:
+             mock.patch.object(HELPER.subprocess, 'check_output', return_value=output) as command, \
+             mock.patch.object(HELPER.os, 'getsid', side_effect=[41, 44, ProcessLookupError]) as session:
             self.assertEqual(HELPER.process_group(41), [
                 {'pid': 101, 'state': 'R+', 'rss': 12 * 1024},
-                {'pid': 102, 'state': 'Z+', 'rss': 3 * 1024}])
-        command.assert_called_once_with(['/bin/ps', '-axo', 'pid=,ppid=,pgid=,sess=,state=,rss='], text=True)
+                {'pid': 102, 'state': 'Z+', 'rss': 3 * 1024},
+                {'pid': 103, 'state': 'S', 'rss': 9 * 1024}])
+        command.assert_called_once_with(['/bin/ps', '-axo', 'pid=,pgid=,state=,rss='], text=True)
+        self.assertEqual(session.call_args_list, [mock.call(103), mock.call(104), mock.call(105)])
 
-    def test_unknown_ps_layout_or_nondecimal_session_fails_closed(self):
-        # sess is not promised to be a Linux numeric SID on all Darwin releases.
+    def test_unknown_ps_layout_fails_closed(self):
         for output in ['1 2 3\n', '1 2 3 0x123 S 9\n']:
             with self.subTest(output=output), mock.patch.object(HELPER.sys, 'platform', 'darwin'), \
                  mock.patch.object(HELPER.subprocess, 'check_output', return_value=output):
@@ -342,8 +158,10 @@ class GroupTermination(unittest.TestCase):
     def test_darwin_accepts_eperm_only_for_disappeared_or_zombie_only_group(self):
         for members in ([], [{'pid': 31, 'state': 'Z+'}]):
             with self.subTest(members=members), mock.patch.object(HELPER.sys, 'platform', 'darwin'), \
-                 mock.patch.object(HELPER.os, 'killpg', side_effect=PermissionError):
+                 mock.patch.object(HELPER.os, 'getsid', return_value=31), \
+                 mock.patch.object(HELPER.os, 'killpg', side_effect=PermissionError) as killpg:
                 HELPER.kill_group(31, members=lambda group: members)
+                killpg.assert_called_once_with(31, signal.SIGKILL)
 
     def test_darwin_eperm_rechecks_exiting_members(self):
         exiting = [{'pid': 31, 'state': '?E', 'rss': 0}]
@@ -351,6 +169,7 @@ class GroupTermination(unittest.TestCase):
         for final in ([], zombie):
             inventory = mock.Mock(side_effect=[exiting, final])
             with self.subTest(final=final), mock.patch.object(HELPER.sys, 'platform', 'darwin'), \
+                 mock.patch.object(HELPER.os, 'getsid', return_value=31), \
                  mock.patch.object(HELPER.os, 'killpg', side_effect=PermissionError), \
                  mock.patch.object(HELPER.time, 'sleep'), mock.patch.object(HELPER.os, 'kill') as kill:
                 HELPER.kill_group(31, members=inventory)
@@ -367,6 +186,7 @@ class GroupTermination(unittest.TestCase):
             with self.subTest(label=label), mock.patch.object(HELPER.sys, 'platform', platform), \
                  mock.patch.object(HELPER.os, 'killpg', side_effect=PermissionError), \
                  mock.patch.object(HELPER.os, 'getpgid', return_value=31), \
+                 mock.patch.object(HELPER.os, 'getsid', return_value=31), \
                  mock.patch.object(HELPER.os, 'kill') as kill, mock.patch.object(HELPER.time, 'sleep'):
                 inventory = mock.Mock(return_value=rows)
                 with self.assertRaises(PermissionError):
@@ -385,7 +205,7 @@ class GroupTermination(unittest.TestCase):
             inventory = mock.Mock(side_effect=[exiting, result])
             with self.subTest(result=result), mock.patch.object(HELPER.sys, 'platform', 'darwin'), \
                  mock.patch.object(HELPER.os, 'killpg', side_effect=PermissionError), \
-                 mock.patch.object(HELPER.os, 'getpgid', return_value=31), \
+                 mock.patch.object(HELPER.os, 'getsid', return_value=31), \
                  mock.patch.object(HELPER.os, 'kill'), mock.patch.object(HELPER.time, 'sleep'):
                 with self.assertRaises(error):
                     HELPER.kill_group(31, members=inventory)
@@ -394,19 +214,69 @@ class GroupTermination(unittest.TestCase):
         rows = [{'pid': 31, 'state': 'S'}, {'pid': 32, 'state': 'R'}, {'pid': 35, 'state': 'Z'}]
         with mock.patch.object(HELPER.sys, 'platform', 'darwin'), \
              mock.patch.object(HELPER.os, 'killpg', side_effect=PermissionError), \
-             mock.patch.object(HELPER.os, 'getpgid', side_effect=[31,40]), \
-             mock.patch.object(HELPER.os, 'getsid', return_value=40), \
+             mock.patch.object(HELPER.os, 'getsid', side_effect=[31, 31, 40]), \
              mock.patch.object(HELPER.os, 'kill') as kill, self.assertRaises(PermissionError):
             HELPER.kill_group(31, members=lambda group: rows)
         kill.assert_called_once_with(31, signal.SIGKILL)
 
     def test_unknown_membership_and_linux_zombie_denial_remain_errors(self):
         with mock.patch.object(HELPER.sys, 'platform', 'darwin'), \
+             mock.patch.object(HELPER.os, 'getsid', return_value=31), \
              mock.patch.object(HELPER.os, 'killpg', side_effect=PermissionError), self.assertRaisesRegex(RuntimeError, 'cannot inspect'):
             HELPER.kill_group(31, members=mock.Mock(side_effect=RuntimeError('cannot inspect')))
         with mock.patch.object(HELPER.sys, 'platform', 'linux'), \
              mock.patch.object(HELPER.os, 'killpg', side_effect=PermissionError), self.assertRaises(PermissionError):
             HELPER.kill_group(31, members=lambda group: [])
+
+    def test_darwin_sweeps_only_revalidated_members_after_killpg_success_or_esrch(self):
+        rows = [{'pid': pid, 'state': state} for pid, state in [(32, 'S'), (33, 'R'), (34, 'S'), (35, 'Z+')]]
+        for outcome in (None, ProcessLookupError):
+            with self.subTest(killpg=outcome), mock.patch.object(HELPER.sys, 'platform', 'darwin'), \
+                 mock.patch.object(HELPER.os, 'killpg', side_effect=outcome) as killpg, \
+                 mock.patch.object(HELPER.os, 'getsid', side_effect=[31, 31, 40, ProcessLookupError]) as sid, \
+                 mock.patch.object(HELPER.os, 'kill') as kill:
+                HELPER.kill_group(31, members=lambda group: rows)
+            killpg.assert_called_once_with(31, signal.SIGKILL)
+            self.assertEqual(sid.call_args_list, [mock.call(pid) for pid in (31, 32, 33, 34)])
+            kill.assert_called_once_with(32, signal.SIGKILL)
+
+    def test_darwin_never_signals_a_reassigned_leader_or_group(self):
+        with mock.patch.object(HELPER.sys, 'platform', 'darwin'), \
+             mock.patch.object(HELPER.os, 'getsid', return_value=40), \
+             mock.patch.object(HELPER.os, 'killpg') as killpg, mock.patch.object(HELPER.os, 'kill') as kill:
+            HELPER.kill_group(31, members=lambda group: [{'pid': 31, 'state': 'S'}])
+        killpg.assert_not_called()
+        kill.assert_not_called()
+
+    def test_darwin_unverified_leader_remains_an_error_even_without_live_rows(self):
+        with mock.patch.object(HELPER.sys, 'platform', 'darwin'), \
+             mock.patch.object(HELPER.os, 'getsid', side_effect=PermissionError('leader identity')), \
+             mock.patch.object(HELPER.os, 'killpg') as killpg:
+            with self.assertRaisesRegex(PermissionError, 'leader identity'):
+                HELPER.kill_group(31, members=lambda group: [])
+        killpg.assert_not_called()
+
+    def test_darwin_reports_worker_denial_after_trying_every_enrolled_worker(self):
+        rows = [{'pid': pid, 'state': 'S'} for pid in (32, 33, 34)]
+        with mock.patch.object(HELPER.sys, 'platform', 'darwin'), \
+             mock.patch.object(HELPER.os, 'killpg'), \
+             mock.patch.object(HELPER.os, 'getsid', side_effect=[31, PermissionError('worker identity'), 31, 31]), \
+             mock.patch.object(HELPER.os, 'kill', side_effect=[PermissionError('worker signal'), None]) as kill:
+            with self.assertRaisesRegex(PermissionError, 'worker identity'):
+                HELPER.kill_group(31, members=lambda group: rows)
+        self.assertEqual(kill.call_args_list, [mock.call(pid, signal.SIGKILL) for pid in (33, 34)])
+
+    def test_linux_still_returns_without_inventory_after_killpg_success_or_esrch(self):
+        for outcome in (None, ProcessLookupError):
+            inventory = mock.Mock()
+            with self.subTest(killpg=outcome), mock.patch.object(HELPER.sys, 'platform', 'linux'), \
+                 mock.patch.object(HELPER.os, 'killpg', side_effect=outcome) as killpg, \
+                 mock.patch.object(HELPER.os, 'getsid') as session, mock.patch.object(HELPER.os, 'kill') as kill:
+                HELPER.kill_group(31, members=inventory)
+            killpg.assert_called_once_with(31, signal.SIGKILL)
+            session.assert_not_called()
+            kill.assert_not_called()
+            inventory.assert_not_called()
 
     @unittest.skipUnless(sys.platform == 'darwin', 'Darwin killpg exit race')
     def test_owned_unreaped_zombie_is_handled_on_darwin(self):
@@ -421,8 +291,108 @@ class GroupTermination(unittest.TestCase):
             self.assertEqual(child.wait(timeout=2), 0)
 
 
+@unittest.skipUnless(sys.platform in ('linux', 'darwin') and Path('/bin/ps').is_file(),
+                     'requires POSIX sessions and ps')
+class EnrolledSessionTermination(unittest.TestCase):
+    SCRIPT = '''import os, sys, time
+r, w = os.pipe()
+worker = os.fork()
+if worker == 0:
+    os.close(r)
+    os.setpgid(0, 0)
+    os.write(w, b'R')
+    os.close(w)
+    time.sleep(15)
+    os._exit(0)
+os.close(w)
+if os.read(r, 1) != b'R':
+    raise RuntimeError('worker startup failed')
+os.close(r)
+print(worker, flush=True)
+if sys.argv[1] == 'False':
+    os.waitpid(worker, 0)
+'''
+
+    def run_session(self, exit_early):
+        # Use real processes, process groups, ps, and signals. Exercise the
+        # Darwin cleanup branch on Linux too without claiming a real Mac run.
+        linux = sys.platform == 'linux'
+        if linux:
+            import ctypes
+            prctl = ctypes.CDLL(None).prctl
+            previous = ctypes.c_int()
+            self.assertEqual(prctl(37, ctypes.byref(previous), 0, 0, 0), 0)  # PR_GET_CHILD_SUBREAPER
+            self.assertEqual(prctl(36, 1, 0, 0, 0), 0)  # PR_SET_CHILD_SUBREAPER
+            self.addCleanup(prctl, 36, previous.value, 0, 0, 0)
+        def stop(child):
+            if child.poll() is None:
+                child.kill()
+                child.wait(timeout=3)
+
+        def reap(pid):
+            deadline = time.monotonic() + 3
+            while True:
+                reaped, status = os.waitpid(pid, os.WNOHANG)
+                if reaped:
+                    return os.waitstatus_to_exitcode(status)
+                self.assertLess(time.monotonic(), deadline, 'session worker did not exit')
+                time.sleep(0.01)
+
+        unrelated = subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(15)'], start_new_session=True)
+        self.addCleanup(stop, unrelated)
+        leader = subprocess.Popen([sys.executable, '-c', self.SCRIPT, str(exit_early)],
+                                  start_new_session=True, stdout=subprocess.PIPE, text=True)
+        self.addCleanup(stop, leader)
+        with leader.stdout as ready:
+            self.assertTrue(select.select([ready], [], [], 4)[0], 'session fixture did not become ready')
+            worker = int(ready.readline())
+        try:
+            self.assertEqual(os.getpgid(worker), worker)
+            self.assertEqual(os.getsid(worker), leader.pid)
+            self.assertNotEqual(os.getsid(unrelated.pid), leader.pid)
+            if exit_early:
+                self.assertEqual(leader.wait(timeout=3), 0)
+                with self.assertRaises(ProcessLookupError):
+                    os.killpg(leader.pid, 0)
+            with mock.patch.object(HELPER.sys, 'platform', 'darwin'), \
+                 mock.patch.object(HELPER.os, 'killpg', wraps=os.killpg) as killpg, \
+                 mock.patch.object(HELPER.os, 'kill', wraps=os.kill) as kill:
+                HELPER.kill_group(leader.pid)
+            self.assertEqual(killpg.call_args_list, [] if exit_early else [mock.call(leader.pid, signal.SIGKILL)])
+            self.assertIn(mock.call(worker, signal.SIGKILL), kill.call_args_list)
+            self.assertFalse(any(call.args[0] == unrelated.pid for call in kill.call_args_list))
+            self.assertIsNone(unrelated.poll())
+            self.assertEqual(leader.wait(timeout=3), 0 if exit_early else -signal.SIGKILL)
+            if linux:
+                status = reap(worker)
+                worker = None
+                self.assertEqual(status, -signal.SIGKILL)
+            else:
+                deadline = time.monotonic() + 3
+                while HELPER.live_group_members(leader.pid, HELPER.process_group):
+                    self.assertLess(time.monotonic(), deadline, 'session worker did not exit')
+                    time.sleep(0.01)
+        finally:
+            stop(leader)
+            if worker is not None:
+                try:
+                    if os.getsid(worker) == leader.pid:
+                        os.kill(worker, signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
+                if linux:
+                    reap(worker)
+
+    def test_split_worker_does_not_survive_successful_original_group_signal(self):
+        self.run_session(exit_early=False)
+
+    def test_split_worker_does_not_survive_vanished_original_group(self):
+        self.run_session(exit_early=True)
+
+
 class RunnerAccounting(unittest.TestCase):
-    def run_mock(self, platform, terminal=None, sampled_overflow=False, wait_status=0, group_replies=None, kill_error=None, refuse_wait=False):
+    def run_mock(self, platform, terminal=None, sampled_overflow=False, wait_status=0,
+                 group_replies=None, kill_error=None, kill_member=None, refuse_wait=False):
         """Exercise the actual Runner without launching a child or setting limits."""
         pending = []
         class Event:
@@ -467,9 +437,9 @@ class RunnerAccounting(unittest.TestCase):
             stack.enter_context(mock.patch.object(HELPER, 'memory_available', return_value=1024**3))
             process_groups = stack.enter_context(mock.patch.object(HELPER, 'process_group', return_value=rows))
             if sampled_overflow:
-                process_groups.side_effect = [[{'pid': 321, 'state': 'R', 'rss': 5121}], []]
+                process_groups.side_effect = [[{'pid': 321, 'state': 'R', 'rss': 5121}], [], []]
             elif terminal:
-                process_groups.side_effect = [terminal, []]
+                process_groups.side_effect = [terminal, [], []]
             if group_replies is not None:
                 process_groups.side_effect = group_replies
             stack.enter_context(mock.patch.object(HELPER.threading, 'Event', Event))
@@ -477,6 +447,8 @@ class RunnerAccounting(unittest.TestCase):
             stack.enter_context(mock.patch.object(HELPER.subprocess, 'Popen', side_effect=popen))
             stack.enter_context(mock.patch.object(HELPER.os, 'wait4', return_value=(321, wait_status, usage)))
             setrlimit = stack.enter_context(mock.patch.object(HELPER.resource, 'setrlimit'))
+            stack.enter_context(mock.patch.object(HELPER.os, 'getsid', return_value=321))
+            stack.enter_context(mock.patch.object(HELPER.os, 'kill', new=kill_member or mock.Mock()))
             killpg = stack.enter_context(mock.patch.object(HELPER.os, 'killpg'))
             killpg.side_effect = kill_error
             failure = None
@@ -522,6 +494,31 @@ class RunnerAccounting(unittest.TestCase):
         self.assertEqual(receipt['reason'], 'live descendants after leader completion')
         self.assertEqual(kills, [mock.call(321, signal.SIGKILL)])
 
+    def test_darwin_rechecks_survivors_after_individual_kill_and_fails_closed(self):
+        live = [{'pid': 322, 'state': 'R', 'rss': 8}]
+        for remains, denial in [([], None), (live, None), (live, PermissionError('worker signal denied'))]:
+            with self.subTest(remains=remains, denial=denial), \
+                 mock.patch.object(HELPER.time, 'monotonic', side_effect=[0, 1, 2, 7]), \
+                 mock.patch.object(HELPER.time, 'sleep'):
+                kill = mock.Mock(side_effect=denial)
+                receipt, _, _, failure = self.run_mock('darwin', group_replies=[live, live, remains],
+                                                       kill_member=kill)
+            kill.assert_called_once_with(322, signal.SIGKILL)
+            self.assertFalse(receipt['complete'])
+            self.assertTrue(receipt['child_reaped'])
+            self.assertEqual(receipt['exit_code'], 0)
+            self.assertEqual(receipt['terminal_live_descendants'], live)
+            self.assertEqual(receipt['remaining_live_after_cleanup'], remains)
+            self.assertEqual(receipt['reason'], 'live descendants after leader completion')
+            if remains:
+                self.assertIn('live group members remain', ' '.join(receipt['supervision_errors']))
+            else:
+                self.assertNotIn('supervision_errors', receipt)
+            if denial:
+                self.assertIs(failure, denial)
+            else:
+                self.assertIsInstance(failure, RuntimeError)
+
     def test_sampled_overflow_kills_but_does_not_claim_hard_address_cap(self):
         receipt, limits, kills, failure = self.run_mock('darwin', sampled_overflow=True, wait_status=9)
         self.assertIsNotNone(failure)
@@ -555,10 +552,9 @@ class RunnerAccounting(unittest.TestCase):
     def test_guarded_darwin_exiting_descendant_vanishes_after_wait4(self):
         busy = [{'pid': 321, 'state': 'R', 'rss': 5121}]
         exiting = [{'pid': 322, 'state': '?E', 'rss': 0}]
-        with mock.patch.object(HELPER.time, 'sleep'), mock.patch.object(HELPER.os, 'getpgid', return_value=321), \
-             mock.patch.object(HELPER.os, 'kill'):
+        with mock.patch.object(HELPER.time, 'sleep'):
             receipt, _, kills, failure = self.run_mock('darwin', sampled_overflow=True, wait_status=9,
-                group_replies=[busy, exiting, exiting, []], kill_error=[None, PermissionError('exiting')])
+                group_replies=[busy, exiting, exiting, [], []])
         self.assertIsInstance(failure, RuntimeError)
         self.assertEqual(kills, [mock.call(321, signal.SIGKILL)])
         self.assertFalse(receipt['complete'])
@@ -572,7 +568,7 @@ class RunnerAccounting(unittest.TestCase):
     def test_terminal_inspection_error_keeps_wait4_and_guard(self):
         busy = [{'pid': 321, 'state': 'R', 'rss': 5121}]
         receipt, _, _, failure = self.run_mock('darwin', sampled_overflow=True, wait_status=9,
-            group_replies=[busy, PermissionError('cannot inspect')])
+            group_replies=[busy, [], PermissionError('cannot inspect'), []])
         self.assertIsInstance(failure, PermissionError)
         self.assertFalse(receipt['complete'])
         self.assertTrue(receipt['child_reaped'])
@@ -583,7 +579,7 @@ class RunnerAccounting(unittest.TestCase):
     def test_no_unbounded_wait_when_child_cannot_be_reaped(self):
         busy = [{'pid': 321, 'state': 'R', 'rss': 5121}]
         receipt, _, _, failure = self.run_mock('darwin', sampled_overflow=True, refuse_wait=True,
-                                               group_replies=[busy, []])
+                                               group_replies=[busy, [], []])
         self.assertIsInstance(failure, RuntimeError)
         self.assertFalse(receipt['complete'])
         self.assertFalse(receipt['child_reaped'])

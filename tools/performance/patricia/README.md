@@ -18,23 +18,53 @@ The tests do not describe the old BST shape contract as unchanged.
 kind-routing controls include malformed five-node prefix trees which would
 have passed a sorted-leaf check while routing lookups incorrectly.
 
-`run_integrated.py` authenticates an ordinary O2 producer and copies its
-objects. Only test modules are compiled; pre-existing production objects must
-remain byte-identical. Select `p123`, `map-balance`, `graph`, or `validation`.
-`--source` identifies an installed producer's owned source snapshot. It is not
-a way to skip source authentication.
+`run_integrated.py` authenticates an ordinary producer and copies its objects.
+Only test modules are compiled; existing production objects must remain
+byte-identical. Select `p123`, `graph`, `validation`, or `builtin`.
+`--source` identifies the producer's authenticated source snapshot, including
+its current private session implementation. Test controls come from this
+checkout and are recorded separately in the receipt.
 
-Original oracle files and manifests are retained. `legacy-controls-pins.json`
-anchors the additional original finite controls to `3b566893`. Test-only
-adaptations save a byte-exact reversible diff. Host control annotations change
-from `Integer` to `Int64`; string fixtures remain literal. All original rows
-remain, including oversized literals, which now wrap and can duplicate other
-rows. This does not claim the old arbitrary-precision contract.
+The maintained Haskell controls are direct sources in `controls/`. They already
+express the current Int64 ABI and Patricia representation; the runner copies
+and compiles them without rewriting types, import lists, labels, or assertion
+bodies. Unchanged controls in other performance directories are reused in
+place. Ordinary control edits require no fixed SHA update. Receipts record
+all control inputs before execution and verify them again afterwards.
 
-For graph controls, `OracleTypes.hs` bridges finite, total container spines to
-the old frozen Graph/Solver/Constraint algorithms. Its representation checks
-use `Data.Bits`, not candidate constructors. Map payloads remain lazy. This
-finite bridge does not prove equivalence for arbitrary partial tree spines.
+The [oracle notes](oracles/README.md) identify the reference algorithms and
+the maintained collection models used by the integrated suites.
+
+Private graph checks still need a test-only view of the current
+`Bootstrap.CrateSession`. The small header lexer changes its module name and
+removes the export restriction, preserving every body byte. Export order,
+comments, and whitespace are accepted. The same helper serves the retained C3
+checks; actual public-export rejection tests continue to compile against the
+ordinary production interfaces.
+
+Historical adapters, `legacy-controls-pins.json`, and source migration manifests
+have been retired from the current tree. Their exact sources and old reports
+remain available in Git at `496dcae024cae1a93096d9bdb9d6b93e57359dc0` (including
+the earlier `171717ad5bd025ee977d4ca9fd8f93abcbc68612` preparation). Routine
+controls use the direct fixtures and the actual validation and binary-writer
+executions below. They do not replay source projections or inverse diff ledgers.
+
+Map maintenance uses the existing `map-policy` framework entry. That suite
+checks contents, balance, cached counts, demand/error order, and the intentional
+step-21 shape difference from the old Map. The obsolete integrated `map-balance`
+group required the entire current 400-step trace to keep the historical tree
+shape and has been retired. Its original runner and source-migration proof
+can be inspected in Git at `496dcae024cae1a93096d9bdb9d6b93e57359dc0`.
+
+All retained finite rows remain, including oversized literals which wrap under
+Int64 and can duplicate other rows. This does not claim the former arbitrary
+precision arithmetic contract.
+
+The graph controls use `Data.Map.Lazy` and `Data.Set` with full-width `Int64`
+keys. `OracleTypes.hs` checks finite Patricia spines with `Data.Bits`, reads
+their entries and independently encodes the model's results into graph fields.
+It also supplies a balanced-tree view for graph algorithms that consume ranks
+and ordered projections. All conversions preserve lazy map values.
 Wide identity layouts use 2^60 instead of 10^40/10^30, with unchanged injective
 relationships, success/rejection expectations, and test count. The 216
 heteroinput cases retain all permutations and authored outcomes. Their wide-ID
@@ -44,26 +74,36 @@ back into the historical label.
 The C4 transaction boundary now checks independent Patricia invariants instead
 of the nine historical BST representation probes. All remaining transaction,
 public trace, demand, first-error, rollback and private-export cases remain.
-The validation-reuse baseline is reconstructed from its pinned original
-source contract after inversely replacing exactly three collection type
-signatures. Its algorithm body remains unchanged.
+The validation-reuse suite compiles the independent fixed `V1FrozenSession`
+reference beside the current `V1SessionUnderTest`. It retains the 20 authored
+programs, raw solver and skeleton-demand probes, three raw rejections, four
+partial-value orders, and three private-export rejections. Its reference is no
+longer reconstructed from the candidate source.
 
 The P3 gate exposed an Int64 boundary bug: composing an encoding with a large
 positive seed can differ from the original recurrence because multiplication
 wraps before the first remainder. `appendDatatypeEncoding` now admits only
-canonical residues to composition. The gate keeps all 922 old checks and adds
-seven full-width seed checks.
+canonical residues to composition. P3 checks the current source key, pooled
+datatype fingerprints and the 12 signed seed cases against independent
+expectations. Its binary raw-object cases round-trip equal and different
+header/body datatype lists, with and without class and instance metadata.
 
-`run_fingerprint.py` retains the frozen F1 control bodies, both O0/O2 host
-builds, exact expected output and actual Separate proof.
-Command transport uses the existing resource guard. The obsolete Integer-to-Int64
-narrowing RULES are intentionally retired. Both Probe and actual Separate
-workers must now contain direct Int64 arithmetic, with zero retired-rule firings. Type-only
-copies use independent `Data.Int.Int64` arithmetic; 30 full-width pairs are
-added per optimization level. An old 2^1024 noncanonical divergence seed is
-explicitly replaced with -1, since the old value wraps to zero. The unmatched
-Core obligation now requires signed Int64 primitive operations and no fusion,
-rather than the obsolete arbitrary-Integer operations.
+P2 compares the current scalar and block fingerprints against a two-residue
+reference using fixed digests, Unicode and block boundaries, signed seeds, and
+deterministic generated strings. The binary writer tests exercise publication,
+corrupt files, and both supported text and binary reads. The separate summary
+controls compare serialized text and pooled chunk digests to the same reference.
+
+`run_fingerprint.py` directly compiles `controls/fingerprint/Oracle.hs`,
+`Probe.hs`, and `Tests.hs`, with authored stdout/stderr expectations beside
+them. Its explicit Python runners preserve both O0/O2 host builds and the
+actual Separate proof without editing a historical Python driver's AST or
+rewriting Haskell source at runtime. Both Probe and actual Separate workers
+must contain direct Int64 arithmetic, with zero retired Integer-narrowing-rule
+firings. The independent `Data.Int.Int64` oracle and 30 full-width pairs per
+optimization level remain. The noncanonical divergence seed is -1 because the
+old 2^1024 value wraps to zero; unmatched Core must use signed Int64 primitive
+operations without the fusion call.
 
 `run_file_controls.py` retains all nine authored file cases and their frozen
 handwritten status/type/error expectations. The ordinary `Crate` route keeps
@@ -88,21 +128,25 @@ remain required. Separate fresh/fresh, warm-cache and audited-rebuild checks
 require complete open-artifact byte equality; three actual corrupted artifacts
 exercise the native admission/audit and independent comparison boundaries.
 
-The independent reader/schema triple is unchanged from pinned Git commit
-`8c4556416023ac727e3fb2294070358a3dae8d9e` and loaded into an isolated directory
-before execution. Each file has its original literal SHA256; tests reject a
-changed tree, changed file and checkout-module substitution. This finite C4
-corpus's own artifacts and linked terms use the old primitive domain: codes
-132 and 133 are explicitly rejected there. The actual builtin dependency
-interface declares both new primitives, so its separate validator applies only
-the authenticated reader's exact one-anchor 131-to-133 bound extension and
-requires the specified Prelude owner and `freezeSTArray`/`stToIO` spelling.
-It retains every dependency byte and content hash; code 134, wrong owners and
-wrong spellings are rejected. This is metadata qualification, not execution
-qualification of those new primitives. All production source pins and the
-three frozen C4 inputs remain unchanged. Across the earlier intentional numeric
-ABI change, old P3 whole-artifact bytes are not an oracle for current output;
-its frozen semantic algorithms remain in the suites above.
+`file_cases.py` executes the authored file cases through an ordinary function
+with explicit selection. `controls/files/FileControls.hs` and
+`fixtures/file-cases.json` contain the directly compiled test and its handwritten
+expectations. Each receipt records the maintained runner/control bytes used in
+that run; no historical Python function extraction or current-source hash
+allowlist is involved.
+
+The independent reader/schema fixtures live in `oracles/file-format`. They were
+extracted once from `8c4556416023ac727e3fb2294070358a3dae8d9e`; normal runs load
+them directly and work without Git history. The typed reader has one explicit
+`primitive_max` parameter: own artifacts and linked terms keep the original
+0..131 domain, while dependency declarations use 0..136. The dependency entry
+point also checks the exact Prelude identities of codes 132..136, their reverse
+name-to-code association and per-container uniqueness. Unknown codes, changed
+owners/names, malformed structures and noncanonical/trailing bytes remain
+errors. There is no intermediate 133-source adapter or inverse text proof.
+Fixture hashes protect only these fixed independent reference inputs. The
+origin and the small interface change are documented in
+[`oracles/file-format/README.md`](oracles/file-format/README.md).
 
 ## Performance
 
@@ -135,8 +179,10 @@ demand and failed-write behavior.
 Run `run_design_controls.py --reference-producer PRODUCER --reference-source SOURCE
 --output FRESH_DIRECTORY` before the ordinary installation build. It checks all
 shared modules, O0/O2, the narrower-host fallback, 150 frozen planner cases and
-529 frozen identity-inventory cases, plus signed rank/select and demand probes.
-The original oracle bodies and their source hashes are in `design-controls`.
+529 identity-inventory cases, plus signed rank/select and demand probes.
+The planner reference and the identity visitor live in `design-controls`.
+The visitor collects identifiers in `Data.Set Int64` and compares their
+signed enumeration and exception behavior to the compiler's inventory.
 The runner rejects a stale canonical builtin source identity before compiling;
 the normal installation subsequently verifies exact fresh regeneration. These
 controls also run in the existing bounded Int64/Patricia CI step.
@@ -149,8 +195,9 @@ The [2026-10-31 design qualification](index-design-results.json) passed the
 retained controls, twelve installed direct commands, and the fresh 711/0
 compiler task with independent raw-byte equality. The three compiled paths
 also exercise 35 explicit rank-view checks, including lazy payloads. The
-unchanged Int64 source-admission manifest is followed by a separately pinned
-`index-design-migration.json`; it is not rewritten to admit this refactor.
+historical source-admission and `index-design-migration.json` proofs are
+archived in Git at `496dcae024cae1a93096d9bdb9d6b93e57359dc0`; they are not
+current qualification gates. The retained result file records that dated run.
 
 The fixed ABBA/BAAB screen has eight ordinary legs. Geometric wall times were
 47.598 seconds for the previous installed compiler and 47.641 seconds for this

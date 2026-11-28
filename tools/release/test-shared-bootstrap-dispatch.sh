@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Control-only launch contracts. No MLF or native compiler is executed.
 set -euo pipefail
+. "$(dirname -- "$0")/test-events.sh" release-shared-bootstrap-dispatch
 root=$(cd -- "$(dirname -- "$0")/../.." && pwd)
 work=$(mktemp -d "${TMPDIR:-/tmp}/mlf-shared-launch.XXXXXXXX")
 trap 'rm -rf "$work"' EXIT
@@ -45,27 +46,35 @@ export TEST_EMISSION="$work/emission" TEST_MODE=legacy
 export MLF_COMPILER="$TEST_COMPILER" MLF_PACKAGE_MANAGER="$TEST_MANAGER"
 export PATH="$work/bin:$PATH"
 unset MLF_ASYNC_BOOTSTRAP_DIR MLF_SHARED_BOOTSTRAP_DIR
+release_begin "release/shared-bootstrap-dispatch/shared-dispatch"
 "$project/scripts/bootstrap-async.sh" argument > "$work/default.out"
 test "$(head -1 "$TEST_DISPATCH")" = "$project/.mlf-build/async-bootstrap"
 test "$(tail -1 "$TEST_DISPATCH")" = argument
 MLF_ASYNC_BOOTSTRAP_DIR="$work/custom" "$project/scripts/bootstrap-async.sh" > "$work/custom.out"
 test "$(cat "$work/custom.out")" = "$work/custom/stage2"
 echo 'PASS shared bootstrap dispatch preserves directory and arguments'
+release_pass
+release_begin "release/shared-bootstrap-dispatch/released-seed"
 status=0
 MLF_PACKAGE_BOOTSTRAP_DIR="$work/rejected" "$project/scripts/bootstrap-package.sh" > "$work/rejected.out" 2> "$work/rejected.err" || status=$?
 test "$status" -eq 2
 grep -F 'scripts/bootstrap-shared.sh' "$work/rejected.err" >/dev/null
 test ! -e "$TEST_EMISSION"
 echo 'PASS shared package bootstrap rejects a released seed before emission'
+release_pass
 for TEST_MODE in native-MLF GHC; do
+  release_begin "release/shared-bootstrap-dispatch/producer/$TEST_MODE"
   export TEST_MODE
   MLF_PACKAGE_BOOTSTRAP_DIR="$work/package-$TEST_MODE" "$project/scripts/bootstrap-package.sh" > "$work/package-$TEST_MODE.out"
   grep -F -- '--emit-llvm-gc package/MLF/Entry/Mlfpkg.hs' "$TEST_EMISSION" >/dev/null
   test -x "$(cat "$work/package-$TEST_MODE.out")"
   echo "PASS shared package launch with $TEST_MODE identity"
+  release_pass
 done
+release_begin "release/shared-bootstrap-dispatch/legacy-dispatch"
 rm "$project/shared-sources.json"
 export TEST_MODE=legacy
 MLF_PACKAGE_BOOTSTRAP_DIR="$work/package-legacy" "$project/scripts/bootstrap-package.sh" > "$work/package-legacy.out"
 grep -F -- '--emit-llvm-gc package/Main.emlf' "$TEST_EMISSION" >/dev/null
 echo 'PASS legacy package launch remains unchanged without shared manifest'
+release_pass

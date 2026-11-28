@@ -85,7 +85,12 @@
     },
     {
       "module": "Bootstrap.Compiler",
-      "path": "libraries/mlf-inference/Bootstrap/Compiler.hs",
+      "path": "libraries/mlf-crates/Bootstrap/Compiler.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "Bootstrap.SourceFrontend",
+      "path": "libraries/mlf-inference/Bootstrap/SourceFrontend.hs",
       "role": "implementation"
     },
     {
@@ -184,6 +189,11 @@
       "role": "implementation"
     },
     {
+      "module": "Bootstrap.Graph.ScopeIndex",
+      "path": "libraries/mlf-inference/Bootstrap/Graph/ScopeIndex.hs",
+      "role": "implementation"
+    },
+    {
       "module": "Bootstrap.Host",
       "path": "libraries/mlf-foundation/Bootstrap/Host.hs",
       "role": "implementation"
@@ -259,6 +269,11 @@
       "role": "implementation"
     },
     {
+      "module": "Bootstrap.LLVM.FunctionPolicy",
+      "path": "libraries/mlf-llvm/Bootstrap/LLVM/FunctionPolicy.hs",
+      "role": "implementation"
+    },
+    {
       "module": "Bootstrap.LLVM.Codegen",
       "path": "libraries/mlf-llvm/Bootstrap/LLVM/Codegen.hs",
       "role": "implementation"
@@ -286,6 +301,11 @@
     {
       "module": "Bootstrap.LLVM.Optimize",
       "path": "libraries/mlf-llvm/Bootstrap/LLVM/Optimize.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "Bootstrap.LLVM.RecursiveArguments",
+      "path": "libraries/mlf-llvm/Bootstrap/LLVM/RecursiveArguments.hs",
       "role": "implementation"
     },
     {
@@ -321,6 +341,16 @@
     {
       "module": "Bootstrap.Module",
       "path": "libraries/mlf-frontend/Bootstrap/Module.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "Bootstrap.NameEncoding",
+      "path": "libraries/mlf-foundation/Bootstrap/NameEncoding.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "Bootstrap.NativeCrate",
+      "path": "libraries/mlf-crates/Bootstrap/NativeCrate.hs",
       "role": "implementation"
     },
     {
@@ -394,6 +424,11 @@
       "role": "implementation"
     },
     {
+      "module": "Bootstrap.SourceCrate",
+      "path": "libraries/mlf-crates/Bootstrap/SourceCrate.hs",
+      "role": "implementation"
+    },
+    {
       "module": "Bootstrap.SourceEquality",
       "path": "libraries/mlf-crates/Bootstrap/SourceEquality.hs",
       "role": "implementation"
@@ -401,6 +436,11 @@
     {
       "module": "Bootstrap.SourceInference",
       "path": "libraries/mlf-crates/Bootstrap/SourceInference.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "Bootstrap.GroundProofEdit",
+      "path": "libraries/mlf-crates/Bootstrap/GroundProofEdit.hs",
       "role": "implementation"
     },
     {
@@ -464,6 +504,11 @@
       "role": "implementation"
     },
     {
+      "module": "Bootstrap.X.Traversal",
+      "path": "libraries/mlf-xmlf/Bootstrap/X/Traversal.hs",
+      "role": "implementation"
+    },
+    {
       "module": "Bootstrap.X.Type",
       "path": "libraries/mlf-xmlf/Bootstrap/X/Type.hs",
       "role": "implementation"
@@ -496,6 +541,11 @@
     {
       "module": "MLF.Entry.TupleList",
       "path": "tests/MLF/Entry/TupleList.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "MLF.CrateNativeCommand",
+      "path": "bootstrap/MLF/CrateNativeCommand.hs",
       "role": "implementation"
     },
     {
@@ -579,6 +629,11 @@
       "role": "implementation"
     },
     {
+      "module": "Package.DependencyMode",
+      "path": "libraries/mlf-package-core/Package/DependencyMode.hs",
+      "role": "implementation"
+    },
+    {
       "module": "Package.Distribution",
       "path": "libraries/mlf-package-core/Package/Distribution.hs",
       "role": "implementation"
@@ -591,6 +646,11 @@
     {
       "module": "Package.Manifest",
       "path": "libraries/mlf-package-core/Package/Manifest.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "Package.NativeArtifact",
+      "path": "libraries/mlf-package-core/Package/NativeArtifact.hs",
       "role": "implementation"
     },
     {
@@ -644,6 +704,11 @@
       "role": "implementation"
     },
     {
+      "module": "Test.CaseSelection",
+      "path": "testing/Test/CaseSelection.hs",
+      "role": "implementation"
+    },
+    {
       "module": "Test.Runner",
       "path": "testing/Test/Runner.hs",
       "role": "implementation"
@@ -684,8 +749,18 @@
       "role": "implementation"
     },
     {
+      "module": "Tests.ReportJournal",
+      "path": "tests/Tests/ReportJournal.hs",
+      "role": "implementation"
+    },
+    {
       "module": "Tests.Selection",
       "path": "tests/Tests/Selection.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "Tests.TestCompilation",
+      "path": "tests/Tests/TestCompilation.hs",
       "role": "implementation"
     },
     {
@@ -701,11 +776,6 @@
     {
       "module": "Tests.TupleList",
       "path": "tests/Tests/TupleList.hs",
-      "role": "implementation"
-    },
-    {
-      "module": "Tests.TupleListLegacy",
-      "path": "tests/Tests/TupleListLegacy.hs",
       "role": "implementation"
     }
   ],

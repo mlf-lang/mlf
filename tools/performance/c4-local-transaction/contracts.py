@@ -1,8 +1,6 @@
 """Pure fail-closed inventory/output checks; never runs a compiler."""
 import ast
-import hashlib
 import json
-from pathlib import Path
 import re
 
 
@@ -11,34 +9,10 @@ def require(value, message):
         raise ValueError(message)
 
 
-def sha_bytes(data):
-    return hashlib.sha256(data).hexdigest()
-
-
 def exact_fields(actual, expected):
     require(set(actual) == set(expected), 'exact summary field inventory')
     require(all(type(actual[k]) is type(v) and actual[k] == v
                 for k, v in expected.items()), 'exact typed summary values')
-
-
-def builtin_payload(data):
-    pattern = rb'builtin-source-v1:[0-9a-f]{64}'
-    require(len(re.findall(pattern, data)) == 1, 'one generated source identity literal')
-    return re.sub(pattern, b'builtin-source-v1:<source-identity>', data)
-
-
-def verify_oracles(directory, manifest, base):
-    for row in manifest['full_algorithm_modules']:
-        frozen = (directory / 'controls' / (row['module'] + '.hs')).read_bytes()
-        require(sha_bytes(frozen) == row['frozen_sha256'], 'fixed complete old oracle')
-        inverse = frozen
-        for old, new in reversed(row['substitutions']):
-            require(inverse.count(new.encode()) == 1, 'one declared oracle substitution')
-            inverse = inverse.replace(new.encode(), old.encode())
-        require(sha_bytes(inverse) == row['original_sha256'], 'exact P3 inverse source identity')
-        if base is not None:
-            require((base / row['source_path']).read_bytes() == inverse,
-                    'actual before algorithms equal complete independent oracle')
 
 
 def public_result(stdout, stderr):
@@ -79,8 +53,10 @@ TRANSACTION = dict(complete=True, authored_fixtures=18, renamed_fixtures=10,
     isolated_restore_payload_probe=1, public_partial_probes=3,
     prepared_unused_payload_probes=3, force_edge_probes=5,
     prefix_payload_barriers=2, seen_prefix_probes=2,
-    prepared_original_payload_demand_probes=2, oracle_boundary_checks=9,
-    candidate_chooses_expected=False, old_public_physical_oracle_weakened=False,
+    prepared_original_payload_demand_probes=2,
+    candidate_chooses_expected=False, old_BST_representation_preserved=False,
+    Patricia_representation_independently_checked=True,
+    oracle_boundary_suite='PatriciaOracleControls',
     arbitrary_forged_prepared_equivalence_claimed=False)
 
 

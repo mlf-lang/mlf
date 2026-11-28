@@ -8,6 +8,7 @@ module Bootstrap.ClassDemand where {
   import Bootstrap.Std;
   import qualified Bootstrap.IntMap as IM;
   import qualified Bootstrap.IntSet as IS;
+  import qualified Bootstrap.IntTree as IT;
 
   -- Frames denote RHS abstraction regions, not the entire scope of a let.
   -- A child finishes before its parent; an instantiated binding finishes
@@ -22,7 +23,9 @@ module Bootstrap.ClassDemand where {
   data Origin = SeedOrigin Int | InstantiatedOrigin Int Int;
   data Slot = Slot Int String Int Origin;
   -- Allocation owns its supply; container cardinality is not an identity.
-  data Universe = Universe Int (IntMap Slot) (IntMap Int) (IntMap (IntMap Int));
+  data Universe = Universe Int (IntMap Slot) (IntMap Int) (IntMap (IntMap Int)) |
+    InheritedUniverse Int (IntMap Slot) (IntMap Int) (IntMap IntSet) |
+    SingleCopyUniverse Int (IntMap Slot) (IntMap Int) Int (IntMap Int) (IntMap IntSet);
   data Plan = Plan Universe (IntMap IntSet) Int;
   data Discovery = Discovery Universe (IntMap IntSet) ([] ((,) Int Int));
 
@@ -54,12 +57,23 @@ module Bootstrap.ClassDemand where {
   originOf (Slot _ _ _ origin) = origin;
   universeSlots :: Universe -> IntMap Slot;
   universeSlots (Universe _ slots _ _) = slots;
+  universeSlots (InheritedUniverse _ slots _ _) = slots;
+  universeSlots (SingleCopyUniverse _ slots _ _ _ _) = slots;
   universeSeeds :: Universe -> IntMap Int;
   universeSeeds (Universe _ _ seeds _) = seeds;
+  universeSeeds (InheritedUniverse _ _ seeds _) = seeds;
+  universeSeeds (SingleCopyUniverse _ _ seeds _ _ _) = seeds;
   universeTransitions :: Universe -> IntMap (IntMap Int);
   universeTransitions (Universe _ _ _ transitions) = transitions;
+  universeTransitions (InheritedUniverse _ _ _ transitions) = IM.map identityMappings transitions;
+  universeTransitions (SingleCopyUniverse _ _ _ use copies inherited) =
+    IM.insertWith IM.union use copies (IM.map identityMappings inherited);
+  identityMappings inputs =
+    IM.fromDistinctAscList (map (\slot -> (,) slot slot) (IS.toAscList inputs));
   nextSlot :: Universe -> Int;
   nextSlot (Universe next _ _ _) = next;
+  nextSlot (InheritedUniverse next _ _ _) = next;
+  nextSlot (SingleCopyUniverse next _ _ _ _ _) = next;
   emptyUniverse :: Universe;
   emptyUniverse = Universe 0 IM.empty IM.empty IM.empty;
   advanceSlot :: Int -> Int;
@@ -93,11 +107,28 @@ module Bootstrap.ClassDemand where {
   seedSlot :: Plan -> Int -> Either String Int;
   seedSlot plan identity = require "seed" identity (universeSeeds (planUniverse plan));
   instantiateIn :: Universe -> Int -> Int -> Either String Int;
-  instantiateIn universe use slot =
-    do {
-      mapping <- require "reachable instantiation" use (universeTransitions universe);
+  instantiateIn universe use slot = case universe of {
+    Universe _ _ _ transitions -> do {
+      mapping <- require "reachable instantiation" use transitions;
       require "instantiation input slot" slot mapping
     };
+    InheritedUniverse _ _ _ transitions -> inheritedInput transitions use slot;
+    SingleCopyUniverse _ _ _ copying copies inherited ->
+      if use /= copying then inheritedInput inherited use slot
+      else case IM.lookup slot copies of {
+        Just target -> Right target;
+        Nothing -> let { inputs = IM.findWithDefault IS.empty use inherited } in
+          checkInheritedInput inputs slot
+      }
+  };
+  inheritedInput transitions use slot = do {
+    inputs <- require "reachable instantiation" use transitions;
+    checkInheritedInput inputs slot
+  };
+  checkInheritedInput inputs slot = do {
+    ensure (IS.member slot inputs) ("class demand: unknown instantiation input slot " ++ showInt slot);
+    Right slot
+  };
   instantiateSlot :: Plan -> Int -> Int -> Either String Int;
   instantiateSlot plan use slot = instantiateIn (planUniverse plan) use slot;
   selectedSlotCount :: Plan -> [] Int -> Either String Int;
@@ -107,9 +138,12 @@ module Bootstrap.ClassDemand where {
       Right (IS.size (IS.unions values))
     };
   transitionCount :: Plan -> Int;
-  transitionCount plan =
-    IM.foldl (\count mapping -> count + IM.size mapping) 0
-      (universeTransitions (planUniverse plan));
+  transitionCount plan = case planUniverse plan of {
+    Universe _ _ _ transitions -> IM.foldl (\count mapping -> count + IM.size mapping) 0 transitions;
+    InheritedUniverse _ _ _ transitions -> IM.foldl (\count inputs -> count + IS.size inputs) 0 transitions;
+    SingleCopyUniverse _ _ _ _ copies inherited -> IM.foldl
+      (\count inputs -> count + IS.size inputs) (IM.size copies) inherited
+  };
 
   dependencies :: Demand -> [] Int;
   dependencies demand =
@@ -185,14 +219,11 @@ module Bootstrap.ClassDemand where {
   allocateSeeds seeds =
     IM.foldl
       (\universe seed ->
-         case universe of {
-           Universe identity slots origins transitions ->
-             let { next = advanceSlot identity } in
-             seq next (Universe next
-               (IM.insert identity
-                 (Slot identity (seedClass seed) (seedOwner seed) (SeedOrigin (seedId seed))) slots)
-               (IM.insert (seedId seed) identity origins) transitions)
-         })
+         let { identity = nextSlot universe; next = advanceSlot identity } in
+         seq next (Universe next
+           (IM.insert identity
+             (Slot identity (seedClass seed) (seedOwner seed) (SeedOrigin (seedId seed))) (universeSlots universe))
+           (IM.insert (seedId seed) identity (universeSeeds universe)) IM.empty))
       emptyUniverse seeds;
   -- Discovery follows actual seed/node paths. It does not form the unrelated
   -- seed-by-use Cartesian product, which would explode for unused local lets.
@@ -213,6 +244,10 @@ module Bootstrap.ClassDemand where {
   allocateAt :: IntMap Frame -> Use -> Int -> Universe -> Either String ((,) Int Universe);
   allocateAt frames use input universe =
     case universe of {
+      InheritedUniverse next slots seeds _ ->
+        allocateAt frames use input (Universe next slots seeds (universeTransitions universe));
+      SingleCopyUniverse next slots seeds _ _ _ ->
+        allocateAt frames use input (Universe next slots seeds (universeTransitions universe));
       Universe next slots seeds transitions ->
         let { previous = IM.findWithDefault IM.empty (useId use) transitions } in
         case IM.lookup input previous of {
@@ -295,6 +330,125 @@ module Bootstrap.ClassDemand where {
     } in
     discover frames uses nodes dependents [] initial;
 
+  -- A reference or union with a single productive predecessor forwards each
+  -- incoming slot exactly once. Its final set is its predecessor's set. A
+  -- productive chain of such aliases ends at a seed, merge or instantiation:
+  -- a cycle containing only aliases has no incoming seed.
+  productiveNodes dependents pending seen =
+    if IS.null pending then seen else let {
+      reached = IS.union seen pending;
+      next = IS.foldl (\acc n -> IS.union acc (IM.get n dependents)) IS.empty pending
+    } in productiveNodes dependents (IS.difference next reached) reached;
+  forwardedInput productive node demand =
+    if not (IS.member node productive) then Nothing else case demand of {
+      RefNode input -> Just input;
+      UnionNodes inputs -> let {
+        active = IS.fromList (filter (\input -> IS.member input productive) inputs)
+      } in if IS.size active == 1 then Just (IS.findMin active) else Nothing;
+      _ -> Nothing
+    };
+  -- The FIFO carries the outgoing edges themselves. A discovered sink has
+  -- no later effect; its reachable set is still recorded before this point.
+  data DiscoveryEdge = ForwardFact ([] DiscoveryEdge) | MergeFact Int ([] DiscoveryEdge)
+    | TransportFact Int Use ([] DiscoveryEdge);
+  data DiscoveryWork = DiscoveryWork Int ([] DiscoveryEdge);
+  enqueue edges slot pending = case edges of {
+    [] -> pending; _ -> (:) (DiscoveryWork slot edges) pending
+  };
+  -- Each row buffers its last touched bitmap word. Older words remain in
+  -- the persistent tree. Revisiting a word resumes from its existing bits.
+  data DiscoveryRow = DiscoveryRow Int Int IntSetTree;
+  frozenRow (DiscoveryRow prefix bits older) =
+    if bits == 0 then IS.wrap older else IS.wrap (IS.insertBM prefix bits older);
+  seedRow slot = DiscoveryRow (IT.prefixOf slot) (IT.bitmapOf slot) IntSetNil;
+  insertRowSlot slot (DiscoveryRow prefix bits older) = let {
+    key = IT.prefixOf slot;
+    current = if key == prefix then bits else IS.bitmapAt key older;
+    combined = orInt current (IT.bitmapOf slot)
+  } in if current == combined then Nothing else let {
+    saved = if key == prefix || bits == 0 then older else IS.insertBM prefix bits older
+  } in seq key (seq combined (seq saved (Just (DiscoveryRow key combined saved))));
+  data DiscoveryIndex = DiscoveryIndex Int (IntMap Int) (IntMap Demand);
+  discoverValidated :: IntMap Frame -> IntMap Seed -> IntMap Use -> IntMap Demand ->
+                       IntMap IntSet -> Either String Discovery;
+  discoverValidated frames seeds uses nodes dependents =
+    case (,) (IM.lookupMin nodes) (IM.lookupMax nodes) of {
+      (,) (Just ((,) low _)) (Just ((,) high _)) -> let {
+        span = high - low;
+        count = IM.size nodes
+      } in if low >= 0 && span >= 0 && quotInt span 4 < count && span < 1152921504606846975
+        then runST (stBind (newSTArray (span + 1) (DiscoveryRow 0 0 IntSetNil))
+          (\rows -> let {
+            universe = allocateSeeds seeds;
+            facts = IM.foldrWithKey (\node demand rest -> case demand of {
+              SeedNode seed -> (:) ((,) node (IM.get seed (universeSeeds universe))) rest;
+              _ -> rest
+            }) [] nodes;
+            productive = productiveNodes dependents (seedWork nodes) IS.empty;
+            aliases = IM.mapMaybeWithKey (forwardedInput productive) nodes;
+            edge output = let { following = IM.get output edges } in
+              if IM.member output aliases then ForwardFact following else
+              case IM.get output nodes of {
+                InstantiateNode use _ -> TransportFact output (IM.get use uses) following;
+                _ -> MergeFact output following
+              };
+            edges = IM.map (\targets -> map edge (IS.toAscList targets)) dependents;
+            index = DiscoveryIndex low aliases nodes;
+            work = foldr (\((,) node slot) rest -> enqueue (IM.get node edges) slot rest) [] facts
+          } in denseSeedFactsWith seedRow low rows facts
+            (denseDiscoverWith frozenRow insertRowSlot frames index rows universe work [])))
+        else discoverUniverse frames seeds uses nodes dependents;
+      _ -> discoverUniverse frames seeds uses nodes dependents
+    };
+  denseSeedFactsWith :: forall s a row. (Int -> row) -> Int -> STArray s row -> [] ((,) Int Int) -> ST s a -> ST s a;
+  denseSeedFactsWith seed low rows facts done =
+    case facts of {
+      [] -> done;
+      (:) ((,) node slot) rest -> stBind (writeSTArray rows (node - low) (seed slot))
+        (\_ -> denseSeedFactsWith seed low rows rest done)
+    };
+  denseDiscoverWith :: forall s row. (row -> IntSet) -> (Int -> row -> Maybe row) ->
+    IntMap Frame -> DiscoveryIndex -> STArray s row -> Universe -> [] DiscoveryWork -> [] DiscoveryWork ->
+    ST s (Either String Discovery);
+  denseDiscoverWith freeze add frames index@(DiscoveryIndex low aliases nodes) rows universe front pending =
+    case front of {
+      [] -> case pending of {
+        [] -> stBind (freezeSTArray rows) (\at -> let {
+          -- IntMap tips are lazy. Each productive forwarding node shares its
+          -- predecessor's frozen set, including forward references by ID.
+          sets = IM.mapWithKey (\node _ -> case IM.lookup node aliases of {
+            Nothing -> freeze (at (node - low)); Just parent -> IM.get parent sets
+          }) nodes
+        } in stReturn (Right (Discovery universe sets [])));
+        _ -> denseDiscoverWith freeze add frames index rows universe (reverse pending) []
+      };
+      (:) (DiscoveryWork slot edges) rest ->
+        denseDependentsWith freeze add frames index rows universe rest pending slot edges
+    };
+  denseDependentsWith :: forall s row. (row -> IntSet) -> (Int -> row -> Maybe row) ->
+    IntMap Frame -> DiscoveryIndex -> STArray s row -> Universe -> [] DiscoveryWork -> [] DiscoveryWork ->
+    Int -> [] DiscoveryEdge -> ST s (Either String Discovery);
+  denseDependentsWith freeze add frames index@(DiscoveryIndex low _ _) rows universe rest pending slot outputs =
+    case outputs of {
+      [] -> denseDiscoverWith freeze add frames index rows universe rest pending;
+      (:) edge remaining -> let {
+        continue next work = denseDependentsWith freeze add frames index rows next rest work slot remaining;
+        record output target next following = stBind (readSTArray rows (output - low))
+          (\previous -> case add target previous of {
+            Nothing -> continue next pending;
+            Just updated -> seq updated (stBind (writeSTArray rows (output - low) updated)
+              (\_ -> continue next (enqueue following target pending)))
+          })
+      } in case edge of {
+        ForwardFact following -> continue universe (enqueue following slot pending);
+        MergeFact output following -> record output slot universe following;
+        TransportFact output use following -> case allocateAt frames use slot universe of {
+          Left err -> stReturn (Left err);
+          Right ((,) target next) -> record output target next following
+        }
+      }
+    };
+
   -- This phase receives an immutable, already allocated universe. Every
   -- operation below is set union or transition lookup: no new origin exists
   -- in the fixed-point loop, and missing preallocation is an explicit error.
@@ -317,23 +471,27 @@ module Bootstrap.ClassDemand where {
     };
   saturate :: Universe -> IntSet -> IntMap Demand -> IntMap IntSet -> IntSet ->
               IntMap IntSet -> Int -> Either String ((,) (IntMap IntSet) Int);
-  saturate universe admissible nodes dependents pending values updates =
+  saturate universe = saturateWith (evaluate universe);
+  saturateWith :: (IntMap IntSet -> Demand -> Either String IntSet) ->
+    IntSet -> IntMap Demand -> IntMap IntSet -> IntSet -> IntMap IntSet -> Int ->
+    Either String ((,) (IntMap IntSet) Int);
+  saturateWith evaluateNode admissible nodes dependents pending values updates =
     case IS.minView pending of {
       Nothing -> Right ((,) values updates);
       Just ((,) identity rest) ->
         do {
-          result <- evaluate universe values (IM.get identity nodes);
+          result <- evaluateNode values (IM.get identity nodes);
           let { previous = IM.get identity values };
           ensure (IS.isSubsetOf previous result)
             "class demand: nonmonotone demand equation";
           if IS.eqIntSet previous result
-          then saturate universe admissible nodes dependents rest values updates
+          then saturateWith evaluateNode admissible nodes dependents rest values updates
           else do {
             ensure (IS.isSubsetOf result admissible)
               "class demand: saturation escaped its immutable universe";
             let { next = IM.insert identity result values };
             let { work = IS.union rest (IM.get identity dependents) };
-            saturate universe admissible nodes dependents work next (updates + 1)
+            saturateWith evaluateNode admissible nodes dependents work next (updates + 1)
           }
         }
     };
@@ -357,6 +515,143 @@ module Bootstrap.ClassDemand where {
     (,) values updates <- foldM step ((,) IM.empty 0) (IM.toAscList nodes);
     Right (Plan universe values updates)
   };
+  -- An instantiation only copies origins owned by its binding or its subtree.
+  -- If every seed owner strictly encloses every binding that is instantiated,
+  -- all transports are identities and no other owner can be created. Check
+  -- distinct frames, regardless of the number of occurrences or seed slots.
+  inheritsEveryOrigin :: IntMap Frame -> IntMap Seed -> IntMap Use -> IntMap Demand -> Bool;
+  inheritsEveryOrigin frames seeds uses nodes = let {
+    owners = IS.toAscList (IM.foldl (\seen seed -> IS.insert (seedOwner seed) seen) IS.empty seeds);
+    bindings = IM.foldl (\seen demand -> case demand of {
+      InstantiateNode use _ -> IS.insert (useBinding (IM.get use uses)) seen;
+      _ -> seen
+    }) IS.empty nodes
+  } in IS.foldr (\binding rest ->
+    all (\owner -> owner /= binding && beneath frames binding owner) owners && rest) True bindings;
+  -- Only seeds can change on empty inputs. Each productive visit schedules
+  -- every dependent, so the omitted initial visits cannot affect the update
+  -- order or count, even when requirements flow through a cycle.
+  seedWork :: IntMap Demand -> IntSet;
+  seedWork nodes = IS.fromDistinctAscList (IM.foldrWithKey (\n d rest -> case d of {
+    SeedNode _ -> (:) n rest; _ -> rest
+  }) [] nodes);
+  solveInherited :: IntMap Seed -> IntMap Demand -> IntMap IntSet -> Either String Plan;
+  solveInherited seeds nodes dependents = do {
+    let { universe = allocateSeeds seeds };
+    let { equations = IM.map (\demand -> case demand of {
+      InstantiateNode _ input -> RefNode input;
+      _ -> demand
+    }) nodes };
+    (,) values updates <- saturate universe (IM.keysSet (universeSlots universe))
+      equations dependents (seedWork nodes) (IM.map (\_ -> IS.empty) nodes) 0;
+    -- Every reachable input set is final. Share it across the uses of the
+    -- node. A use may occur at several nodes in the general planner API, so
+    -- keep the union of its inputs, omitting uses with no reachable slot.
+    let { transitions = IM.foldl (\seen demand -> case demand of {
+      InstantiateNode use input -> let { slots = IM.get input values } in
+        if IS.null slots then seen else IM.insertWith IS.union use slots seen;
+      _ -> seen
+    }) IM.empty nodes };
+    Right (Plan (InheritedUniverse (nextSlot universe) (universeSlots universe)
+      (universeSeeds universe) transitions) values updates)
+  };
+  -- For the single copying output, classifying only owners tells us exactly
+  -- which seed owners reach its input. The actual per-slot final calculation
+  -- still uses the same ordered worklist.
+  copySites :: IntMap Frame -> IntMap Seed -> IntMap Use -> IntMap Demand ->
+    IntMap IntSet -> Maybe ([] Int);
+  copySites frames seeds uses nodes dependents = let {
+    bad = 0 - 1;
+    transport use owner = if owner < 0 then owner
+      else if beneath frames owner (useBinding use) then useReceiver use
+      else if beneath frames (useBinding use) owner then owner else bad;
+    evaluateOwners values demand = case demand of {
+      Empty -> IS.empty;
+      SeedNode seed -> IS.singleton (seedOwner (IM.get seed seeds));
+      UnionNodes inputs -> IS.unions (map (\n -> IM.get n values) inputs);
+      RefNode input -> IM.get input values;
+      InstantiateNode use input -> IS.map (transport (IM.get use uses)) (IM.get input values)
+    };
+    fixed pending values = case IS.minView pending of {
+      Nothing -> values;
+      Just ((,) output rest) -> let { next = evaluateOwners values (IM.get output nodes) } in
+        if IS.eqIntSet next (IM.get output values) then fixed rest values
+        else fixed (IS.union rest (IM.get output dependents)) (IM.insert output next values)
+    };
+    owners = fixed (seedWork nodes) (IM.map (\_ -> IS.empty) nodes)
+  } in if IM.foldr (\owners found -> IS.member bad owners || found) False owners then Nothing
+    else Just (IM.foldrWithKey (\n demand rest -> case demand of {
+      InstantiateNode use input -> if IS.foldr (\owner exists ->
+        beneath frames owner (useBinding (IM.get use uses)) || exists)
+        False (IM.get input owners) then (:) n rest else rest;
+      _ -> rest
+    }) [] nodes);
+  -- Walk backwards from the sole copying node's input. Once a seed passes
+  -- that node it has another identity and cannot be that seed again. The old
+  -- FIFO walk therefore first sees each copied seed in this distance order,
+  -- breaking ties by the initial demand node's ascending identity.
+  seedDistances :: IntMap Demand -> Int -> Int -> IntMap Int;
+  seedDistances nodes copying input = let {
+    walk depth pending distances = if IS.null pending then distances else let {
+      measured = IS.foldl (\acc node -> IM.insert node depth acc) distances pending;
+      advance rest node = foldlStrict (\seen parent ->
+        if parent == copying || IM.member parent measured then seen else IS.insert parent seen)
+        rest (dependencies (IM.get node nodes));
+      next = IS.foldl advance IS.empty pending
+    } in walk (depth + 1) next measured
+  } in walk 0 (IS.singleton input) IM.empty;
+  solveSingleCopy :: IntMap Frame -> IntMap Seed -> IntMap Use -> IntMap Demand ->
+    IntMap IntSet -> Int -> Either String Plan;
+  solveSingleCopy frames seeds uses nodes dependents copying =
+    case IM.get copying nodes of {
+      InstantiateNode site input -> do {
+        let {
+          use = IM.get site uses;
+          distances = seedDistances nodes copying input;
+          candidates = IM.foldrWithKey (\node demand rest -> case demand of {
+            SeedNode seed -> case IM.lookup node distances of {
+              Just depth -> if beneath frames (seedOwner (IM.get seed seeds)) (useBinding use)
+                then (:) ((,,) depth node seed) rest else rest;
+              Nothing -> rest
+            };
+            _ -> rest
+          }) [] nodes;
+          before ((,,) distance node _) ((,,) other peer _) =
+            if distance == other then compareInt node peer else compareInt distance other;
+          copy universe ((,,) _ _ seed) = mapEither snd
+            (allocateAt frames use (IM.get seed (universeSeeds universe)) universe);
+          equations = IM.mapWithKey (\output demand -> case demand of {
+            InstantiateNode _ n -> if output == copying then demand else RefNode n;
+            _ -> demand
+          }) nodes
+        };
+        universe <- foldM copy (allocateSeeds seeds) (sortBy before candidates);
+        mapping <- require "reachable instantiation" site (universeTransitions universe);
+        let {
+          evaluateNode values demand = case demand of {
+            InstantiateNode _ n -> let { inputs = IM.get n values } in
+              Right (IM.foldlWithKey (\slots slot target -> if IS.member slot inputs
+                then IS.insert target (IS.delete slot slots) else slots) inputs mapping);
+            _ -> evaluate universe values demand
+          }
+        };
+        (,) values updates <- saturateWith evaluateNode (IM.keysSet (universeSlots universe))
+          equations dependents (seedWork nodes) (IM.map (\_ -> IS.empty) nodes) 0;
+        let {
+          copyInputs = IM.keysSet mapping;
+          inherited = IM.foldl (\seen demand -> case demand of {
+            InstantiateNode use n -> let {
+              inputs = IM.get n values;
+              live = if use == site then IS.difference inputs copyInputs else inputs
+            } in if IS.null live then seen else IM.insertWith IS.union use live seen;
+            _ -> seen
+          }) IM.empty nodes
+        };
+        Right (Plan (SingleCopyUniverse (nextSlot universe) (universeSlots universe)
+          (universeSeeds universe) site mapping inherited) values updates)
+      };
+      _ -> Left "class demand: missing copying instantiation"
+    };
   solve :: [] Frame -> [] Seed -> [] Use -> IntMap Demand -> Either String Plan;
   solve frameList seedList useList nodes =
     do {
@@ -383,22 +678,19 @@ module Bootstrap.ClassDemand where {
       then solveOrdered seeds nodes
       else do {
         let { dependents = dependentNodes nodes };
-        discovered <- discoverUniverse frames seeds uses nodes dependents;
-        case discovered of {
-          Discovery universe reached _ ->
-            do {
-              fixed <- saturate universe (IM.keysSet (universeSlots universe))
-                nodes dependents (IM.keysSet nodes)
-                (IM.map (\_ -> IS.empty) nodes) 0;
-              case fixed of {
-                (,) values updates ->
-                  do {
-                    ensure (IM.eqIntMap IS.eqIntSet reached values)
-                      "class demand: preallocation and immutable saturation disagree";
-                    Right (Plan universe values updates)
-                  }
-              }
-            }
+        if inheritsEveryOrigin frames seeds uses nodes
+        then solveInherited seeds nodes dependents
+        else case copySites frames seeds uses nodes dependents of {
+          Just [] -> solveInherited seeds nodes dependents;
+          Just [only] -> solveSingleCopy frames seeds uses nodes dependents only;
+          _ -> do {
+            Discovery universe reached _ <- discoverValidated frames seeds uses nodes dependents;
+            (,) values updates <- saturate universe (IM.keysSet (universeSlots universe))
+              nodes dependents (seedWork nodes) (IM.map (\_ -> IS.empty) nodes) 0;
+            ensure (IM.eqIntMap IS.eqIntSet reached values)
+              "class demand: preallocation and immutable saturation disagree";
+            Right (Plan universe values updates)
+          }
         }
       }
     }

@@ -17,14 +17,14 @@ ROOT=Path(__file__).resolve().parents[3]
 # Endpoint profiles that can be prepared here. emlf-source-v1 is declared in
 # matrix.json but has no preparation path in this revision, so it is not listed.
 PROFILES={name:{'producer_kind':'empty','label':'bootstrap crate producer (no installed native data)'}
-          for name in ['crate-bootstrap-v1', 'crate-fused-v1']}
+          for name in ['crate-bootstrap-v1', 'crate-bootstrap-production-v1', 'crate-bootstrap-cached-production-v1', 'crate-fused-v1', 'crate-plan-v1']}
 
 
 def pack(values):
     return ''.join(str(len(x))+':'+x for x in values)
 
 
-def prepare_host_package(ghc, source, producer, deps, run):
+def prepare_host_package(ghc, source, producer, deps, run, *, expose_host_io=False):
     pkg=ghc.with_name('ghc-pkg');deps.mkdir()
     objects=deps/'objects';objects.mkdir();db=deps/'package-db'
     packages=['base','array','bytestring','text','containers','directory']
@@ -37,11 +37,23 @@ def prepare_host_package(ghc, source, producer, deps, run):
     run('init-package-db',[pkg,'init',db])
     ids=[subprocess.check_output([pkg,'--global','field',name,'id','--simple-output'],text=True).strip() for name in packages]
     conf=deps/'package.conf'
+    exposed = 'MLF.Primitive MLF.Host.IO' if expose_host_io else 'MLF.Primitive'
+    hidden = 'MLF.Host.Base MLF.Host.Async' if expose_host_io else 'MLF.Host.Base MLF.Host.IO MLF.Host.Async'
     conf.write_text('name: mlf-shape-primitives\nversion: 0.1\nid: mlf-shape-primitives-0.1\nkey: mlf-shape-primitives-0.1\n'
-        'exposed: True\nexposed-modules: MLF.Primitive\nhidden-modules: MLF.Host.Base MLF.Host.IO MLF.Host.Async\n'
+        f'exposed: True\nexposed-modules: {exposed}\nhidden-modules: {hidden}\n'
         +'import-dirs: '+str(objects)+'\nlibrary-dirs: '+str(deps)+'\nhs-libraries: HSmlf-shape-primitives-0.1\ndepends: '+' '.join(ids)+'\n')
     run('register-package',[pkg,'--package-db',db,'register',conf])
     return db
+
+
+def runtime_cflags():
+    return shlex.split(subprocess.check_output(['pkg-config', '--cflags', 'bdw-gc', 'gmp'], text=True))
+
+
+def runtime_command(clang, source, cflags, output):
+    runtime = source / 'runtime'
+    return [str(clang), '-O2', '-std=c11', *cflags, '-I' + str(runtime),
+            '-c', str(runtime / 'mlf_runtime.c'), '-o', str(output)]
 
 
 def main():
@@ -53,6 +65,8 @@ def main():
     p.add_argument('--output',type=Path,required=True)
     p.add_argument('--clang',default='/usr/bin/clang')
     p.add_argument('--ghc')
+    p.add_argument('--expose-host-io', action='store_true',
+                   help='Expose MLF.Host.IO in the private dependency package for the full compiler Main wrapper.')
     p.add_argument('--endpoint',default=json.loads(Path(__file__).with_name('matrix.json').read_text())['default_endpoint'],choices=sorted(PROFILES))
     a=p.parse_args();out=a.output.resolve();out.mkdir(parents=True,exist_ok=False)
     H=command_runner.load_helper()
@@ -71,11 +85,11 @@ def main():
     builtin_record={}
     with H.SerialLock(ROOT/'.mlf-build'):
         deps=out/'dependencies'
-        db=prepare_host_package(ghc,source,producer,deps,run)
-        cflags=shlex.split(subprocess.check_output(['pkg-config','--cflags','bdw-gc','gmp'],text=True))
+        db=prepare_host_package(ghc,source,producer,deps,run,expose_host_io=a.expose_host_io)
+        cflags=runtime_cflags()
         libs=shlex.split(subprocess.check_output(['pkg-config','--libs','bdw-gc','gmp'],text=True))
         clang=Path(a.clang).resolve();runtime=deps/'runtime.o'
-        run('runtime',[clang,'-O2','-std=c11',*cflags,'-I'+str(source/'runtime'),'-c',source/'runtime/mlf_runtime.c','-o',runtime])
+        run('runtime',runtime_command(clang,source,cflags,runtime))
         if a.build_builtin:
             # The public crate path produces the fixed checked builtin pair once.
             # It is a reused dependency, never a timed target.
@@ -100,7 +114,7 @@ def main():
     builtin_record.update({str(builtin)+s: H.sha(str(builtin)+s) for s in ['.mlfci','.mlfco']})
     H.save(out/'setup.json',{'complete':True,'endpoint':a.endpoint,'endpoint_label':profile['label'],
         'producer':str(producer),'source':str(source),'ghc':str(ghc),'package_db':str(db),
-        'clang':str(clang),'runtime':str(runtime),'libs':libs,'limits':limits,'builtin':str(builtin),
+        'clang':str(clang),'runtime':str(runtime),'runtime_cflags':cflags,'libs':libs,'limits':limits,'builtin':str(builtin),
         'builtin_record':builtin_record,
         'identity':{'producer_receipt_sha256':H.sha(producer/'receipt.json'),
             'producer_emlf_sha256':H.sha(producer/'bin/emlf'),

@@ -29,19 +29,21 @@ module Bootstrap.PreparedPreludeWholeRoot
     Artifact.FragmentState Modules.Names Modules.Interface (Set String) (Set String)
     (Map String Source.SourceContract);
   preparedContracts (PreparedPrelude _ _ _ _ _ _ _ contracts) = contracts;
-  data RootCompilation = SyntheticRoot Core.Compilation (Either String ([] Int)) | ImportedRoot Imported.Compilation;
+  data RootCompilation = CrateRoot Compiler.Compilation | SyntheticRoot Core.Compilation (Either String ([] Int)) | ImportedRoot Imported.Compilation;
   rootCompiledTerm compiled = case compiled of {
+    CrateRoot value -> Compiler.compiledTerm value;
     SyntheticRoot value _ -> Core.compiledTerm value;
     ImportedRoot value -> Checked.term (Imported.checkedWrapper value)
   };
   rootInferredType compiled = case compiled of {
+    CrateRoot value -> Compiler.inferredType value;
     SyntheticRoot value _ -> Core.inferredType value;
     ImportedRoot value -> Imported.inferredType value
   };
-  data WholeRootOutcome = OriginalFallback String Core.Compilation |
+  data WholeRootOutcome = OriginalFallback String Compiler.Compilation |
     InstalledRoot Checked.CheckedTerm RootCompilation (Map String String) Standalone.RewrittenRoot ([] String);
   checkedTerm outcome = case outcome of {
-    OriginalFallback _ compiled -> Core.checkedTerm compiled;
+    OriginalFallback _ compiled -> Compiler.checkedTerm compiled;
     InstalledRoot checked _ _ _ _ -> checked
   };
   reused outcome = case outcome of { OriginalFallback _ _ -> False; InstalledRoot _ _ _ _ _ -> True };
@@ -52,7 +54,7 @@ module Bootstrap.PreparedPreludeWholeRoot
   -- Actual user-root inference with checked import parameters, not a fabricated
   -- grafted Compilation or proof of baseline principal-scheme equivalence.
   rawRootCompilation outcome = case outcome of {
-    OriginalFallback _ compiled -> SyntheticRoot compiled (Right []);
+    OriginalFallback _ compiled -> CrateRoot compiled;
     InstalledRoot _ compiled _ _ _ -> compiled
   };
   rootDictionaryMap outcome = case outcome of {
@@ -189,7 +191,11 @@ module Bootstrap.PreparedPreludeWholeRoot
     Left (CompileError phase message) -> Left (CompileError phase (Modules.displayNames diagnosticNames message));
     Right compiled -> Right compiled
   };
-  original reason mode program = mapEither (OriginalFallback reason) (Compiler.compileProgramWithPrelude mode program);
+  original reason _ _ = Right (Left reason);
+  fallback reason mode program = do {
+    compiled <- Compiler.compileProgramWithPrelude mode program;
+    ioReturn (mapEither (OriginalFallback reason) compiled)
+  };
   -- Conservative namespace admission. Intrinsic tuple/list syntax does not
   -- declare a replaceable imported value. Other canonical-name occurrences
   -- may conservatively fall back, never count as installed-root successes.
@@ -214,17 +220,22 @@ module Bootstrap.PreparedPreludeWholeRoot
     case Modules.chooseName used "installedUserInstance" index of {
       (,) name next -> (,) (snoc names name) next
     }) ((,) [] 0) instances);
-  compileInstalledRoot :: PreparedPrelude -> PreludeMode -> SProgram -> Either CompileError WholeRootOutcome;
+  compileInstalledRoot :: PreparedPrelude -> PreludeMode -> SProgram -> IO (Either CompileError WholeRootOutcome);
   compileInstalledRoot = compileRoot False False;
-  compileDemandRoot :: PreparedPrelude -> PreludeMode -> SProgram -> Either CompileError WholeRootOutcome;
+  compileDemandRoot :: PreparedPrelude -> PreludeMode -> SProgram -> IO (Either CompileError WholeRootOutcome);
   compileDemandRoot = compileRoot True False;
-  compileDirectRoot :: PreparedPrelude -> PreludeMode -> SProgram -> Either CompileError WholeRootOutcome;
+  compileDirectRoot :: PreparedPrelude -> PreludeMode -> SProgram -> IO (Either CompileError WholeRootOutcome);
   compileDirectRoot = compileRoot True True;
-  compileRoot demand direct (PreparedPrelude _ iface linked names env sourceValues protected contracts) mode program =
+  compileRoot demand direct context mode program = case planRoot demand direct context mode program of {
+    Left err -> ioReturn (Left err);
+    Right (Left reason) -> fallback reason mode program;
+    Right (Right result) -> ioReturn (Right result)
+  };
+  planRoot demand direct (PreparedPrelude _ iface linked names env sourceValues protected contracts) mode program =
     if collides protected program then original "canonical installed identifier collision" mode program
     else do {
       root <- Core.atPhase ModuleResolution (Standalone.rewriteRootWithNames mode names env program);
-      if not (Standalone.rewrittenNeeded root) then original "no facade use; unchanged pure route" mode program
+      if not (Standalone.rewrittenNeeded root) then original "no facade use; ordinary crate request" mode program
       else if ownSupportCollision protected root then original "own class stable support collision" mode program
       else do {
         let {
@@ -270,7 +281,7 @@ module Bootstrap.PreparedPreludeWholeRoot
         checked <- Core.atPhase Verification (Checked.check (XWithData declarations grafted));
         Core.atPhase Verification (ensure (T.alphaEq (Checked.typeOf checked) (rootInferredType compiled))
           "installed Prelude graft changed actual root type");
-        Right (InstalledRoot checked compiled (snd lowered) root (M.keys selectedSignatures))
+        Right (Right (InstalledRoot checked compiled (snd lowered) root (M.keys selectedSignatures)))
       }
     }
 }

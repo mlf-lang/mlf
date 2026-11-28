@@ -4,7 +4,16 @@
 set -euo pipefail
 root=$(cd -- "$(dirname -- "$0")/../../.." && pwd)
 fixtures="$root/tests/fixtures/async-completion"
+native_proofs_enabled=true
+case "${1:-}" in
+  '') ;;
+  --language-only) native_proofs_enabled=false; shift ;;
+  *) exit 2 ;;
+esac
+test "$#" -eq 0
 compiler=$(command -v "${EMLF:-emlf}")
+. "$root/tools/testing/native-events.sh"
+. "$root/tools/testing/compiler-diagnostics.sh"
 compiler=$(cd -- "$(dirname -- "$compiler")" && pwd)/$(basename -- "$compiler")
 cc=$(command -v "${CC:-clang}")
 output=${MLF_ASYNC_COMPLETION_BUILD_DIR:-"$root/.mlf-build/async-completion-gate"}
@@ -30,7 +39,7 @@ cleanup() {
   if [ -n "$watchdog_pid" ]; then kill "$watchdog_pid" 2>/dev/null || true; fi
   if [ -n "$command_pid" ]; then kill "$command_pid" 2>/dev/null || true; fi
 }
-trap cleanup EXIT
+trap 'status=$?; cleanup; mlf_case_cleanup "$status"' EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
 run() {
@@ -55,7 +64,7 @@ run() {
   wait "$watchdog_pid" 2>/dev/null || true
   watchdog_pid=
   printf '%s\n' "$status" > "$work/$label.status"
-  test ! -e "$work/$label.timed-out" || fail "$label timed out"
+  test ! -e "$work/$label.timed-out" || { mlf_case_result timeout "$status"; fail "$label timed out"; }
   return "$status"
 }
 success() {
@@ -70,7 +79,7 @@ record_inputs() {
     jq --arg path "${file#"$root"/}" --arg hash "$(sha256 "$file")" '. + {($path):$hash}' "$destination" > "$destination.tmp"
     mv "$destination.tmp" "$destination"
   done < <({ find "$fixtures" "$root/runtime" -type f; printf '%s\n' \
-    "$root/tools/release/check_async_abi.py" "$root/tests/native/completion_cell_tests.c" "$root/tests/native/async_completion_primitives.c" \
+    "$root/tools/release/check_async_abi.py" "$root/tools/testing/native-events.sh" "$root/tools/testing/compiler-diagnostics.sh" "$root/tests/native/completion_cell_tests.c" "$root/tests/native/async_completion_primitives.c" \
     "$root/libraries/mlf-foundation/Bootstrap/Types.hs" \
     "$root/libraries/mlf-language-core/Bootstrap/Data.hs" "$root/libraries/mlf-language-core/Bootstrap/Primitive.hs" \
     "$root/libraries/mlf-frontend/Bootstrap/Module.hs" \
@@ -81,8 +90,10 @@ record_inputs "$work/inputs.json"
 compiler_hash=$(sha256 "$compiler")
 cc_hash=$(sha256 "$cc")
 printf 'IO ()\n' > "$work/io-unit.type"
-success capability "$compiler" --run --expr 'do { reply <- processSupervisor "MLF-PROCESS-1\0version\0"; printInt (stringCodeAt reply 2) }'
-test "$(cat "$work/capability.stdout")" = 49 || fail 'real stage-2 host bridge required'
+if mlf_case_selected async-completion/capability; then mlf_case_start async-completion/capability; fi
+mlf_source_success capability "$compiler" --run --expr 'do { reply <- processSupervisor "MLF-PROCESS-1\0version\0"; printInt (stringCodeAt reply 2) }'
+test "$(cat "$work/capability.stdout")" = 49 || fail 'real host bridge required'
+mlf_case_result pass 0
 read -r -a cflags <<< "$(pkg-config --cflags gmp)"
 read -r -a libs <<< "$(pkg-config --libs gmp)"
 if [ -n "${MLF_GC_PREFIX:-}" ]; then
@@ -95,18 +106,27 @@ fi
 libs+=(-lm -lpthread)
 if [ "$(uname -s)" = Linux ]; then libs+=(-ldl); fi
 success runtime "$cc" -O2 -std=c11 -Wall -Wextra -Werror "${cflags[@]}" -c "$root/runtime/mlf_runtime.c" -o "$work/runtime.o"
+native_proofs=0
+if $native_proofs_enabled; then
 for native in completion_cell_tests async_completion_primitives; do
+  mlf_case_selected "async-completion/native/$native" || continue
+  mlf_case_start "async-completion/native/$native"
   success "$native.link" "$cc" -O2 -std=c11 -Wall -Wextra -Werror "${cflags[@]}" "$root/tests/native/$native.c" "$work/runtime.o" "${libs[@]}" -o "$work/$native"
-  success "$native.execute" "$work/$native"
+  success "$native.execute" env -u MLF_TEST_EVENTS -u MLF_TEST_EXACT "$work/$native"
   cat "$work/$native.execute.stdout"
+  native_proofs=$((native_proofs + 1))
+  mlf_case_result pass 0
 done
+fi
 runtime=0
 for source in "$fixtures"/runtime/*.emlf; do
   name=$(basename "$source" .emlf)
-  success "$name.compile" "$compiler" -i "$fixtures" "$source"
+  mlf_case_selected "async-completion/runtime/$name" || continue
+  mlf_case_start "async-completion/runtime/$name"
+  mlf_source_success "$name.compile" "$compiler" -i "$fixtures" "$source"
   success "$name.check" "$compiler" --check "$work/$name.compile.stdout"
   cmp "$work/io-unit.type" "$work/$name.check.stdout" || fail "$name is not IO ()"
-  success "$name.interpreter" "$compiler" -i "$fixtures" --run "$source"
+  mlf_source_success "$name.interpreter" "$compiler" -i "$fixtures" --run "$source"
   success "$name.target-interpreter" "$compiler" --run-xmlf "$work/$name.compile.stdout"
   cmp "$fixtures/runtime/$name.expected" "$work/$name.interpreter.stdout" || fail "$name source interpreter differs"
   cmp "$fixtures/runtime/$name.expected" "$work/$name.target-interpreter.stdout" || fail "$name target interpreter differs"
@@ -115,12 +135,15 @@ for source in "$fixtures"/runtime/*.emlf; do
   success "$name.link" "$cc" -O2 -Wno-override-module -x ir "$work/$name.emit.stdout" -x none "$work/runtime.o" "${libs[@]}" -o "$work/$name.native"
   success "$name.native" "$work/$name.native"
   cmp "$fixtures/runtime/$name.expected" "$work/$name.native.stdout" || fail "$name native differs"
+  mlf_case_result pass 0
   runtime=$((runtime + 1))
   echo "PASS $name source/target interpreter and native"
 done
 negative=0
 for source in "$fixtures"/negative/*.emlf; do
   name=$(basename "$source" .emlf)
+  mlf_case_selected "async-completion/source-rejection/$name" || continue
+  mlf_case_start "async-completion/source-rejection/$name"
   label="negative-$name"
   status=0
   run "$label" "$compiler" -i "$fixtures" "$source" || status=$?
@@ -132,13 +155,19 @@ for source in "$fixtures"/negative/*.emlf; do
     generalize-allocated) expected='^Inference: cannot raise a protected type variable' ;;
     *) expected='^Inference:' ;;
   esac
-  grep -Eq "$expected" "$work/$label.stderr" || fail "$name wrong rejection phase"
+  mlf_compiler_diagnostics < "$work/$label.stderr" > "$work/$label.diagnostics"
+  grep -Eq "$expected" "$work/$label.diagnostics" || fail "$name wrong rejection phase"
+  mlf_case_result pass "$status"
   negative=$((negative + 1))
 done
 targets=0
 for source in "$fixtures"/target-negative/*.xmlf; do
   name=$(basename "$source" .xmlf)
+  selected_target=false
   for mode in check run-xmlf xmlf-to-llvm; do
+    mlf_case_selected "async-completion/target-rejection/$name/$mode" || continue
+    mlf_case_start "async-completion/target-rejection/$name/$mode"
+    selected_target=true
     label="target-$name-$mode"
     status=0
     run "$label" "$compiler" "--$mode" "$source" || status=$?
@@ -146,8 +175,9 @@ for source in "$fixtures"/target-negative/*.xmlf; do
     test ! -s "$work/$label.stdout" || fail "$name produced effects/output"
     grep -Eiq '(type|kind|primitive|constructor|argument)' "$work/$label.stderr" || fail "$name unrelated target rejection"
     if grep -Eiq '(expected .* at|parse error|unknown primitive)' "$work/$label.stderr"; then fail "$name failed before checking"; fi
+    mlf_case_result pass "$status"
   done
-  targets=$((targets + 1))
+  if $selected_target; then targets=$((targets + 1)); fi
 done
 record_inputs "$work/inputs.final.json"
 cmp "$work/inputs.json" "$work/inputs.final.json" || fail 'inputs changed during run'
@@ -163,11 +193,12 @@ for label in "${labels[@]}"; do
 done
 jq -n --arg compiler_sha256 "$compiler_hash" --arg clang_sha256 "$cc_hash" \
   --arg runtime_object_sha256 "$(sha256 "$work/runtime.o")" --arg work "$work" \
+  --arg exact "${MLF_TEST_EXACT:-}" --argjson native_proofs "$native_proofs" \
   --argjson source_native_fixtures "$runtime" --argjson source_rejections "$negative" --argjson target_rejections "$targets" \
   --argjson commands "${#labels[@]}" --argjson seconds "$((SECONDS - started))" --argjson timeout_seconds "$timeout_seconds" \
   --slurpfile inputs "$work/inputs.json" --slurpfile observations "$work/observations.json" \
-  '{complete:true,source_native_fixtures:$source_native_fixtures,source_rejections:$source_rejections,
-    target_rejections:$target_rejections,target_rejection_entrypoints:3,native_proofs:2,
+  '{complete:($exact == ""),source_native_fixtures:$source_native_fixtures,source_rejections:$source_rejections,
+    target_rejections:$target_rejections,target_rejection_entrypoints:3,native_proofs:$native_proofs,
     backends:["source-interpreter","target-interpreter","llvm"],commands:$commands,
     compiler_sha256:$compiler_sha256,clang_sha256:$clang_sha256,runtime_object_sha256:$runtime_object_sha256,
     work:$work,seconds:$seconds,timeout_seconds:$timeout_seconds,inputs:$inputs[0],observations:$observations[0]}' > "$output/result.tmp"

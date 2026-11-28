@@ -17,7 +17,7 @@ suite = (:) ((,) "checked emission agrees with raw independently checked emissio
 
 agreement : IO ()
 agreement = S.mapM_ (\source -> do
-  compiled <- H.right (C.compile "<checked-emission>" source)
+  compiled <- ioBind (C.compile "<checked-emission>" source) (H.right)
   expected <- H.right (Check.checkClosed (C.compiledTerm compiled))
   H.assert (H.eq expected (Checked.typeOf (C.checkedTerm compiled))) "witness type differs"
   raw <- H.right (LLVM.emitEntryChunks false (C.compiledTerm compiled))
@@ -38,8 +38,8 @@ rejects = S.mapM_ (\term -> do
 
 ioEntry : IO ()
 ioEntry = do
-  pure <- H.right (C.compile "<pure>" "42")
-  action <- H.right (C.compile "<action>" "return 42 :: IO Int")
+  pure <- ioBind (C.compile "<pure>" "42") (H.right)
+  action <- ioBind (C.compile "<action>" "return 42 :: IO Int") (H.right)
   H.reject (LLVM.emitCheckedChunks true (C.checkedTerm pure))
   _ <- H.right (LLVM.emitCheckedChunks true (C.checkedTerm action))
   return ()

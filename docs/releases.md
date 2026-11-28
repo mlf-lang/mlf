@@ -284,7 +284,7 @@ install in a path with spaces, modules, interpreter/LLVM output equality, native
 package tests, safe reinstall, and preservation of unrelated commands.
 
 The first seed archive is assembled locally from the retained six-group native
-validation. Its executables match `docs/native-tests-validation.json`; subsequent
+validation. Its executables match [the native tests validation record](https://github.com/mlf-lang/mlf/blob/0704d216b8cf6d887d3737efa30a2eae3c152f0a/docs/native-tests-validation.json); subsequent
 releases use that published native seed. This establishes the initial bootstrap
 anchor without introducing a GHC or Python dependency in CI.
 

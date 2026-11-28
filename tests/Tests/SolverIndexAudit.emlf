@@ -1,4 +1,7 @@
 module Tests.SolverIndexAudit where
+import Prelude hiding (Monad, return, bind)
+import MLF.Primitive (Monad, return, bind)
+import qualified Test.Assert as A
 import Bootstrap.Types
 import qualified Bootstrap.Std as L
 import qualified Bootstrap.IntMap as IM
@@ -8,7 +11,7 @@ import qualified Bootstrap.Graph.Solver as S
 import qualified Tests.DenseNormalization as N
 import qualified Tests.Helpers as H
 
-suite : [] ((,) String (IO ()))
+suite : [] ((,) String (A.Test ()))
 suite = (:) ((,) "incremental index audit agrees with independent reconstruction" audits) []
 
 -- Keep the previous reconstruction algorithm as an independent oracle.
@@ -35,18 +38,18 @@ variants index = case IM.toList index of
   ((:) (IM.insert key (setSizeWrong values) index)
   ((:) (IntMap (IntMapBin 2 (key + 1) (IntMapTip key values) (IntMapTip key values))) [])))))))
 
-check solver = H.assert (H.eq (S.finish solver) (reference solver)) "incremental index audit changed acceptance or returned graph"
-audits : IO ()
+check solver = A.assert (H.eq (S.finish solver) (reference solver)) "incremental index audit changed acceptance or returned graph"
+audits : A.Test ()
 audits = L.mapM_ (\scale -> L.mapM_ (\shift -> do
  let input = N.rename (\n -> shift + scale * n) (N.fixture 7)
- prepared <- H.right (S.prepare input)
+ prepared <- A.right H.show (S.prepare input)
  let graph = S.graph prepared
  let parents = S.structuralParents prepared
  let descendants = S.bindingChildren prepared
  let scopes = S.scopeIndex prepared
  let parentVariants = variants parents
  let descendantVariants = variants descendants
- H.assert (L.length parentVariants == 8 && L.length descendantVariants == 8) "index corruption classes changed"
+ A.assert (L.length parentVariants == 8 && L.length descendantVariants == 8) "index corruption classes changed"
  check (Solver graph parents descendants scopes)
  L.mapM_ (\p -> check (Solver graph p descendants scopes)) (L.tail parentVariants)
  L.mapM_ (\d -> check (Solver graph parents d scopes)) (L.tail descendantVariants)

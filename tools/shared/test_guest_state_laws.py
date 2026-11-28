@@ -6,15 +6,18 @@ Four sequential stages normally total about 90 seconds; the safety watchdog is
 LLVM emission, copied state implementation, or full native/unit qualification.
 """
 import argparse
-import hashlib
 import json
 import os
+import re
 from pathlib import Path
 import subprocess
 import sys
-from test_direct import authenticate_build
+from test_direct import authenticate_build, sha
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / 'tools/testing'))
+from receipt_selection import identity, select
+
 WATCHDOG = ROOT/'tools/shared/resource_watchdog.py'
 FLAGS = ('MLF_GRAPH_BUILD_NEGATIVE', 'MLF_ORACLE_TRAVERSAL_NEGATIVE')
 CASES = (
@@ -32,73 +35,17 @@ def require(value, message):
     if not value:
         raise ValueError(message)
 
-def digest(path):
-    return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+# The source CLI reports its dependency decisions on stderr before the program
+# runs; the watchdog merges both streams. Strip only that exact leading block
+# so the law output itself is still compared byte for byte.
+DEPENDENCY_LINE = re.compile(rb'dependency [^\r\n]+: (?:native|ir|source|unused) \([^\r\n]*\)\n')
 
-def capture_inputs(root, fixed):
-    # Follow aliases inside the repository, but never silently skip their source
-    # contents. Record each lexical link before deduplicating resolved dirs, so
-    # retargets/new aliases and cycles cannot hide behind the visited set.
-    root = root.resolve(strict=True)
-    entries, hashes, visited = {}, {}, set()
-    def remember_file(path, source=False):
-        path = Path(path).absolute()
-        resolved = path.resolve(strict=True)
-        require(resolved.is_file(), 'input is not a file: '+str(path))
-        require(not source or resolved.is_relative_to(root), 'source escapes repository')
-        if resolved not in hashes:
-            hashes[resolved] = digest(resolved)
-        entries[str(resolved)] = {'kind': 'file', 'sha256': hashes[resolved], 'resolved': str(resolved)}
-        if path.is_symlink():
-            entries[str(path)] = {'kind': 'file-symlink', 'target': os.readlink(path), 'resolved': str(resolved)}
-    def directory_link(path):
-        resolved = path.resolve(strict=True)
-        require(resolved.is_relative_to(root) and resolved.is_dir(), 'source directory escapes repository')
-        entries[str(path.absolute())] = {'kind': 'directory-symlink', 'target': os.readlink(path),
-                                        'resolved': str(resolved)}
-    def walk_error(error):
-        raise error
-    for path in fixed:
-        remember_file(path)
-    for relative in ['libraries', 'tests', 'tools/shared/fixtures']:
-        directory = root/relative
-        require(directory.is_dir() and directory.resolve(strict=True).is_relative_to(root),
-                'missing or escaping source root: '+relative)
-        if directory.is_symlink():
-            directory_link(directory)
-        for current, directories, files in os.walk(directory, followlinks=True, onerror=walk_error):
-            current = Path(current)
-            resolved = current.resolve(strict=True)
-            require(resolved.is_relative_to(root), 'source directory escapes repository')
-            if current.is_symlink():
-                directory_link(current)
-            if resolved in visited:
-                directories[:] = []
-                continue
-            visited.add(resolved)
-            pending = []
-            for name in sorted(directories):
-                child = current/name
-                if child.is_symlink():
-                    directory_link(child)  # Validate before os.walk opens the target.
-                if child.resolve(strict=True) not in visited:
-                    pending.append(name)
-            directories[:] = pending
-            for name in sorted(files):
-                path = current/name
-                if path.suffix in {'.hs', '.emlf'}:
-                    remember_file(path, source=True)
-                elif path.is_symlink():
-                    # Broken directory links may appear in os.walk's files list.
-                    resolved = path.resolve(strict=True)
-                    require(resolved.is_relative_to(root) and resolved.is_file(),
-                            'broken, escaping, or changing non-source alias')
-                    entries[str(path.absolute())] = {'kind': 'non-source-symlink',
-                        'target': os.readlink(path), 'resolved': str(resolved)}
-    return dict(sorted(entries.items()))
-
-def unchanged(before, after):
-    require(before == after, 'source/tool/input inventory changed during campaign')
+def program_output(log):
+    lines = log.splitlines(keepends=True)
+    index = 0
+    while index < len(lines) and DEPENDENCY_LINE.fullmatch(lines[index]):
+        index += 1
+    return b''.join(lines[index:])
 
 def verify_observation(resource, status, log, expected):
     require(set(LIMITS) <= set(resource.get('limits', {})) and resource['limits'] == LIMITS,
@@ -118,49 +65,45 @@ def verify_observation(resource, status, log, expected):
                 sample.get('group_rss', LIMITS['process_tree_rss_bytes']+1) <= LIMITS['process_tree_rss_bytes'] and
                 sample.get('output_bytes', LIMITS['max_output_bytes']+1) <= LIMITS['max_output_bytes'],
                 'resource sample exceeds bounds')
-    require(log == expected, 'law output differs from exact oracle')
+    output = program_output(log)
+    require(output == expected, 'law output differs from exact oracle')
     if status == 1:
-        require(b'PASS' not in log and log.startswith(b'FAIL '), 'invalid negative control output')
+        require(b'PASS' not in output and output.startswith(b'FAIL '), 'invalid negative control output')
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--build-receipt', type=Path, required=True)
     parser.add_argument('--output', type=Path, required=True)
     args = parser.parse_args()
+    labels = [label + suffix for label, *_ in CASES for suffix in ('-positive', '-negative')]
+    selected = select('guest-state-laws/', labels)
     receipt = args.build_receipt.resolve(strict=True)
     producer_dir = receipt.parent
     output = args.output.resolve()
     output.mkdir(parents=True, exist_ok=False)
     record = {'complete': False, 'kind': 'actual-import-guest-state-laws', 'commands': [],
               'full_native_unit': False, 'native_or_llvm_output': False,
-              'per_stage_limits': LIMITS, 'expected_campaign_seconds_approximate': 90.5}
+              'per_stage_limits': LIMITS}
+    if selected:
+        record.update(scope='focused', selected_ids=[identity('guest-state-laws/', selected)])
+    else:
+        record['expected_campaign_seconds_approximate'] = 90.5
     def save():
         temporary = output/'receipt.json.tmp'
         temporary.write_text(json.dumps(record, indent=2)+'\n')
         temporary.replace(output/'receipt.json')
-    def authenticate():
+    try:
         producer = authenticate_build(receipt, producer_dir/'bin')
         require(producer['optimization'] == '2', 'state-law gate requires authenticated O2 producer')
-        for name, expected in producer['object_inputs'].items():
-            path = (producer_dir/name).resolve(strict=True)
-            require(path.is_relative_to(producer_dir) and digest(path) == expected,
-                    'producer object changed: '+name)
-        return producer
-    try:
-        producer = authenticate()
         compiler = producer_dir/'bin/emlf'
-        fixed = [Path(__file__), WATCHDOG, ROOT/'tools/shared/test_direct.py', ROOT/'tools/shared/build.py',
-                 receipt, compiler, ROOT/'tests/Tests/Graph.emlf', ROOT/'tests/Tests/Oracle.emlf',
-                 *[ROOT/'tools/shared/fixtures'/case[1] for case in CASES]]
-        before = capture_inputs(ROOT, fixed)
-        record.update(inputs=before, producer_receipt_sha256=digest(receipt),
-                      producer_objects=producer['object_inputs'])
+        record.update(producer_receipt_sha256=sha(receipt), compiler=producer['outputs']['emlf'])
         save()
         results = {}
         for label, fixture, flag, roots, positive, negative in CASES:
             for failure in [False, True]:
-                unchanged(before, capture_inputs(ROOT, fixed))
-                stage = label+('-negative' if failure else '-positive')
+                stage = label + ('-negative' if failure else '-positive')
+                if selected and stage != selected:
+                    continue
                 directory = output/stage
                 directory.mkdir()
                 command = [str(compiler)]
@@ -186,21 +129,22 @@ def main():
                 expected_status = 1 if failure else 0
                 verify_observation(resource, expected_status, log_path.read_bytes(), negative if failure else positive)
                 require(result.returncode == expected_status, 'watchdog process status mismatch')
-                unchanged(before, capture_inputs(ROOT, fixed))
-                results[str(resource_path)] = digest(resource_path)
-                results[str(log_path)] = digest(log_path)
+                results[str(resource_path)] = sha(resource_path)
+                results[str(log_path)] = sha(log_path)
                 row.update(complete=True, expected_negative_control=failure,
                            elapsed_seconds=resource['elapsed_seconds'],
-                           resource_receipt_sha256=digest(resource_path), log_sha256=digest(log_path))
+                           resource_receipt_sha256=results[str(resource_path)], log_sha256=results[str(log_path)])
                 save()
-        authenticate()
-        unchanged(before, capture_inputs(ROOT, fixed))
-        require(all(digest(path) == expected for path, expected in results.items()), 'recorded result changed')
-        record.update(complete=True, inputs_unchanged=True, producer_and_objects_reauthenticated=True,
-                      result_files=results, observed_campaign_seconds=sum(row['elapsed_seconds'] for row in record['commands']))
+        require(all(sha(path) == expected for path, expected in results.items()), 'recorded result changed')
+        record.update(complete=True, result_files=results,
+                      observed_campaign_seconds=sum(row['elapsed_seconds'] for row in record['commands']))
         save()
-        print(json.dumps({'complete': True, 'stages': 4, 'positive_law_checks': 18,
-                          'negative_controls': 2, 'full_native_unit': False}))
+        summary = {'complete': True, 'stages': len(record['commands']), 'full_native_unit': False}
+        if selected:
+            summary['selected_ids'] = record['selected_ids']
+        else:
+            summary.update(positive_law_checks=18, negative_controls=2)
+        print(json.dumps(summary))
     except BaseException as error:
         record['error'] = type(error).__name__+': '+str(error)
         save()

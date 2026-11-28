@@ -5,6 +5,7 @@
 module Bootstrap.ArtifactStorage where {
   import MLF.Primitive;
   import Bootstrap.Types;
+  import qualified Bootstrap.X.Syntax as X;
   import Bootstrap.Std;
   import qualified Bootstrap.Bitstream as W;
   import qualified Bootstrap.Host as Host;
@@ -189,6 +190,13 @@ module Bootstrap.ArtifactStorage where {
         XAbs name ty body -> admit ((:) (AdmitName name) ((:) (AdmitType ty) ((:) (AdmitTerm body) rest)));
         XApp a b -> admit ((:) (AdmitTerm a) ((:) (AdmitTerm b) rest));
         XTypeAbs variable ty body -> admit ((:) (AdmitVariable variable) ((:) (AdmitType ty) ((:) (AdmitTerm body) rest)));
+        XProjection rows selected -> admit (foldr (\((,,) name arg result) pending ->
+          append [AdmitName name,AdmitVariable arg] (case result of {
+            Nothing -> pending; Just r -> (:) (AdmitVariable r) pending
+          })) ((:) (AdmitName selected) rest) rows);
+        XInstantiationSpine name rows -> admit ((:) (AdmitName name) (foldr
+          (\((,,) ty _ operand) pending -> (:) (AdmitType (XCon ty [])) ((:) (AdmitTerm operand) pending))
+          rest rows));
         XTypeApp body computation -> admit ((:) (AdmitTerm body) ((:) (AdmitComputation computation) rest));
         XLet name rhs body -> admit ((:) (AdmitName name) ((:) (AdmitTerm rhs) ((:) (AdmitTerm body) rest)));
         XLetRec bindings body -> admit ((:) (AdmitRec bindings) ((:) (AdmitTerm body) rest));
@@ -631,6 +639,8 @@ module Bootstrap.ArtifactStorage where {
     XApp a b -> v2Par (p > 1) [V2Term 1 a, V2Text " ", V2Term 2 b];
     XTypeAbs variable bound body -> v2Par (p > 0)
       [V2Text "/\\(", V2Variable variable, V2Text " >= ", V2Type 0 bound, V2Text ") -> ", V2Term 0 body];
+    XProjection rows selected -> [V2Term p (X.expandProjection rows selected)];
+    XInstantiationSpine head rows -> [V2Term p (X.expandInstantiationSpine head rows)];
     XTypeApp body computation -> [V2Term 2 body, V2Text "[", V2Computation computation, V2Text "]"];
     XLet name rhs body -> v2Par (p > 0)
       [V2Text "let ", V2Name name, V2Text " = ", V2Term 0 rhs, V2Text " in ", V2Term 0 body];

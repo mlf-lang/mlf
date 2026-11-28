@@ -76,11 +76,19 @@ differ. No claim about other platforms or layouts follows from these results.
 
 ## Retained controls and measurement boundary
 
-`run_controls.py --full` reuses the complete old Darwin readiness suite. Its
-existing fault expectations are unchanged; an explicit test-only failing
-spawn adapter exercises the old fallback traces. Added source admission in
-the C4 gate accepts only the reviewed complete header hashes and verifies an
-exact inverse to the previous header; other dependency checks remain intact.
+`run_controls.py --full` runs the Darwin readiness suite with an explicit
+test-only failing spawn adapter to exercise its fallback traces. Each producer
+and this run's source inputs are authenticated independently; the runner no
+longer requires a historical header hash or an inverse source transformation.
+The performance measurements below retain the original experiment's scope.
+
+The current explicit-cwd implementation is checked directly. `CwdCapability.c`
+compiles and runs against the selected SDK and OS, exercising the public spawn
+file-action API when available. Its result chooses the expected cwd-spawn or
+fork-fallback observations; source formatting and unrelated header changes do
+not choose the behavior. All fault, eligibility, inherited-state and real child
+controls remain. Run `python3 -B tools/performance/process-spawn/test_runtime_protocol.py`
+for the capability/observed-state parser controls on any host with Python.
 
 The controls include 20 new and 27 retained syscall/fault/order cases, 12
 additional real-command parity executions, 40 retained transport executions,

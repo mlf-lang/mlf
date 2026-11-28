@@ -127,14 +127,8 @@ static void gc_free(void *memory) {
 #define free(memory) gc_free(memory)
 #include "khash.h"
 
-/* Generated modules reference exactly one ABI symbol. Linking against a
- * runtime with incompatible field offsets must fail before execution. */
-/* Canonical source constructor tags and Char/typed-IOError primitives 95..102 and managed stack/context 103..106. */
-void mlf_require_haskell_boundary_v4_abi(void) {}
-void mlf_require_byte_file_v2_abi(void) {}
-void mlf_require_freeze_st_array_abi(void) {}
-void mlf_require_st_to_io_abi(void) {}
-void mlf_require_byte_array_crc32_abi(void) {}
+/* Export one epoch for the entire native layout and primitive contract. */
+void mlf_require_runtime_v5_abi(void) {}
 
 typedef enum {
     HOLE, BUSY, INDIRECT, THUNK, APPLICATION, CLOSURE,

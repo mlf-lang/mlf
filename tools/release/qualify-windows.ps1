@@ -33,6 +33,8 @@ $report = [ordered]@{
 }
 $reportPath = "$Output/release-validation.json"
 Write-ReleaseJson $reportPath $report
+$suite = 'windows-release-qualification'
+$testCase = 'release/windows/build-runner-protocol'
 $saved = @{}
 $variables = @('PATH','TEMP','TMP','CC','MLF_COMPILER','MLF_PACKAGE_MANAGER','MLF_NATIVE_PREFIX','MLF_GC_PREFIX','MLF_WINDOWS_HOST','MLF_CLANG','MLF_BUILD_RUNNER','MLF_BUILD_REPORT')
 foreach ($name in $variables) { $saved[$name] = [Environment]::GetEnvironmentVariable($name,'Process') }
@@ -46,8 +48,11 @@ try {
     $env:CC = $Clang
     $protocol = Invoke-ReleaseCommand $buildRunner @('--protocol-version') "$Output/build-runner-protocol.log" $root
     Assert-Release ($protocol.Trim() -eq '1') 'Unsupported build runner protocol'
+    Write-ReleaseTestEvent $suite $testCase pass @{protocol=1}
     $builds = @()
     foreach ($directory in @($Stage1,$Stage2)) {
+        $stage = if ($directory -eq $Stage1) { 'stage1' } else { 'stage2' }
+        $testCase = "self-host/windows/$stage-provenance"
         $build = Read-ReleaseJson "$directory/build-report.json"
         Assert-Release ($build.complete -eq $true -and $build.implementation -eq 'MLF') "Incomplete native build: $directory"
         Assert-Release ($build.toolchain.clang.sha256 -eq $report.clang_sha256) "Build used a different Clang: $directory"
@@ -65,16 +70,21 @@ try {
         foreach ($name in @('emlf','mlfpkg')) {
             $target = @($build.builds | Where-Object { $_.kind -eq "executable mlf-compiler:$name" })
             Assert-Release ($target.Count -eq 1 -and $target[0].key -match '^[0-9a-f]{64}$') "Missing unique native $name build: $directory"
+            Assert-Release ($target[0].cached -eq $false) "Native $name build was reused: $directory"
             $cache = Join-Path "$directory/cache" $target[0].key
             $binary = Get-ReleaseHash "$directory/bin/$name.exe"
             Assert-Release ((Get-ReleaseHash "$cache/program.exe") -eq $binary) "Published $name differs from its native build artifact"
             $outputs[$name] = @{llvm_sha256=(Get-ReleaseHash "$cache/program.ll"); binary_sha256=$binary}
         }
         $builds += @{report=$build; outputs=$outputs}
+        Write-ReleaseTestEvent $suite $testCase pass @{tools=$outputs;receipt="$directory/build-report.json"}
     }
     foreach ($name in @('emlf','mlfpkg')) {
+        $testCase = "self-host/windows/$name-llvm-fixed-point"
         Assert-Release ($builds[0].outputs[$name].llvm_sha256 -eq $builds[1].outputs[$name].llvm_sha256) "Native $name LLVM did not reach a fixed point"
+        Write-ReleaseTestEvent $suite $testCase pass $builds[1].outputs[$name]
     }
+    $testCase = 'self-host/windows/producer-chain'
     Assert-Release ($builds[1].report.toolchain.compiler.sha256 -eq $builds[0].outputs.emlf.binary_sha256) 'Second native build did not use the first compiler'
     Assert-Release ($builds[1].report.toolchain.manager.sha256 -eq $builds[0].outputs.mlfpkg.binary_sha256) 'Second native build did not use the first manager'
     Copy-Item -LiteralPath "$Stage1/build-report.json" -Destination "$Output/stage1-build-report.json"
@@ -82,17 +92,24 @@ try {
     $fixedPoint = @{complete=$true; stages=2; reused_candidate_build=$false; tools=@{emlf=$builds[1].outputs.emlf;mlfpkg=$builds[1].outputs.mlfpkg}}
     Write-ReleaseJson "$Output/fixed-point.json" $fixedPoint
     $report.tests.fixed_point = $fixedPoint
+    Write-ReleaseTestEvent $suite $testCase pass @{receipt="$Output/fixed-point.json"}
     foreach ($name in @('emlf','mlfpkg')) {
+        $testCase = "release/windows/$name-version"
         $text = Invoke-ReleaseCommand "$Stage2/bin/$name.exe" @('--version') "$Output/$name-version.log" $Output
         Assert-Release ($text.Trim() -eq "$name $version") "Embedded $name version does not match VERSION"
+        Write-ReleaseTestEvent $suite $testCase pass @{version=$version;log="$Output/$name-version.log"}
     }
+    $testCase = 'release/windows/runtime-evidence'
     Write-Output 'Windows qualification: compact-GC runtime regressions'
-    & "$PSScriptRoot/test-windows-runtime.ps1" -NativePrefix $NativePrefix -Clang $Clang -HostHelper $helper -Output "$Output/runtime"
+    & python -B "$PSScriptRoot/../testing/run.py" windows-runtime --report "$Output/runtime-framework.json" -- -NativePrefix $NativePrefix -Clang $Clang -HostHelper $helper -Output "$Output/runtime"
+    Assert-Release ($LASTEXITCODE -eq 0) 'Windows runtime adapter failed'
     $runtime = Read-ReleaseJson "$Output/runtime/runtime-verification.json"
     Copy-Item -LiteralPath "$Output/runtime/runtime-verification.json" -Destination "$Output/runtime-verification.json"
     foreach ($file in (Get-ChildItem "$Output/runtime/*.log")) { Copy-Item -LiteralPath $file.FullName -Destination "$Output/runtime-$($file.Name)" }
     Assert-Release ($runtime.complete -eq $true -and $runtime.helper_sha256 -eq $report.helper_sha256) 'Runtime regressions did not use the qualified filesystem helper'
     $report.tests.runtime = $runtime
+    Write-ReleaseTestEvent $suite $testCase pass @{receipt="$Output/runtime-verification.json"}
+    $testCase = 'release/windows/package-evidence'
     Write-Output 'Windows qualification: build the test-owned compiler campaign runner'
     $null = Invoke-ReleaseCommand $manager @('--manifest',"$root/mlf-package.json",'--compiler',$compiler,'--clang',$Clang,'--runtime',"$root/runtime/mlf_runtime.c",'--build-dir',"$Output/campaign-build",'--timeout','21600','build','--target','compiler-tests') "$Output/campaign-build.log" $root
     $runner = "$Output/campaign-build/bin/compiler-tests.exe"
@@ -117,6 +134,8 @@ try {
     Copy-Item -LiteralPath "$root/tests/golden/unit-inventory.json" -Destination "$Output/unit-inventory.json"
     $report.tests.resolver = @{passed=22;manager_sha256=$report.manager_sha256;runner_sha256=$runnerHash;implementation='MLF'}
     $report.tests.integration = @{passed=29;compiler_sha256=$report.compiler_sha256;manager_sha256=$report.manager_sha256;runner_sha256=$runnerHash;coverage_report_sha256=$coverageHash;coverage_inventory_sha256=$inventoryHash;implementation='MLF'}
+    Write-ReleaseTestEvent $suite $testCase pass @{receipt="$Output/package-integration.json"}
+    $testCase = 'release/windows/parity-evidence'
     Assert-Release (!$Checker -and !$Manifest) 'Native parity builds and verifies its own independent checker and corpus'
     Write-Output 'Windows qualification: native 7,086 parity cases and 160 interpreter/native runtime executions'
     $null = Invoke-ReleaseCommand $runner @('parity','--manager',$manager,'--compiler',$compiler,'--build-dir',"$Output/parity") "$Output/parity.log" $root
@@ -126,6 +145,8 @@ try {
     $report.tests.parity = $parity.parity
     $report.tests.parity.compiler_sha256 = $parity.compiler_sha256
     $report.tests.parity.runner_sha256 = $runnerHash
+    Write-ReleaseTestEvent $suite $testCase pass @{receipt="$Output/parity-verification.json"}
+    $testCase = 'release/windows/final-provenance'
     foreach ($path in (Get-ChildItem "$NativePrefix/include","$NativePrefix/lib" -Recurse -File)) {
         $relative = [IO.Path]::GetRelativePath($NativePrefix,$path.FullName).Replace('\','/')
         $report.dependencies[$relative] = Get-ReleaseHash $path.FullName
@@ -144,9 +165,11 @@ try {
     foreach ($file in (Get-ChildItem -LiteralPath $Output -File | Where-Object Name -ne 'release-validation.json')) { $report.evidence[$file.Name] = Get-ReleaseHash $file.FullName }
     $report.complete = $true
     Write-ReleaseJson $reportPath $report
+    Write-ReleaseTestEvent $suite $testCase pass @{receipt=$reportPath;compiler_sha256=$report.compiler_sha256;manager_sha256=$report.manager_sha256}
     Write-Output "Windows qualification passed: $reportPath"
 } catch {
     $report.error = $_.Exception.Message
+    Write-ReleaseTestEvent $suite $testCase fail $report.error
     Write-ReleaseJson $reportPath $report
     throw
 } finally {

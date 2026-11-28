@@ -203,6 +203,8 @@ module Bootstrap.Types where {
     SConstructor String |
     SLam String (Maybe SAnnotation) SExpr |
     SApp SExpr SExpr |
+    SApplyDictionaries TermRef ([] String) |
+    SBindDictionaries ([] String) SExpr |
     SLet String SExpr SExpr |
     SAnn SExpr SAnnotation |
     -- Declaration provenance is distinct from expression annotation/coercion.
@@ -293,6 +295,8 @@ module Bootstrap.Types where {
     XAbs XName XType XTerm |
     XApp XTerm XTerm |
     XTypeAbs XTyVar XType XTerm |
+    XProjection ([] ((,,) XName XTyVar (Maybe XTyVar))) XName |
+    XInstantiationSpine XName ([] ((,,) String Bool XTerm)) |
     XTypeApp XTerm XComputation |
     XLet XName XTerm XTerm |
     XLetRec ([] ((,,) XName XType XTerm)) XTerm |
@@ -340,11 +344,19 @@ module Bootstrap.Types where {
   -- Case projection barriers precede every use of their sealed field schemes.
   data SolveStep = Instantiate Edge | ProjectCase ([] ((,) Int Int));
   data Typed = Typed Int Form;
+  data PrimitiveOperand = PrimitiveUse Typed Edge | ClosedPrimitiveForm Form;
   data Form =
     FVariable XName (Maybe Edge) |
     FDeclaredVariable XName XType Edge |
     FLambda XName Int Typed Edge |
+    FBindDictionaries ([] ((,) XName Int)) Typed Edge |
     FApply Typed Typed Edge Edge |
+    FApplyVariable XName Edge Typed Edge |
+    FApplyDictionaries XName Edge ([] XName) |
+    FApplyGroundDictionaries XName Edge ([] ((,) Typed Edge)) |
+    FApplyPrimitive Primitive ([] Int) ([] PrimitiveOperand) |
+    FPrimitiveStringConversion Primitive XName XType Typed Edge String |
+    FIntStringCalls XName Typed Typed Edge Int ([] StringCallArm) Typed Edge |
     FBinding XName Typed Typed Edge |
     FCoercion XName Int Int |
     FIntegerLiteral Int |
@@ -359,6 +371,7 @@ module Bootstrap.Types where {
     FScopedEvidence ResolvedCandidateEnvironment |
     FWithGivens ([] EvidenceBinding) Form |
     FChecked ([] ((,) XTyVar Kind)) Typed Edge;
+  data StringCallArm = StringCallArm Int String Typed Edge Edge;
   data RecursiveClosure = RecursiveClosure Int (IntMap Int);
   data RecursiveDefinition = RecursiveDefinition XName Int Typed Edge (Maybe RecursiveClosure);
   data Branch = Branch XPattern Typed Edge;
@@ -373,7 +386,10 @@ module Bootstrap.Types where {
     CGivenScope ([] String) Core |
     CVar String |
     CLam String Core |
+    CBindDictionaries ([] String) Core |
     CApp Core Core |
+    CApplyDictionaries TermRef ([] String) |
+    CApplyScopedDictionaries TermRef ([] ((,) String CandidateEnvironment)) |
     CLet String Core Core |
     CCoerce SAnnotation |
     CInt Int |
@@ -386,7 +402,8 @@ module Bootstrap.Types where {
     CRec ([] ((,,) String RecursiveMode Core)) Core |
     CWanted String ([] ((,) EvidenceRole String)) |
     CChecked SType SExpr;
-  data Binding = Mono XName Int | Poly XName Int | DeclaredPoly XName Int XType | RecursiveMono XName Int Int;
+  data Binding = Mono XName Int | Poly XName Int | DeclaredPoly XName Int XType |
+    RecursiveMono XName Int Int | RecursiveDictionaryMono XName Int Int Int;
   data Phase = Parsing | ModuleResolution | Inference | Resolution | Elaboration | Verification;
   data CompileError = CompileError Phase String
 }

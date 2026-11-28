@@ -2,7 +2,7 @@
 {-# LANGUAGE NoImplicitPrelude, NoMonomorphismRestriction, RankNTypes,
              KindSignatures, FlexibleContexts, FlexibleInstances,
              MultiParamTypeClasses, OverloadedStrings #-}
-module Bootstrap.LLVM (emitLLVM, emitLLVMIO, emitLLVMChunks, emitLLVMIOChunks, ioType, dataConstructors, constructorEntry, emitEntry, emitEntryChunks, emitCheckedChunks, entryCode, PreparedEntry, prepareChecked, prepareCheckedProfiled, emitPreparedChunks, preparedKey, checkedInputKey, crateInputKey, canonicalErasedKey) where {
+module Bootstrap.LLVM (emitLLVM, emitLLVMIO, emitLLVMChunks, emitLLVMIOChunks, ioType, dataConstructors, constructorEntry, emitEntry, emitEntryChunks, emitCheckedChunks, entryCode, runtimeAbi, abiDeclaration, abiCall, PreparedEntry, prepareChecked, prepareCheckedProfiled, emitPreparedChunks, preparedKey, checkedInputKey, crateInputKey, canonicalErasedKey) where {
   import MLF.Primitive;
   import Bootstrap.Types;
   import qualified Bootstrap.Std as L;
@@ -60,7 +60,7 @@ module Bootstrap.LLVM (emitLLVM, emitLLVMIO, emitLLVMChunks, emitLLVMIOChunks, i
   -- The constructor remains private: a cached emission query can only prepare
   -- runtime code from an independently checked term, and cannot replace its
   -- erased program while retaining the successful check.
-  data PreparedEntry = PreparedEntry Bool (Map String ((,) Int Int)) XErased;
+  data PreparedEntry = PreparedEntry Bool (Map String ((,) Int Int)) ([] ([] String)) XErased;
   -- Diagnostic demand, deliberately absent from ordinary emission. Forcing
   -- Right/PreparedEntry alone would charge lazy optimization to LLVM output.
   demandName (XName identity hint) = seq identity (seq (stringLength hint) ());
@@ -91,9 +91,9 @@ module Bootstrap.LLVM (emitLLVM, emitLLVMIO, emitLLVMChunks, emitLLVMIOChunks, i
       (demandList (\(XErasedAlternative pattern body) ->
         seq (demandPattern pattern) (demandErased body)) alternatives)
   };
-  demandPrepared (PreparedEntry execute constructors term) = seq execute
+  demandPrepared (PreparedEntry execute constructors families term) = seq execute
     (seq (demandList (\((,) name ((,) tag arity)) ->
-      seq (stringLength name) (seq tag (seq arity ()))) (M.toList constructors)) (demandErased term));
+      seq (stringLength name) (seq tag (seq arity ()))) (M.toList constructors)) (seq (demandList (demandList stringLength) families) (demandErased term)));
   prepareCheckedProfiled profile requireIO checked =
     Host.phaseValue profile "optimize_ms" (Host.phaseEither demandPrepared)
       (prepareChecked requireIO checked);
@@ -109,6 +109,16 @@ module Bootstrap.LLVM (emitLLVM, emitLLVMIO, emitLLVMChunks, emitLLVMIOChunks, i
     } in
     M.fromList compareString
       (L.zipWith constructorEntry (L.range 0 (L.length all - 1)) all);
+  -- Keep whole declarations together. A builtin constructor also named by a
+  -- user declaration makes both families ineligible for representation proofs.
+  entryFamilies declarations = let {
+    names d = L.map D.constructorName (dataConstructors d);
+    builtins = L.map names D.builtinDeclarations;
+    users = L.map names declarations;
+    overlaps = Set.intersection compareString (Set.fromList compareString (L.concat builtins))
+      (Set.fromList compareString (L.concat users))
+  } in L.filter (\group -> L.not (L.any (\name -> Set.member compareString name overlaps) group))
+    (L.append builtins users);
   prepareChecked :: Bool -> Checked.CheckedTerm -> Either String PreparedEntry;
   prepareChecked requireIO checked =
     let {
@@ -133,12 +143,13 @@ module Bootstrap.LLVM (emitLLVM, emitLLVMIO, emitLLVMChunks, emitLLVMIOChunks, i
            optimized = Optimize.optimizeCheckedTerm term
          } in
          let {
-           lowered = Wrappers.optimize declarations constructors optimized
+           lowered = Optimize.compactStaticRecursion (Wrappers.optimize declarations constructors optimized)
          } in
-         Right (PreparedEntry (ioType ty) constructors lowered);
+         Right (PreparedEntry (ioType ty) constructors (entryFamilies declarations) lowered);
   emitPreparedChunks :: PreparedEntry -> Either String ([] String);
-  emitPreparedChunks (PreparedEntry executeIO constructors lowered) =
-    case Codegen.generate constructors lowered of {
+  emitPreparedChunks (PreparedEntry executeIO constructors families lowered) =
+    let { plans = Codegen.familyPlans constructors families } in
+    case Codegen.generatePreparedProgram True Set.empty constructors plans lowered of {
       Left error -> Left error;
       Right ((,) entry code) ->
         let {
@@ -275,18 +286,19 @@ module Bootstrap.LLVM (emitLLVM, emitLLVMIO, emitLLVMChunks, emitLLVMIOChunks, i
          } in
          Right
            (runtimePack
-              ((:) "MLF-CODEGEN-INPUT-COMPACT-4-RESULT-SUM-1-LAZY-PRODUCER-1-STRING-INDEX-1-READY-TOTAL-3-SEQ-DEMAND-1-CONCAT-LIST-1-ORDERED-DEMAND-1-READY-LET-1-BYTE-FILE-2"
-                 ((:) "compact-bdwgc-v1-process-v1-completion-v2-haskell-boundary-v3"
+              ((:) "MLF-CODEGEN-INPUT-COMPACT-4-RESULT-SUM-1-LAZY-PRODUCER-1-STRING-INDEX-1-READY-TOTAL-3-SEQ-DEMAND-1-CONCAT-LIST-1-ORDERED-DEMAND-1-READY-LET-1-BYTE-FILE-2-EXHAUSTIVE-CASE-1"
+                 ((:) runtimeAbi
                     ((:) (runtimeBool (ioType (Checked.typeOf checked)))
                        ((:) (constructorKey (entryConstructors declarations))
                           ((:) (runtimePack (L.map D.prettyDeclaration declarations))
                              ((:) (canonicalErasedKey (X.erase (Checked.term checked))) [])))))));
-  preparedKey (PreparedEntry executeIO constructors lowered) =
+  preparedKey (PreparedEntry executeIO constructors families lowered) =
     runtimePack
-      ((:) "MLF-CODEGEN-PREPARED-COMPACT-4-RESULT-SUM-1-LAZY-PRODUCER-1-STRING-INDEX-1-READY-TOTAL-3-SEQ-DEMAND-1-CONCAT-LIST-1-ORDERED-DEMAND-1-READY-LET-1-BYTE-FILE-2"
-         ((:) "compact-bdwgc-v1-process-v1-completion-v2-haskell-boundary-v3"
+      ((:) "MLF-CODEGEN-PREPARED-COMPACT-4-RESULT-SUM-1-LAZY-PRODUCER-1-STRING-INDEX-1-READY-TOTAL-3-SEQ-DEMAND-1-CONCAT-LIST-1-ORDERED-DEMAND-1-READY-LET-1-BYTE-FILE-2-EXHAUSTIVE-CASE-1"
+         ((:) runtimeAbi
             ((:) (runtimeBool executeIO)
-               ((:) (constructorKey constructors) ((:) (canonicalErasedKey lowered) [])))));
+               ((:) (constructorKey constructors) ((:) (runtimePack (L.map runtimePack families))
+                  ((:) (canonicalErasedKey lowered) []))))));
   -- A crate links all checked fragments, including declarations outside the
   -- entry's dependency closure. Their bodies are not inputs to its execution.
   -- This projection is used ONLY as a whole-program cache key. The checked
@@ -367,28 +379,27 @@ module Bootstrap.LLVM (emitLLVM, emitLLVMIO, emitLLVMChunks, emitLLVMIOChunks, i
          } in
          Right
            (runtimePack
-              ((:) "MLF-CODEGEN-CRATE-INPUT-COMPACT-4-RESULT-SUM-1-LAZY-PRODUCER-1-STRING-INDEX-1-READY-TOTAL-3-SEQ-DEMAND-1-CONCAT-LIST-1-ORDERED-DEMAND-1-READY-LET-1-BYTE-FILE-2"
-                 ((:) "compact-bdwgc-v1-process-v1-completion-v2-haskell-boundary-v3"
+              ((:) "MLF-CODEGEN-CRATE-INPUT-COMPACT-4-RESULT-SUM-1-LAZY-PRODUCER-1-STRING-INDEX-1-READY-TOTAL-3-SEQ-DEMAND-1-CONCAT-LIST-1-ORDERED-DEMAND-1-READY-LET-1-BYTE-FILE-2-EXHAUSTIVE-CASE-1"
+                 ((:) runtimeAbi
                     ((:) (runtimeBool (ioType (Checked.typeOf checked)))
                        ((:) (constructorKey (entryConstructors declarations))
                           ((:) (runtimePack (L.map D.prettyDeclaration declarations))
                              ((:) (entryRuntimeKey (X.erase (Checked.term checked))) [])))))));
+  -- One link symbol covers the complete value layout and primitive contract.
+  -- Replace it whenever the boundary changes so old producers cannot link
+  -- merely by requiring a subset of the current runtime's capabilities.
+  runtimeAbi :: String;
+  runtimeAbi = "mlf_require_runtime_v5_abi";
+  abiDeclaration :: String;
+  abiDeclaration = "declare void @" ++ runtimeAbi ++ "()";
+  abiCall :: String;
+  abiCall = "  call void @" ++ runtimeAbi ++ "()";
   entryCode :: String -> Bool -> [] String;
   entryCode entry executeIO =
-    let {
-      abi = "mlf_require_haskell_boundary_v4_abi"
-    } in
-    (:) ("declare void @" ++ (abi ++ "()\ndeclare void @mlf_require_byte_file_v2_abi()\ndeclare void @mlf_require_freeze_st_array_abi()\ndeclare void @mlf_require_st_to_io_abi()\ndeclare void @mlf_require_byte_array_crc32_abi()"))
-      ((:) "define ptr @mlf_entry() {"
-         ((:) ("  call void @" ++ (abi ++ "()\n  call void @mlf_require_byte_file_v2_abi()\n  call void @mlf_require_freeze_st_array_abi()\n  call void @mlf_require_st_to_io_abi()\n  call void @mlf_require_byte_array_crc32_abi()"))
-            ((:) ("  %root = call ptr " ++ (entry ++ "(ptr null, ptr null)"))
-               ((:) "  ret ptr %root"
-                  ((:) "}"
-                     ((:) "define i32 @main(i32 %argc, ptr %argv) {"
-                        ((:) "  call void @mlf_set_args(i32 %argc, ptr %argv)"
-                           ((:) "  %root = call ptr @mlf_entry()"
-                              ((:)
-                                 ("  %status = call i32 @mlf_run(ptr %root, i64 " ++
-                                  ((if executeIO then "1" else "0") ++ ")"))
-                                 ((:) "  ret i32 %status" ((:) "}" [])))))))))))
+    [abiDeclaration, "define ptr @mlf_entry() {", abiCall,
+     "  %root = call ptr " ++ entry ++ "(ptr null, ptr null)", "  ret ptr %root", "}",
+     "define i32 @main(i32 %argc, ptr %argv) {",
+     "  call void @mlf_set_args(i32 %argc, ptr %argv)", "  %root = call ptr @mlf_entry()",
+     "  %status = call i32 @mlf_run(ptr %root, i64 " ++ (if executeIO then "1" else "0") ++ ")",
+     "  ret i32 %status", "}"]
 }

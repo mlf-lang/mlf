@@ -3,11 +3,12 @@
 This is a validation protocol for the existing `tools/bench` entry, not another
 benchmark implementation. Static checks do not establish executable correctness.
 
-1. Run `python3 tools/bench/check-migration.py`. Review the source diff: only
-   current list/tuple/unit syntax, entry/dependency paths, matching manifest pins,
-   documentation and the explicit correctness-only mode may change. C sources,
-   default/check inputs, output oracles, performance limits and backend flags
-   remain unchanged. Retain the source commit and tool/build receipts.
+1. Run `python3 tools/bench/check-migration.py`. This checks the canonical
+   inventory, independent source pins, input sizes, backend flags, fixtures and
+   registered entry points. It does not prescribe the runner's source spelling,
+   helper names or case layout. C sources, default/check inputs, output oracles,
+   performance limits and backend flags remain unchanged. Retain the source
+   commit and tool/build receipts.
 2. Build the current GHC-hosted `emlf` and `mlfpkg`, scheduler helper and existing
    bench target using README commands in fresh directories. Pin GHC 9.14.1,
    Clang, runtime, GC/GMP and **PCRE2 10.49**. Missing or mismatched dependencies
@@ -17,6 +18,13 @@ benchmark implementation. Static checks do not establish executable correctness.
    or limit, and mixed limits plus `--check-only` must fail; a failed/missing PCRE2
    dependency must not produce successful correctness or performance status.
    Do not interpret these expected refusals as completed workload checks.
+   The harness also executes the runner's shared domain operations in
+   `harness/runner-modes-preserve-limits-and-reject-invalid-options`,
+   `harness/runner-optional-package-maps-preserve-dependency-pins`, and
+   `harness/runner-reports-distinguish-correctness-from-performance`.
+   These cover exact unrounded limits, absent and malformed optional maps,
+   conflicting dependency pins, and correctness-only versus measured report
+   claims. They do not replace the executable workload qualification below.
 4. Use the reviewed additive `--check-only` mode on all ten workloads, with the
    same new compiler in both compiler slots if testing current compatibility:
    `bench COMPILER COMPILER OUTPUT 3 CLANG --check-only`. Expected terminal

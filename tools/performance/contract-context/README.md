@@ -4,16 +4,15 @@ The parsed-source drivers retain encodings of predecessor contracts alongside th
 
 Both parsed-source driver implementations carry the owned encoding pool. The public structural encoders retain their existing behavior, and the cache helpers fall back to structural encoding when an entry is absent. The encoding keeps the existing query key format and exact bytes, including ordered candidates, roles, classes, and protection flags. This change reuses encoding work, not inference results. It does not hardcode a candidate count such as 44. Repeated query-key file writes, digesting, and reads remain unchanged.
 
-The independent controls compare complete keys and contract encodings against the retained frozen encoder at O0 and O2. They exercise type and name variants, ordered and repeated candidates, roles and protection, lazy unused values, missing-entry fallbacks, a real prepared group and a successful finalized contract delta. Historical validation controls invert the exact pinned, reversible contract-driver source edits, then the existing datatype-driver edits, solely to establish the retained source proof. They still run the unprojected candidate; the historical oracle and its expectations remain unchanged.
+The independent controls compare complete keys and contract encodings against the retained frozen encoder at O0 and O2. They exercise type and name variants, ordered and repeated candidates, roles and protection, lazy unused values, missing-entry fallbacks, a real prepared group and a successful finalized contract delta.
 
 From the repository root, with an authenticated ordinary producer and its source snapshot:
 
 ```sh
 python3 -B tools/performance/contract-context/run_controls.py \
   --producer "$PRODUCER" --source "$PRODUCER_SOURCE" --output "$FRESH_OUTPUT"
-python3 -B tools/performance/patricia/test_adapters.py
-python3 -O -B tools/performance/patricia/test_adapters.py
-python3 -B tools/performance/a1-private-index/test_current.py
+python3 -B tools/testing/run.py python-patricia-adapters
+python3 -B tools/testing/run.py python-patricia-adapters --python-optimization
 python3 tools/testing/check_manifest_snapshot.py
 ```
 

@@ -25,7 +25,7 @@ def authenticator(root):
     return module
 
 
-def prepare(root, output, clang):
+def prepare(root, output, clang, optimization="0"):
     root, output = root.resolve(strict=True), output.resolve()
     if output == root or root.is_relative_to(output):
         raise ValueError('build directory must not contain the checkout')
@@ -67,15 +67,16 @@ def prepare(root, output, clang):
         save()
         if result.returncode != 0:
             raise RuntimeError(label + ' failed; see ' + str(stderr))
-        if expected is not None and (stdout.read_bytes() != expected or stderr.stat().st_size):
+        diagnostics = auth.command_diagnostics(argv, stderr.read_bytes())[1] if expected is not None else b''
+        if expected is not None and (stdout.read_bytes() != expected or diagnostics):
             raise ValueError(label + ' capability or identity mismatch')
 
     run('build', [sys.executable, '-B', root / 'tools/shared/build.py', '--bootstrap-only',
-                 '--optimization', '2', '--cc', cc, '--build-dir', output], 18000)
+                 '--optimization', optimization, '--cc', cc, '--build-dir', output], 18000)
     receipt, binaries = output / 'receipt.json', output / 'bin'
     producer = auth.authenticate_build(receipt, binaries, root)
-    if producer.get('optimization') != '2':
-        raise ValueError('async parity requires the O2 GHC producer')
+    if producer.get('optimization') != optimization:
+        raise ValueError(f'async parity requested the O{optimization} GHC producer')
     receipt_identity = auth.identified(receipt)
     unchanged()
     runner = binaries / 'mlf-build-runner'
@@ -98,7 +99,7 @@ def prepare(root, output, clang):
         auth.verify_file(command['stdout'])
         auth.verify_file(command['stderr'])
     temporary_runner.replace(runner)
-    proof.update(producer_receipt=receipt_identity, inputs=inputs,
+    proof.update(producer_receipt=receipt_identity, inputs=inputs, optimization=optimization,
                  runner=auth.identified(runner), runner_protocol_version=1,
                  compiler=producer['outputs']['emlf'], manager=producer['outputs']['mlfpkg'],
                  complete=True)
@@ -110,8 +111,9 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--build-dir', type=Path, default=ROOT / '.mlf-build/async-ghc')
     parser.add_argument('--clang', default=os.environ.get('CC', 'clang'))
+    parser.add_argument('--optimization', choices=('0', '2'), default='0')
     options = parser.parse_args()
-    prepare(ROOT, options.build_dir, options.clang)
+    prepare(ROOT, options.build_dir, options.clang, options.optimization)
 
 
 if __name__ == '__main__':

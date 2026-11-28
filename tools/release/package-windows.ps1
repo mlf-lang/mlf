@@ -104,7 +104,8 @@ internal POSIX release/benchmark groups are not qualified on Windows.
 MLF is BSD-3-Clause. Dependency notices and redistribution sources are bundled
 under licenses/ and sources/. The binaries are unsigned developer previews.
 '@ + "`n")
-& "$PSScriptRoot/smoke-windows.ps1" -Package $bundle -Clang $Clang -Output "$Output/smoke-work" | Tee-Object -FilePath "$Output/smoke.log"
+& python -B "$PSScriptRoot/../testing/run.py" sdk-smoke-windows --report "$Output/smoke-framework.json" -- -Package $bundle -Clang $Clang -Output "$Output/smoke-work" | Tee-Object -FilePath "$Output/smoke.log"
+Assert-Release ($LASTEXITCODE -eq 0) 'Windows SDK smoke adapter failed'
 Copy-Item -LiteralPath "$Output/smoke-work/verification.json" -Destination "$bundle/evidence/release-smoke.json"
 Copy-Item -LiteralPath "$Output/smoke.log" -Destination "$bundle/evidence/release-smoke.log"
 $checksums = foreach ($file in (Get-ChildItem -LiteralPath $bundle -Recurse -File | Sort-Object FullName)) {

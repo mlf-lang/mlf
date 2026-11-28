@@ -101,7 +101,7 @@ terminated with SIGSEGV and remains a failed attempt. No assertion of all 739
 legacy Core actions executing is made; the focused report stays partial and
 unqualified, with cleanup explicitly unverified.
 
-[Focused validation record and exact stdout captures](../tools/testing/evidence/pr19-main-20261105/validation.json)
+[Focused validation record and exact stdout captures](https://github.com/mlf-lang/mlf/blob/0704d216b8cf6d887d3737efa30a2eae3c152f0a/tools/testing/evidence/pr19-main-20261105/validation.json)
 include tool/binary identities, command arguments, exits, timings, failed
 attempts, a 378-path source snapshot, and a 155-path source union derived from
 the actual build cache receipts. Absolute producer paths in the summary are

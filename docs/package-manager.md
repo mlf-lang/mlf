@@ -164,8 +164,10 @@ For example, `./mlfpkg test --target unit --target packages` selects two groups.
 Plain `test` runs every declared group. Every selected test command executes;
 test-group results are not cached. Checked build artifacts and port preparation
 can be shared, while the compact-GC layout and backend executions still run.
-Port preparation and source driver LLVM track their resolved import closures
-rather than the complete repository inventory. Driver native objects and links
+Port preparation tracks the resolved source imports of each fixture. The backend
+drivers use the same package build actions through LLVM emission as ordinary
+executables. Their transferable LLVM artifact covers the target and its declared
+dependency inputs. Driver native objects and links
 are cached with their native toolchain, headers, libraries and ordered flags;
 each group's verification report records the actual artifact keys and reuse.
 The retained `driver-build/build-report.json` is bound by its SHA-256 in that
@@ -185,9 +187,16 @@ checking and LLVM emission when the selected compiler supports
 `--compile-crate-to-llvm-gc` with `--codegen-cache`. The manager keeps the separate
 checked-artifact and LLVM cache actions: a fresh target hands its verified LLVM
 to the emission action, while a no-edit build reuses their completed artifacts.
-Libraries still compile to checked artifacts only. Older seed compilers and
-checked-only artifacts use the staged commands with the existing cache checks.
-The ordinary `emlf SOURCE -o OUTPUT` installed driver is a separate entry.
+When a source library is compiled, a capable compiler can also produce a
+native object. Each native target checks compatible cached objects and links
+the ones supplying reachable exports. Checked releases and libraries without
+usable native objects supply checked IR. Older seed compilers use the staged
+commands. The build report's `dependency_modes` rows give the reason for each
+choice, and `native-dependencies.json` in the executable artifact lists the
+exact objects passed to the linker.
+For a source file, `emlf SOURCE -o OUTPUT` infers an implicit crate and can link
+the installed standard-library and runtime objects. See [compiler roots and
+caching](compiler-entry-unification.md).
 
 Libraries and targets compile as crates through generated `.mlfci` metadata and
 `.mlfco` checked fragments. Declaration SCC inference releases each solver graph
@@ -369,6 +378,11 @@ its `query_report` paths retain complete per-SCC detail. Each crate artifact als
 stores a checked `unit.query-summary.json`, so an outer hit does not parse the
 detailed report again. JSON transport scans by scalar offsets and joins string
 runs without repeatedly copying the remaining input.
+For a native executable, `dependency_modes` in `build-report.json` records
+how each library was prepared and linked. The same choices appear on stderr.
+The link prefers compatible library machine code, then checked IR. Source
+packages can produce both forms. [Dependency selection](compiler-entry-unification.md#choosing-dependency-implementations)
+
 Each crate also records `unit.validation.json`. Its checked/reused object counts
 distinguish independent root validation from SHA-verified dependency receipt
 reuse; outer hits report no new object checks. Metadata graph and semantic

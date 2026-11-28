@@ -125,7 +125,8 @@ def main():
                   *sorted((ROOT / 'runtime').glob('*.h'))]
         inputs += [Path(arg) for arg in native['link_args'] if Path(arg).is_absolute()]
         record['inputs'].update({str(path): sha(path) for path in inputs})
-        flags = ['-O' + producer['optimization'], '-fpedantic-bottoms', '-fno-state-hack',
+        producer_optimization = producer['optimization']
+        flags = ['-O' + producer_optimization, '-fpedantic-bottoms', '-fno-state-hack',
                  '-package-env', '-', '-clear-package-db', '-global-package-db',
                  '-no-user-package-db', '-hide-all-packages']
         for package in ['base', 'array', 'bytestring', 'text', 'containers', 'directory']:
@@ -157,20 +158,22 @@ def main():
         artifact(output / 'union-host-controls')
         runner.run('run-union-host', [output / 'union-host-controls'],
                    expected=union_message, timeout=120)
-        # Recompile the real Map closure at O0 as well as using authenticated O2
-        # objects above. An O0 fixture linked to O2 Map objects is not this check.
-        noopt = [flag for flag in flags if flag != '-O' + producer['optimization']]
-        noopt_objects = output / 'union-host-O0'
-        noopt_objects.mkdir()
-        runner.run('compile-union-host-O0', [ghc, '--make', '-j1', *noopt, '-O0', '-i',
-                   '-Wno-star-is-type', '-Wno-deprecations',
+        # Build the real Map closure at the other optimization level in a
+        # fresh directory. Recompiling only the fixture would mix levels.
+        alternate_optimization = '2' if producer_optimization == '0' else '0'
+        alternate_flags = ['-O' + alternate_optimization, *flags[1:]]
+        alternate_name = 'union-host-O' + alternate_optimization
+        alternate_objects = output / alternate_name
+        alternate_controls = output / (alternate_name + '-controls')
+        alternate_objects.mkdir()
+        runner.run('compile-' + alternate_name, [ghc, '--make', '-j1', *alternate_flags,
+                   '-i', '-Wno-star-is-type', '-Wno-deprecations',
                    '-i' + str(ROOT / 'libraries/mlf-foundation'), '-i' + str(ROOT / 'host/ghc'),
-                   '-odir', noopt_objects, '-hidir', noopt_objects, '-rtsopts=ignoreAll', UNION_HOST,
-                   output / 'host.o', output / 'supervisor.o', '-o', output / 'union-host-O0-controls'],
+                   '-odir', alternate_objects, '-hidir', alternate_objects, '-rtsopts=ignoreAll',
+                   UNION_HOST, output / 'host.o', output / 'supervisor.o', '-o', alternate_controls],
                    timeout=180)
-        artifact(output / 'union-host-O0-controls')
-        runner.run('run-union-host-O0', [output / 'union-host-O0-controls'],
-                   expected=union_message, timeout=180)
+        artifact(alternate_controls)
+        runner.run('run-' + alternate_name, [alternate_controls], expected=union_message, timeout=180)
         emitted = runner.run('emit-native', [build / 'bin/emlf', '-i',
                              ROOT / 'libraries/mlf-foundation', '--emit-llvm-gc', NATIVE], timeout=240)
         llvm = output / 'program.ll'
@@ -221,7 +224,8 @@ def main():
         authenticate_build(build_receipt, build / 'bin')
         record.update(complete=True, host_cases=19611, host_demand_checks=11, native_cases=100,
                       union_host_pairs_per_optimization=16745, union_host_demand_checks=9,
-                      union_host_optimizations=['0', producer['optimization']], union_native_cases=75)
+                      union_host_optimizations=sorted([producer_optimization, alternate_optimization]),
+                      union_native_cases=75)
         print('PASS ordered maps: 19611 host cases, 11 host demand checks, 100 native cases; '
               'union 16745 host pairs at O0/O2, 9 demand checks and 75 native cases')
     except BaseException as error:

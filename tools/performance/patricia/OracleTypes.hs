@@ -6,7 +6,7 @@
 module OracleTypes
   (module T,IntMap,IntSet,pattern IntMap,pattern IntSet,
    wrapMap,unwrapMap,wrapSet,unwrapSet,validMap,validSet,
-   mapEntries,setEntries,sameMap,sameSet) where
+   mapEntries,setEntries,fromMapEntries,fromSetEntries,sameMap,sameSet) where
 import Bootstrap.Types as T hiding (IntMap(..),IntSet(..))
 import qualified Bootstrap.Types as R
 import qualified MLF.Host.Base as B
@@ -88,7 +88,11 @@ unwrapSet s=if validSet s then balanced[(k,())|k<-setEntries s] else error "orac
 wrapMap :: Map B.Int a -> R.IntMap a
 wrapMap t=case oldProof t of
  Prelude.Nothing->error "oracle bridge: invalid BST map"
- Prelude.Just _->let tree=build(sortOn(unsigned.fst)(oldEntries t)) in tree `seq` R.IntMap tree
+ Prelude.Just _->fromMapEntries (oldEntries t)
+
+-- Encode a finite set of distinct keys without inspecting the payloads.
+fromMapEntries :: [(B.Int,a)] -> R.IntMap a
+fromMapEntries entries=let tree=build(sortOn(unsigned.fst)entries) in tree `seq` R.IntMap tree
  where
  build []=R.IntMapNil
  build [(k,v)]=k `seq` R.IntMapTip k v
@@ -100,7 +104,10 @@ wrapMap t=case oldProof t of
 wrapSet :: Map B.Int () -> R.IntSet
 wrapSet t=case oldProof t of
  Prelude.Nothing->error "oracle bridge: invalid BST set"
- Prelude.Just _->let tree=build(sortOn unsigned(map fst(oldEntries t))) in tree `seq` R.IntSet tree
+ Prelude.Just _->fromSetEntries (map fst (oldEntries t))
+
+fromSetEntries :: [B.Int] -> R.IntSet
+fromSetEntries entries=let tree=build(sortOn unsigned entries) in tree `seq` R.IntSet tree
  where
  build []=R.IntSetNil
  build ks=let p=head ks .&. complement 63;n=fromIntegral(length ks) in

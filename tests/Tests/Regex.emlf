@@ -1,59 +1,126 @@
 module Tests.Regex where
+import Prelude hiding (Monad, return, bind)
+import MLF.Primitive (Monad, return, bind)
 import Bootstrap.Types
 import qualified Bootstrap.Std as S
 import qualified Bootstrap.Regex as R
+import qualified Package.OS as O
+import qualified Test.Assert as A
+import qualified Test.Case as C
+import qualified Test.Runner as Runner
 import qualified Tests.Coverage as Coverage
 
-regex : String -> R.Regex
-regex text = case R.compile text of { Left error -> panic error; Right value -> value }
-assert : Bool -> String -> IO ()
-assert condition message = if condition then return () else panic ("regex test: " ++ message)
-match : String -> String -> Int -> Int -> IO ()
-match pattern subject start end = assert (case R.find (regex pattern) subject 0 of { Nothing -> false; Just ((,) a b) -> a == start && b == end }) ("unexpected match for " ++ pattern)
-reject : String -> IO ()
-reject pattern = assert (case R.compile pattern of { Left error -> stringLength error > 0; Right value -> false }) ("invalid pattern accepted: " ++ pattern)
-checked : String -> IO () -> IO ()
-checked identity action = do { action; Coverage.passed "regex" identity }
+assert : Bool -> String -> A.Test ()
+assert condition message = A.assert condition ("regex test: " ++ message)
+withRegex : forall a. String -> Either String R.Regex -> (R.Regex -> A.Test a) -> A.Test a
+withRegex pattern compiled action = case compiled of
+ Left message -> A.fail ("regex test: could not compile " ++ pattern ++ ": " ++ message)
+ Right value -> action value
+matchWith : String -> Either String R.Regex -> String -> Int -> Int -> A.Test ()
+matchWith pattern compiled subject start end = withRegex pattern compiled (\value ->
+ assert (case R.find value subject 0 of { Nothing -> false; Just ((,) a b) -> a == start && b == end }) ("unexpected match for " ++ pattern))
+match : String -> String -> Int -> Int -> A.Test ()
+match pattern = matchWith pattern (R.compile pattern)
+reject : String -> A.Test ()
+reject pattern = assert (case R.compile pattern of { Left error -> stringLength error > 0; Right _ -> false }) ("invalid pattern accepted: " ++ pattern)
+check : String -> A.Test () -> C.Case
+check identity action = C.test identity identity ((:) "suite:regex" []) action
+invalidInputs : [] ((,) String String)
+invalidInputs =
+ (:) ((,) "regex/invalid/open-class" "[") (
+ (:) ((,) "regex/invalid/open-group" "(") (
+ (:) ((,) "regex/invalid/unmatched-close-group" "a)") (
+ (:) ((,) "regex/invalid/leading-repeat" "*a") (
+ (:) ((,) "regex/invalid/repeated-star" "a**") (
+ (:) ((,) "regex/invalid/lazy-quantifier" "a+?") (
+ (:) ((,) "regex/invalid/reversed-range" "[z-a]") (
+ (:) ((,) "regex/invalid/empty-class" "[]") (
+ (:) ((,) "regex/invalid/trailing-escape" "\\") (
+ (:) ((,) "regex/invalid/backreference" "\\1") (
+ (:) ((,) "regex/invalid/word-boundary" "\\b") (
+ (:) ((,) "regex/invalid/lookahead" "(?=a)") (
+ (:) ((,) "regex/invalid/reversed-bound" "a{2,1}") (
+ (:) ((,) "regex/invalid/oversized-bound" "a{1001}") (
+ (:) ((,) "regex/invalid/malformed-bound" "a{1,x}") (
+ (:) ((,) "regex/invalid/class-range-escape" "[\\d-z]") (
+ (:) ((,) "regex/invalid/nested-repeat-size" "(a{1000}){1000}") (
+ [])))))))))))))))))
+invalidCases : [] C.Case
+invalidCases = S.map (\((,) identity pattern) ->
+ C.test identity identity ((:) "suite:regex" ((:) "generated:invalid-patterns" [])) (reject pattern)) invalidInputs
+
+-- Cache only matching immutable patterns. Every offset, count and replacement
+-- still runs its independent expected-result assertion.
+regularCases : [] C.Case
+regularCases =
+ let laterBranch = R.compile "a.*z|b" in
+ let ambiguousRepeat = R.compile "(a|aa)*b" in
+ let dot = R.compile "." in
+ let empty = R.compile "" in
+ let nullableRepeat = R.compile "(a?)*" in
+ let greedyRepeat = R.compile "a*" in
+ let oneOrMore = R.compile "a+" in
+ let ambiguousSubject = S.concatStrings (S.replicate 200 "a") in
+ (:) (check "regex/invalid/nested-empty-repeat-size" (reject "((){1000}){1000}")) (
+ (:) (check "regex/match/left-alternative-long" (match "ab|a" "ab" 0 2)) (
+ (:) (check "regex/match/left-alternative-short" (match "a|ab" "ab" 0 1)) (
+ (:) (check "regex/match/leftmost-long" (matchWith "a.*z|b" laterBranch "a--b--z" 0 7)) (
+ (:) (check "regex/match/later-alternative" (matchWith "a.*z|b" laterBranch "a--b--" 3 4)) (
+ (:) (check "regex/match/greedy-backtrack" (match "a*ab" "aaaab" 0 5)) (
+ (:) (check "regex/match/one-or-more" (matchWith "a+" oneOrMore "baaaac" 1 5)) (
+ (:) (check "regex/match/optional" (match "ab?c" "ac" 0 2)) (
+ (:) (check "regex/match/bounded-repeat" (match "a{2,4}" "aaaaa" 0 4)) (
+ (:) (check "regex/match/unbounded-repeat" (match "a{2,}" "aaaaa" 0 5)) (
+ (:) (check "regex/match/exact-repeat" (match "a{3}" "baaaa" 1 4)) (
+ (:) (check "regex/match/range" (match "[a-c]+" "xcabz" 1 4)) (
+ (:) (check "regex/match/negated-range" (match "[^a-c]+" "abXYZc" 2 5)) (
+ (:) (check "regex/match/escape-class" (match "[\\D]+" "12xyz3" 2 5)) (
+ (:) (check "regex/match/negated-escape-class" (match "[^\\D]+" "ab123c" 2 5)) (
+ (:) (check "regex/match/predefined-classes" (match "\\w+\\s\\d+" "!a_1 23?" 1 7)) (
+ (:) (check "regex/match/escaped-class-delimiters" (match "[\\]\\-]+" "x]-y" 1 3)) (
+ (:) (check "regex/match/anchors" (match "^a..$" "abc" 0 3)) (
+ (:) (check "regex/match/nullable-star" (matchWith "(a?)*" nullableRepeat "aaa" 0 3)) (
+ (:) (check "regex/match/nested-star" (match "(a*)*b" "aaab" 0 4)) (
+ (:) (check "regex/match/empty-alternative-before-required" (match "(|a)*b" "aaab" 0 4)) (
+ (:) (check "regex/match/empty-alternative-star" (match "(|a)*" "aaa" 0 0)) (
+ (:) (check "regex/match/nullable-alternative-priority" (match "(a?|b)*" "b" 0 0)) (
+ (:) (check "regex/match/anchor-alternative-star" (match "(^|.)*" "a" 0 0)) (
+ (:) (check "regex/match/nullable-dot-alternative" (match "(a?|.)*" "ab" 0 1)) (
+ (:) (check "regex/match/ambiguous-success" (matchWith "(a|aa)*b" ambiguousRepeat (ambiguousSubject ++ "b") 0 201)) (
+ (:) (check "regex/match/ambiguous-failure-terminates" (withRegex "(a|aa)*b" ambiguousRepeat (\value -> assert (case R.find value ambiguousSubject 0 of { Nothing -> true; Just result -> false }) "ambiguous failure did not terminate"))) (
+ (:) (check "regex/match/unicode-range" (match "[α-ω]+" "xαβω!" 1 4)) (
+ (:) (check "regex/match/nul" (matchWith "." dot (stringFromCode 0) 0 1)) (
+ (:) (check "regex/match/dot-excludes-newline" (withRegex "." dot (\value -> assert (case R.find value "\n" 0 of { Nothing -> true; Just result -> false }) "dot matched newline"))) (
+ (:) (check "regex/match/offset-preserves-anchor" (withRegex "^b" (R.compile "^b") (\value -> assert (case R.find value "ab" 1 of { Nothing -> true; Just result -> false }) "offset changed beginning anchor"))) (
+ (:) (check "regex/match/reject-past-end-offset" (withRegex "$" (R.compile "$") (\value -> assert (case R.find value "ab" 3 of { Nothing -> true; Just result -> false }) "out-of-range search accepted"))) (
+ (:) (check "regex/match/reject-negative-offset" (withRegex "a" (R.compile "a") (\value -> assert (case R.find value "a" (-1) of { Nothing -> true; Just result -> false }) "negative search accepted"))) (
+ (:) (check "regex/count/nonoverlap" (withRegex "aa" (R.compile "aa") (\value -> assert (R.countMatches value "aaaaa" == 2) "matches overlapped"))) (
+ (:) (check "regex/count/empty-advancement" (withRegex "" empty (\value -> withRegex "(a?)*" nullableRepeat (\second -> withRegex "a*" greedyRepeat (\third -> assert (R.countMatches value "αβ" == 3 && R.countMatches second "bb" == 3 && R.countMatches third "aaa" == 2) "empty-match advancement changed"))))) (
+ (:) (check "regex/replace/literal" (withRegex "a+" oneOrMore (\value -> assert (eqString (R.replaceAll value "$1\\tail" "caaad") "c$1\\taild") "replacement was not literal"))) (
+ (:) (check "regex/replace/empty-advancement" (withRegex "" empty (\value -> withRegex "a*" greedyRepeat (\second -> assert (eqString (R.replaceAll value "-" "αβ") "-α-β-" && eqString (R.replaceAll second "x" "aaa") "xx") "empty replacement skipped subject characters")))) (
+ (:) (check "regex/replace/alternative-priority" (withRegex "(a|ab)" (R.compile "(a|ab)") (\value -> assert (eqString (R.replaceAll value "x" "abab") "xbxb") "replacement changed alternative priority"))) (
+ (:) (check "regex/replace/fasta-clean" (withRegex ">[^\n]*\n|\n" (R.compile ">[^\n]*\n|\n") (\value -> assert (eqString (R.replaceAll value "" ">ONE\nAC\nGT\n>TWO\nTA\n") "ACGTTA") "FASTA cleaning differs"))) (
+ [])))))))))))))))))))))))))))))))))))))))
+
+cases : [] C.Case
+cases = S.append invalidCases regularCases
+
+observe : Runner.Result -> IO ()
+observe result = if Runner.passed result then Coverage.passed "regex" (Runner.identity result) else return ()
 main : IO ()
 main = do
- Coverage.mapCounted "regex" "invalid-patterns-executed" (\((,) identity pattern) -> checked identity (reject pattern)) (S.zip ((:) "regex/invalid/open-class" ((:) "regex/invalid/open-group" ((:) "regex/invalid/unmatched-close-group" ((:) "regex/invalid/leading-repeat" ((:) "regex/invalid/repeated-star" ((:) "regex/invalid/lazy-quantifier" ((:) "regex/invalid/reversed-range" ((:) "regex/invalid/empty-class" ((:) "regex/invalid/trailing-escape" ((:) "regex/invalid/backreference" ((:) "regex/invalid/word-boundary" ((:) "regex/invalid/lookahead" ((:) "regex/invalid/reversed-bound" ((:) "regex/invalid/oversized-bound" ((:) "regex/invalid/malformed-bound" ((:) "regex/invalid/class-range-escape" ((:) "regex/invalid/nested-repeat-size" []))))))))))))))))) ((:) "[" ((:) "(" ((:) "a)" ((:) "*a" ((:) "a**" ((:) "a+?" ((:) "[z-a]" ((:) "[]" ((:) "\\" ((:) "\\1" ((:) "\\b" ((:) "(?=a)" ((:) "a{2,1}" ((:) "a{1001}" ((:) "a{1,x}" ((:) "[\\d-z]" ((:) "(a{1000}){1000}" []))))))))))))))))))
- checked "regex/invalid/nested-empty-repeat-size" (reject "((){1000}){1000}")
- checked "regex/match/left-alternative-long" (match "ab|a" "ab" 0 2)
- checked "regex/match/left-alternative-short" (match "a|ab" "ab" 0 1)
- checked "regex/match/leftmost-long" (match "a.*z|b" "a--b--z" 0 7)
- checked "regex/match/later-alternative" (match "a.*z|b" "a--b--" 3 4)
- checked "regex/match/greedy-backtrack" (match "a*ab" "aaaab" 0 5)
- checked "regex/match/one-or-more" (match "a+" "baaaac" 1 5)
- checked "regex/match/optional" (match "ab?c" "ac" 0 2)
- checked "regex/match/bounded-repeat" (match "a{2,4}" "aaaaa" 0 4)
- checked "regex/match/unbounded-repeat" (match "a{2,}" "aaaaa" 0 5)
- checked "regex/match/exact-repeat" (match "a{3}" "baaaa" 1 4)
- checked "regex/match/range" (match "[a-c]+" "xcabz" 1 4)
- checked "regex/match/negated-range" (match "[^a-c]+" "abXYZc" 2 5)
- checked "regex/match/escape-class" (match "[\\D]+" "12xyz3" 2 5)
- checked "regex/match/negated-escape-class" (match "[^\\D]+" "ab123c" 2 5)
- checked "regex/match/predefined-classes" (match "\\w+\\s\\d+" "!a_1 23?" 1 7)
- checked "regex/match/escaped-class-delimiters" (match "[\\]\\-]+" "x]-y" 1 3)
- checked "regex/match/anchors" (match "^a..$" "abc" 0 3)
- checked "regex/match/nullable-star" (match "(a?)*" "aaa" 0 3)
- checked "regex/match/nested-star" (match "(a*)*b" "aaab" 0 4)
- checked "regex/match/empty-alternative-before-required" (match "(|a)*b" "aaab" 0 4)
- checked "regex/match/empty-alternative-star" (match "(|a)*" "aaa" 0 0)
- checked "regex/match/nullable-alternative-priority" (match "(a?|b)*" "b" 0 0)
- checked "regex/match/anchor-alternative-star" (match "(^|.)*" "a" 0 0)
- checked "regex/match/nullable-dot-alternative" (match "(a?|.)*" "ab" 0 1)
- checked "regex/match/ambiguous-success" (match "(a|aa)*b" (S.concatStrings (S.replicate 200 "a") ++ "b") 0 201)
- checked "regex/match/ambiguous-failure-terminates" (assert (case R.find (regex "(a|aa)*b") (S.concatStrings (S.replicate 200 "a")) 0 of { Nothing -> true; Just result -> false }) "ambiguous failure did not terminate")
- checked "regex/match/unicode-range" (match "[α-ω]+" "xαβω!" 1 4)
- checked "regex/match/nul" (match "." (stringFromCode 0) 0 1)
- checked "regex/match/dot-excludes-newline" (assert (case R.find (regex ".") "\n" 0 of { Nothing -> true; Just result -> false }) "dot matched newline")
- checked "regex/match/offset-preserves-anchor" (assert (case R.find (regex "^b") "ab" 1 of { Nothing -> true; Just result -> false }) "offset changed beginning anchor")
- checked "regex/match/reject-past-end-offset" (assert (case R.find (regex "$") "ab" 3 of { Nothing -> true; Just result -> false }) "out-of-range search accepted")
- checked "regex/match/reject-negative-offset" (assert (case R.find (regex "a") "a" (-1) of { Nothing -> true; Just result -> false }) "negative search accepted")
- checked "regex/count/nonoverlap" (assert (R.countMatches (regex "aa") "aaaaa" == 2) "matches overlapped")
- checked "regex/count/empty-advancement" (assert (R.countMatches (regex "") "αβ" == 3 && R.countMatches (regex "(a?)*") "bb" == 3 && R.countMatches (regex "a*") "aaa" == 2) "empty-match advancement changed")
- checked "regex/replace/literal" (assert (eqString (R.replaceAll (regex "a+") "$1\\tail" "caaad") "c$1\\taild") "replacement was not literal")
- checked "regex/replace/empty-advancement" (assert (eqString (R.replaceAll (regex "") "-" "αβ") "-α-β-" && eqString (R.replaceAll (regex "a*") "x" "aaa") "xx") "empty replacement skipped subject characters")
- checked "regex/replace/alternative-priority" (assert (eqString (R.replaceAll (regex "(a|ab)") "x" "abab") "xbxb") "replacement changed alternative priority")
- checked "regex/replace/fasta-clean" (assert (eqString (R.replaceAll (regex ">[^\n]*\n|\n") "" ">ONE\nAC\nGT\n>TWO\nTA\n") "ACGTTA") "FASTA cleaning differs")
- putStrLn "regular-expression tests passed"
+ args <- O.allArguments
+ case Runner.plan args cases of
+  Left _ -> do { code <- Runner.run args cases; exitWith code }
+  Right ((,) options selected) ->
+   if Runner.listing options then do { code <- Runner.run args cases; if code == 0 then return () else exitWith code }
+   else do
+    let complete = S.length selected == S.length cases && S.null (Runner.selectors options)
+    Coverage.begin "regex" complete
+    code <- Runner.runObserved observe args cases
+    if code == 0 then do
+     let invalid = S.filter (\entry -> S.elem eqString "generated:invalid-patterns" (C.tags entry)) selected
+     Coverage.metric "regex" "invalid-patterns-executed" (S.length invalid)
+     Coverage.finish "regex"
+     if Runner.json options then return () else putStrLn "regular-expression tests passed"
+    else do { Coverage.flush; exitWith code }

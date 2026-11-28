@@ -1,4 +1,6 @@
 module Tests.PortSuite where
+import Prelude hiding (Monad, return, bind)
+import MLF.Primitive (Monad, return, bind)
 import Bootstrap.Types
 import qualified Bootstrap.Std as S
 import qualified Package.OS as O
@@ -18,6 +20,8 @@ import qualified Bootstrap.X.Syntax as X
 import qualified Bootstrap.X.Type as T
 import qualified Bootstrap.Primitive as Primitive
 import qualified Bootstrap.Data as D
+import qualified Test.Case as Case
+import qualified Test.Runner as Runner
 names : [] String
 names = O.words "foundation MapFolds IntegerContainers OptimizerQueries ConstructorProjection ForceReuse StrictFields prelude Target frontend LexerCounters LLVMBuild RuntimeCases StateRuntime StateTypes GraphConformance GraphScopes GraphDense OrderedTraversal SolverReuse TypeCache GraphStack EmbeddingPruning InferenceConformance PrimitiveMetadata"
 familyId name = "port/" ++ name
@@ -50,10 +54,11 @@ prepareFixture name destination = do
  hash <- fileDigest destination
  J.write (destination ++ ".checks.json") (J.Object ((:) ((,) "format" (J.num 1)) ((:) ((,) "fixture" (J.str name)) ((:) ((,) "target_sha256" (J.str hash)) ((:) ((,) "entry_type" (J.str "IO ()")) ((:) ((,) "inferred_type" (J.str (Pretty.prettyType ty))) ((:) ((,) "checks" V.portTargetChecks) [])))))))
  putStrLn ("CHECKED " ++ name)
-preparedSource : String -> IO String
-preparedSource name = preparedSourceFor names true name
-preparedSourceFor : [] String -> Bool -> String -> IO String
-preparedSourceFor selected full name = do
+-- Phase 1 keeps the existing content identity contract and reads the manifest
+-- once for the invocation. Every target and checker receipt is still hashed
+-- independently, including a second target hash after reading its bytes.
+preparedManifest : [] String -> Bool -> Bool -> IO ((,,) String String ([] J.Json))
+preparedManifest selected full allowFull = do
  path <- getEnv "MLF_TEST_PORT_TARGETS"
  expected <- getEnv "MLF_TEST_PORT_TARGETS_SHA256"
  H.assert (stringLength path > 0 && stringLength expected == 64) "missing prepared port targets"
@@ -64,46 +69,64 @@ preparedSourceFor selected full name = do
  let actualNames = S.map (J.getText "fixture" "") rows
  let fullCoverage = eqString (J.getText "scope" "full" manifest) "full" && S.length rows == 25 && S.eqList eqString (S.sortBy compareString names) (S.sortBy compareString actualNames)
  let partialCoverage = eqString (J.getText "scope" "" manifest) "partial" && S.not (S.null selected) && S.length selected == S.length (S.nubBy eqString selected) && S.all (\fixture -> S.elem eqString fixture names) selected && J.equal (J.get "selected_fixtures" manifest) (J.stringArray selected) && S.length rows == S.length selected && S.eqList eqString (S.sortBy compareString selected) (S.sortBy compareString actualNames)
- H.assert (J.equal (J.get "format" manifest) (J.num 1) && (if full then fullCoverage else partialCoverage)) "prepared port coverage changed"
- row <- case S.find (\row -> eqString name (J.getText "fixture" "" row)) rows of {Just row -> return row; Nothing -> H.fail "prepared port target missing"}
+ H.assert (J.equal (J.get "format" manifest) (J.num 1) && (if full then fullCoverage else partialCoverage || allowFull && fullCoverage)) "prepared port coverage changed"
+ return ((,,) path expected rows)
+preparedSource : [] J.Json -> String -> IO String
+preparedSource rows name = do
+ row <- case S.find (\row -> eqString name (J.getText "fixture" "" row)) rows of {Just row -> return row; Nothing -> B.failCase "prepared port target missing"}
  let target = J.getText "target" "" row
  digest <- fileDigest target
- H.assert (eqString digest (J.getText "target_sha256" "" row)) "prepared port target changed"
+ B.assertCase (eqString digest (J.getText "target_sha256" "" row)) "prepared port target changed"
  checks <- J.read (target ++ ".checks.json")
  checksHash <- fileDigest (target ++ ".checks.json")
- H.assert (eqString checksHash (J.getText "checks_sha256" "" row) && V.validPortTargetChecks name digest checks) "prepared port check receipt changed"
+ B.assertCase (eqString checksHash (J.getText "checks_sha256" "" row) && V.validPortTargetChecks name digest checks) "prepared port check receipt changed"
  source <- readFile target
  after <- fileDigest target
- H.assert (eqString digest after) "prepared port target changed while reading"
+ B.assertCase (eqString digest after) "prepared port target changed while reading"
  return source
-runFixture : B.Backends -> String -> IO ()
-runFixture backends name = runPreparedFixture backends names true name
-runPreparedFixture : B.Backends -> [] String -> Bool -> String -> IO ()
-runPreparedFixture backends selected full name = do
+runPreparedFixture : B.Backends -> [] J.Json -> String -> IO ()
+runPreparedFixture backends rows name = do
  let source = "bootstrap/tests/" ++ name ++ ".emlf"
  expected <- if eqString name "PrimitiveMetadata" then return (Bytes.encode metadata) else Bytes.readFile ("bootstrap/tests/" ++ name ++ ".expected")
- H.assert (S.not (Bytes.null expected)) "empty port fixture expectation"
+ B.assertCase (S.not (Bytes.null expected)) "empty port fixture expectation"
  case S.lookup eqString name references of
   Nothing -> return ()
   Just reference -> do
    exe <- getEnv "MLF_TEST_REFERENCES"
    work <- getEnv "MLF_TEST_WORK"
-   code <- O.exec "" ((:) exe ((:) reference [])) "" (work ++ "/oracle.out") (work ++ "/oracle.err") 1800
-   output <- Bytes.readFile (work ++ "/oracle.out")
-   error <- readFile (work ++ "/oracle.err")
-   H.assert (code == 0 && eqString error "" && H.eq output expected) ("independent reference differs: " ++ name)
+   let oracle = work ++ "/port-" ++ name ++ "-reference"
+   code <- O.exec "" ((:) exe ((:) reference [])) "" (oracle ++ ".stdout") (oracle ++ ".stderr") 1800
+   output <- Bytes.readFile (oracle ++ ".stdout")
+   error <- readFile (oracle ++ ".stderr")
+   referenceHash <- fileDigest exe
+   outputHash <- fileDigest (oracle ++ ".stdout")
+   J.write (oracle ++ ".json")
+    (J.set "fixture" (J.str name) (J.set "reference" (J.str reference)
+      (J.set "reference_sha256" (J.str referenceHash)
+        (J.set "stdout_sha256" (J.str outputHash) (J.set "exit_code" (J.num code) J.empty)))))
+   B.assertCase (code == 0 && eqString error "" && H.eq output expected) ("independent reference differs: " ++ name)
    if eqString name "InferenceConformance" then do
     code <- O.exec "" ((:) exe ((:) reference ((:) "--generate" []))) "" (work ++ "/generated.emlf") (work ++ "/generated.err") 1800
     generated <- Bytes.readFile (work ++ "/generated.emlf")
     original <- Bytes.readFile source
-    H.assert (code == 0 && H.eq generated original && H.contains "Fig12-A8\tREJECT Inference\n" (Bytes.decodeText expected)) "inference input generation or A8 coverage differs"
+    B.assertCase (code == 0 && H.eq generated original && H.contains "Fig12-A8\tREJECT Inference\n" (Bytes.decodeText expected)) "inference input generation or A8 coverage differs"
     else return ()
- serialized <- preparedSourceFor selected full name
+ serialized <- preparedSource rows name
  let heavy = S.elem eqString name (O.words "GraphConformance GraphDense InferenceConformance SolverReuse StateTypes")
  let execution = B.withExecutionTimeout (if heavy then 1800 else 60) backends
  observed <- B.executeNativeSerialized execution B.IOEntry (B.Input "" false) serialized
- H.right (B.outcome observed)
- H.assert (H.eq (B.outputBytes observed) expected && eqString (B.stderrOutput observed) "" && eqString (B.remaining observed) "") ("port runtime output differs: " ++ name)
+ B.rightCase (B.outcome observed)
+ B.assertCase (H.eq (B.outputBytes observed) expected && eqString (B.stderrOutput observed) "" && eqString (B.remaining observed) "") ("port runtime output differs: " ++ name)
+label name = "MLF compiler port: " ++ name
+
+registry backends rows = S.map (\name -> Case.test (familyId name) (label name)
+ ((:) ("family:" ++ familyId name) ((:) "oracle:checked-target" ((:) "backend:llvm"
+  (case S.lookup eqString name references of
+   Nothing -> []
+   Just reference -> (:) ("reference:" ++ reference) []))))
+ (B.recoverCase (B.inRegisteredCase backends (familyId name) (label name)
+  (do { runPreparedFixture backends rows name; putStrLn ("PASS " ++ name) })))) names
+
 main : IO ()
 main = do
  args <- O.allArguments
@@ -113,22 +136,40 @@ main = do
    (:) "--list" [] -> putStr (S.unlines names)
    (:) "--prepare" ((:) name ((:) destination [])) -> prepareFixture name destination
    _ -> executeFixtures args
+
 executeFixtures : [] String -> IO ()
 executeFixtures args = do
- (,) full selected <- case args of
-  (:) "--only" names' -> do
-   H.assert (S.not (S.null names') && S.length names' == S.length (S.nubBy eqString names') && S.all (\name -> S.elem eqString name names) names') "invalid port fixture selection"
-   return ((,) false names')
-  _ -> do
-   (,) full identities <- H.right (Selection.choose familyIds args)
-   return ((,) full (S.filter (\name -> S.elem eqString (familyId name) identities) names))
- let focused = case args of { (:) "--families" _ -> true; _ -> false }
- let expectedPrepared = if focused then selected else names
- Selection.begin "port" full (S.map familyId selected)
- B.withBackends (\backends -> do
-  S.mapM_ (\name -> do
-   B.inCase backends ("MLF compiler port: " ++ name) (do { runPreparedFixture backends expectedPrepared (S.not focused) name; putStrLn ("PASS " ++ name) })
-   Selection.passed "port" (familyId name)) selected
-  B.auditNativeBackends backends
-  putStrLn (showInt (S.length selected) ++ " MLF port fixtures; 0 failures"))
- Selection.finish "port"
+ let inventory = registry B.inventoryContext []
+ let runnerArgs = case args of { (:) "--only" _ -> []; (:) "--families" _ -> []; _ -> args }
+ reported <- B.reportArgs runnerArgs
+ (,) options planned <- H.right (Runner.plan reported inventory)
+ (,,) full allowFull selected <- case args of
+  (:) "--only" requested -> do
+   H.assert (S.not (S.null requested) && S.length requested == S.length (S.nubBy eqString requested) && S.all (\name -> S.elem eqString name names) requested) "invalid port fixture selection"
+   return ((,,) true false requested)
+  (:) "--families" _ -> do
+   (,) _ identities <- H.right (Selection.choose familyIds args)
+   return ((,,) false false (S.filter (\name -> S.elem eqString (familyId name) identities) names))
+  _ ->
+   let identities = S.map Case.id planned in
+   return ((,,) (S.null (Runner.selectors options)) true (S.filter (\name -> S.elem eqString (familyId name) identities) names))
+ if Runner.listing options then do
+  code <- Runner.runOptions options inventory planned
+  if code == 0 then return () else exitWith code
+ else do
+  let identities = S.map familyId selected
+  let fullRun = S.length selected == S.length names && S.eqList eqString args runnerArgs && S.null (Runner.selectors options)
+  Selection.begin "port" fullRun identities
+  (,,) manifest hash rows <- preparedManifest selected full allowFull
+  B.withBackends (\backends -> do
+   let cases = registry backends rows
+   let ordered = S.concatMap (\identity -> S.filter (\entry -> eqString identity (Case.id entry)) cases) identities
+   code <- Runner.runOptions options cases ordered
+   if code == 0 then do
+    _ <- B.auditNativeBackends backends
+    after <- fileDigest manifest
+    H.assert (eqString hash after) "prepared port manifest changed during execution"
+    S.mapM_ (Selection.passed "port") identities
+    putStrLn (showInt (S.length selected) ++ " MLF port fixtures; 0 failures")
+   else do { B.flushRows; Selection.flush; exitWith code })
+  Selection.finish "port"

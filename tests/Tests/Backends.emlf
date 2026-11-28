@@ -1,25 +1,31 @@
 module Tests.Backends
  (Backends, Entry(..), Event(..), Input(..), Observation(..), RuntimeError(..),
-  withBackends, withExecutionTimeout, withInterpreterTimeout, inCase, auditBackends, auditSelectedBackends, auditNativeBackends, execute,
-  executeWithArguments, executeSerialized, executeNativeSerialized, serializeTerm, capture, outcome, events, remaining,
-  output, outputBytes, stderrOutput) where
+  withBackends, inventoryContext, withExecutionTimeout, withInterpreterTimeout, inCase, inRegisteredCase,
+  flushRows, auditBackends, auditSelectedBackends, auditNativeBackends, execute,
+  executeWithArguments, executeSerialized, executeNativeSerialized, executeGeneratedLLVM, serializeTerm, capture, outcome, events, remaining,
+  output, outputBytes, stderrOutput, assertCase, failCase, rightCase, rejectCase, recoverCase, reportArgs) where
 import Bootstrap.Types
+import MLF.Primitive (IOError, catchIOError, ioError, ioeGetErrorString, textFromChars, textToChars, userError)
 import qualified Bootstrap.Std as S
 import qualified Bootstrap.Map as M
 import qualified Bootstrap.IntSet as IS
 import qualified Bootstrap.X.Syntax as X
 import qualified Bootstrap.X.Pretty as Pretty
+import qualified Tests.ReportJournal as Journal
 import qualified Tests.Helpers as H
 import qualified Tests.Bytes as Bytes
+import qualified Tests.TestCompilation as TC
 import qualified Package.OS as O
 import qualified Package.Json as J
+import qualified Test.Assert as A
 
 data Entry = IOEntry | ProgramEntry
 data Event = ReadLine | Write String | WriteBytes Bytes.Bytes | WriteError String
 data Input = Input String Bool | RawInput Bytes.Bytes Bool
 data RuntimeError = RuntimeError String
 data Observation = Observation (Either RuntimeError ()) ([] Event) String
-data Backends = Backends String IntArray Int Int Int
+data Compilation = Compilation TC.Service J.Json J.Json ([] String)
+data Backends = Backends String IntArray Int Int Int (Maybe Compilation)
 instance H.Eq RuntimeError where { eq (RuntimeError a) (RuntimeError b) = eqString a b }
 instance H.Show RuntimeError where { show (RuntimeError a) = a }
 instance H.Eq Event where
@@ -46,13 +52,52 @@ stderrOutput observed = S.concatStrings (S.map (\event -> case event of { WriteE
 encodedInput input = case input of { Input text _ -> Bytes.encode text; RawInput bytes _ -> bytes }
 failWrites input = case input of { Input _ fail -> fail; RawInput _ fail -> fail }
 decodeInput input bytes = case input of { Input _ _ -> Bytes.decodeText bytes; RawInput _ _ -> Bytes.latin1 bytes }
-directory (Backends d _ _ _ _) = d
-serial (Backends _ s _ _ _) = s
-budget (Backends _ _ n _ _) = n
-candidateBudget (Backends _ _ _ n _) = n
-interpreterBudget (Backends _ _ _ _ n) = n
-withExecutionTimeout seconds (Backends d s _ candidate interpreter) = Backends d s seconds candidate interpreter
-withInterpreterTimeout seconds (Backends d s native candidate _) = Backends d s native candidate seconds
+directory (Backends d _ _ _ _ _) = d
+serial (Backends _ s _ _ _ _) = s
+budget (Backends _ _ n _ _ _) = n
+candidateBudget (Backends _ _ _ n _ _) = n
+interpreterBudget (Backends _ _ _ _ n _) = n
+compilation (Backends _ _ _ _ _ service) = case service of
+  Just value -> value
+  Nothing -> panic "backend execution has no test compilation service"
+compilationService (Compilation value _ _ _) = value
+compilationProducer (Compilation _ value _ _) = value
+compilationNative (Compilation _ _ value _) = value
+compilationFlags (Compilation _ _ _ value) = value
+withExecutionTimeout seconds (Backends d s _ candidate interpreter service) = Backends d s seconds candidate interpreter service
+withInterpreterTimeout seconds (Backends d s native candidate _ service) = Backends d s native candidate seconds service
+inventoryContext : Backends
+inventoryContext = Backends "" (panic "backend discovery cannot execute a fixture") 0 0 0 Nothing
+
+-- These tests keep their batched IO fixtures. Only explicit assertion errors
+-- travel through this recovery channel; unexpected IO errors are rethrown.
+assertionPrefix = "MLF test assertion: "
+failCase : forall a. String -> IO a
+failCase message = ioError (userError (textToChars (assertionPrefix ++ message)))
+assertCase : Bool -> String -> IO ()
+assertCase condition message = if condition then ioReturn () else failCase message
+rightCase : forall e a. H.Show e => Either e a -> IO a
+rightCase result = case result of { Left error -> failCase (H.show error); Right value -> ioReturn value }
+rejectCase : forall e a. Either e a -> IO ()
+rejectCase result = case result of { Left _ -> ioReturn (); Right _ -> failCase "unexpected success" }
+recoverCase : IO () -> A.Test ()
+recoverCase action = A.Test (catchIOError (do { action; ioReturn (Right ()) }) (\error ->
+ let message = textFromChars (ioeGetErrorString error) in
+ if O.starts assertionPrefix message
+ then ioReturn (Left (A.Failure (O.drop (stringLength assertionPrefix) message) Nothing))
+ else ioError error))
+
+reportArgs args = do
+  path <- getEnv "MLF_TEST_CASE_REPORT"
+  if eqString path "" || S.elem eqString "--report" args then ioReturn args
+  else ioReturn (S.append args ((:) "--report" ((:) path [])))
+
+removeGenerated directory names = case S.splitAt 128 names of
+  (,) [] _ -> ioReturn ()
+  (,) batch remaining -> do
+    O.run "" (S.append (O.words "/bin/rm -f") (S.map (\name -> directory ++ "/" ++ name) batch))
+    removeGenerated directory remaining
+
 withBackends : forall a. (Backends -> IO a) -> IO a
 withBackends action = do
   work <- getEnv "MLF_TEST_WORK"
@@ -64,16 +109,53 @@ withBackends action = do
   let dir = work ++ "/matrix-" ++ abi
   O.mkdir dir
   names <- O.entries dir
-  S.mapM_ (\name -> if O.starts "program-" name then do
-    let path = dir ++ "/" ++ name
-    present <- fileExists path
-    if present then O.remove path else return ()
-    else return ()) names
-  writeFile (dir ++ "/rows.jsonl") ""
+  let generated = S.filter (\name -> S.any (\prefix -> O.starts prefix name) (O.words "program- emitted- case-")) names
+  removeGenerated dir generated
+  emitter <- getEnv "MLF_BOOTSTRAP_LLVM"
+  emitterPresent <- if eqString emitter "" then ioReturn false else fileExists emitter
+  emitterHash <- if emitterPresent then fileDigest emitter else ioReturn ""
+  writeFile (dir ++ "/emitter.sha256") emitterHash
+  -- A source-only selection does not prepare the compiler or native toolchain.
+  -- Execution owns a fresh report; only successful immutable products cross
+  -- suite directories through the package builder's checked artifact store.
+  service <- if emitterPresent then do
+    sourceRoot <- getEnv "MLF_TEST_SOURCE_ROOT"
+    compiler <- getEnv "MLF_BOOTSTRAP_COMPILER"
+    cache <- getEnv "MLF_TEST_COMPILATION_CACHE"
+    O.require (stringLength sourceRoot > 0 && stringLength compiler > 0 && stringLength cache > 0)
+      "backend execution requires the selected test compilation service"
+    value <- TC.open sourceRoot compiler cache (dir ++ "/compilation")
+    producer <- TC.registerProducer value emitter
+    flagsFile <- getEnv "MLF_TEST_LINK_FLAGS_FILE"
+    packedFlags <- readFile flagsFile
+    let flags = S.append (O.unpack packedFlags) ((:) "-lm" [])
+    native <- TC.nativeIdentity value flags
+    ioReturn (Just (Compilation value producer native flags))
+   else ioReturn Nothing
+  setEnv rowReport (dir ++ "/rows.jsonl")
+  Journal.begin rowReport (dir ++ "/rows.jsonl") ""
   writeFile (dir ++ "/current-label") "<unlabelled>"
-  count <- newIntArray 1 0
-  action (Backends dir count 60 candidate candidate)
-inCase context label action = do { writeFile (directory context ++ "/current-label") label; action }
+  writeFile (dir ++ "/current-id") "<unregistered>"
+  count <- newIntArray 2 0
+  value <- catchIOError (action (Backends dir count 60 candidate candidate service))
+    (\error -> do { flushRows; ioError error })
+  flushRows
+  if emitterPresent then do
+    after <- fileDigest emitter
+    H.assert (eqString after emitterHash) "backend emitter changed during the matrix"
+  else ioReturn ()
+  case service of { Just selected -> TC.finish (compilationService selected); Nothing -> ioReturn () }
+  ioReturn value
+inCase context label action = inRegisteredCase context label label action
+inRegisteredCase context identity label action = do
+  writeFile (directory context ++ "/current-label") label
+  writeFile (directory context ++ "/current-id") identity
+  writeIntArray (serial context) 1 0
+  action
+rowReport : String
+rowReport = "MLF_TEST_BACKEND_ROWS"
+flushRows : IO ()
+flushRows = Journal.flush rowReport
 auditBackends context = auditMatrix false context (O.words "interpreter llvm")
 -- Explicit family selections can consist entirely of source/type assertions.
 -- A reviewed zero-row selection still checks that no execution rows occurred.
@@ -81,16 +163,18 @@ auditSelectedBackends context = auditMatrix true context (O.words "interpreter l
 auditNativeBackends context = auditMatrix false context ((:) "llvm" [])
 auditMatrix allowEmpty context expected = do
   count <- readIntArray (serial context) 0
+  flushRows
   text <- readFile (directory context ++ "/rows.jsonl")
   rows <- S.mapM (\line -> H.right (J.parse line)) (O.nonempty (H.lines text))
   H.assert ((allowEmpty || count > 0) && count >= 0 && S.length rows == count) "missing backend executions"
   H.assert (S.all (\row -> J.equal (J.get "backends" row) (J.stringArray expected)) rows) "incomplete backend row"
-  H.assert (S.length (S.nubBy eqInt (S.map ((\row -> readInt (case J.get "index" row of { J.Number text -> text; _ -> "-1" }))) rows)) == count) "duplicate backend row"
+  H.assert (S.all (\((,) index row) -> J.equal (J.get "index" row) (J.num index))
+             (S.zip (S.range 0 (count - 1)) rows)) "backend row indices are missing or out of order"
   putStrLn ("Backend matrix: " ++ showInt count ++ " rows x " ++ showInt (S.length expected) ++ " backends; no missing executions")
   ioReturn count
 capture context term inputs = do
   observed <- execute context IOEntry (Input (S.unlines inputs) false) term
-  H.assert (eqString (remaining observed) "") ("unused input: " ++ remaining observed)
+  assertCase (eqString (remaining observed) "") ("unused input: " ++ remaining observed)
   ioReturn ((,) (outcome observed) (events observed))
 execute context entry input term = executeWithArguments context [] entry input term
 serializeTerm term = Pretty.prettyTerm (transportNames term)
@@ -104,49 +188,133 @@ executeSerialized context entry input source = executeSerializedWithArguments co
 -- independent references remain the oracle; no outer interpretation is needed.
 executeNativeSerialized : Backends -> Entry -> Input -> String -> IO Observation
 executeNativeSerialized context entry input source = do
-  index <- beginExecution context source
-  observed <- native context (directory context ++ "/case-" ++ showInt index) [] entry input
+  (,,) index coordinate hash <- beginExecution context source
+  attempt <- runCoordinate context index coordinate hash "llvm" (native context (stem context index) hash [] entry input)
+  observed <- case attempt of { Left error -> ioError error; Right value -> ioReturn value }
   recordExecution context index ((:) "llvm" [])
   ioReturn observed
+stem context index = directory context ++ "/case-" ++ showInt index
 beginExecution context source = do
   index <- readIntArray (serial context) 0
+  coordinate <- readIntArray (serial context) 1
   writeIntArray (serial context) 0 (index + 1)
-  writeFile (directory context ++ "/case-" ++ showInt index ++ ".xmlf") source
-  ioReturn index
+  writeIntArray (serial context) 1 (coordinate + 1)
+  let target = stem context index ++ ".xmlf"
+  writeFile target source
+  hash <- fileDigest target
+  ioReturn ((,,) index coordinate hash)
 recordExecution context index backends = do
   label <- readFile (directory context ++ "/current-label")
-  log <- readFile (directory context ++ "/rows.jsonl")
   let row = J.Object ((:) ((,) "label" (J.str label)) ((:) ((,) "index" (J.num index)) ((:) ((,) "backends" (J.stringArray backends)) [])))
-  writeFile (directory context ++ "/rows.jsonl") (log ++ J.render row ++ "\n")
+  Journal.append rowReport (directory context ++ "/rows.jsonl") (J.render row ++ "\n")
 executeSerializedWithArguments context arguments entry input source = do
-  index <- beginExecution context source
-  let stem = directory context ++ "/case-" ++ showInt index
+  (,,) index coordinate hash <- beginExecution context source
+  let path = stem context index
   interpreter <- getEnv "MLF_BOOTSTRAP_INTERPRETER"
   let mode = case entry of { IOEntry -> "--run-xmlf"; ProgramEntry -> "--run-program-xmlf" }
-  first <- observe (withExecutionTimeout (interpreterBudget context) context) (stem ++ "-interpreter") (S.append ((:) interpreter ((:) mode ((:) (stem ++ ".xmlf") ((:) "--" [])))) arguments) input
-  second <- native context stem arguments entry input
-  H.assert (H.eq first second) ("backend mismatch\ninterpreter: " ++ H.show first ++ "\nLLVM: " ++ H.show second)
+  interpreted <- runCoordinate context index coordinate hash "interpreter"
+    (observe (withExecutionTimeout (interpreterBudget context) context) (path ++ "-interpreter")
+      (S.append ((:) interpreter ((:) mode ((:) (path ++ ".xmlf") ((:) "--" [])))) arguments) input)
+  emitted <- runCoordinate context index coordinate hash "llvm" (native context path hash arguments entry input)
+  first <- case interpreted of { Left error -> ioError error; Right value -> ioReturn value }
+  second <- case emitted of { Left error -> ioError error; Right value -> ioReturn value }
   recordExecution context index (O.words "interpreter llvm")
+  assertCase (H.eq first second) ("backend mismatch\ninterpreter: " ++ H.show first ++ "\nLLVM: " ++ H.show second)
   ioReturn first
-native : Backends -> String -> [] String -> Entry -> Input -> IO Observation
-native context stem arguments entry input = do
-  emitter <- getEnv "MLF_BOOTSTRAP_LLVM"
+-- Preserve the v1 matrix receipt above. A separate per-backend artifact
+-- survives a failed assertion, a no-result peer, or an interrupted matrix.
+runCoordinate : Backends -> Int -> Int -> String -> String -> IO Observation -> IO (Either IOError Observation)
+runCoordinate context index coordinate hash backend action = do
+  identity <- readFile (directory context ++ "/current-id")
+  label <- readFile (directory context ++ "/current-label")
+  let path = stem context index
+  let evidence = path ++ "-" ++ backend
+  let file = evidence ++ ".observation.json"
+  let fields = J.set "case_id" (J.str identity) (J.set "label" (J.str label)
+                (J.set "coordinate" (J.num coordinate) (J.set "backend" (J.str backend)
+                (J.set "target_sha256" (J.str hash) (J.set "evidence_stem" (J.str evidence) J.empty)))))
+  let record value = writeFile file (J.render value ++ "\n")
+  let withProcess value = do
+        let receipt = evidence ++ ".status.json"
+        present <- fileExists receipt
+        process <- if present then J.read receipt else ioReturn J.Null
+        record (J.set "process" process value)
+  record (J.set "status" (J.str "started") fields)
+  catchIOError
+   (do
+    observation <- action
+    let result = case outcome observation of { Left error -> J.str (H.show error); Right _ -> J.Null }
+    withProcess (J.set "status" (J.str "observed")
+      (J.set "diagnostic" result (J.set "events" (J.stringArray (S.map H.show (events observation)))
+        (J.set "remaining_input" (J.str (remaining observation)) fields))))
+    ioReturn (Right observation))
+   (\error -> do
+    withProcess (J.set "status" (J.str "error")
+      (J.set "diagnostic" (J.str (textFromChars (ioeGetErrorString error))) fields))
+    ioReturn (Left error))
+native : Backends -> String -> String -> [] String -> Entry -> Input -> IO Observation
+native context stem sourceHash arguments entry input = do
   let mode = (case entry of { IOEntry -> "--xmlf-to-llvm-io"; ProgramEntry -> "--xmlf-to-llvm" })
-  code <- O.exec "" ((:) emitter ((:) mode ((:) (stem ++ ".xmlf") []))) "" (stem ++ ".ll") (stem ++ ".emit.err") (candidateBudget context)
-  error <- readFile (stem ++ ".emit.err")
-  if code == 1 then ioReturn (Observation (Left (RuntimeError (normalize (stripFinalNewline error)))) [] (decodeInput input (encodedInput input))) else do
-    H.assert (code == 0 && eqString error "") ("LLVM emitter failed: " ++ error)
-    hash <- fileDigest (stem ++ ".ll")
-    let program = directory context ++ "/program-" ++ hash
-    cached <- fileExists program
-    if cached then ioReturn () else do
-      flagsFile <- getEnv "MLF_TEST_LINK_FLAGS_FILE"
-      flags <- readFile flagsFile
-      root <- getEnv "MLF_TEST_ROOT"
-      let runtime = directory context ++ "/runtime.o"
-      let argv = S.append ((:) "clang" ((:) "-O2" ((:) "-Wno-override-module" ((:) (stem ++ ".ll") ((:) runtime ((:) (root ++ "/trace.o") [])))))) (S.append (O.unpack flags) ((:) "-lm" ((:) "-o" ((:) program []))))
-      O.run "" argv
-    observe context (stem ++ "-llvm") ((:) program arguments) input
+  actual <- fileDigest (stem ++ ".xmlf")
+  assertCase (eqString actual sourceHash) "backend serialized target changed before emission"
+  let selected = compilation context
+  let service = compilationService selected
+  emitted <- TC.emittedLLVMWithIdentity service (compilationProducer selected) mode [] (stem ++ ".xmlf") (candidateBudget context)
+  case emitted of
+    Left ((,,) code text error) -> do
+      writeFile (stem ++ ".ll") text
+      writeFile (stem ++ ".emit.err") error
+      if code == 1
+      then ioReturn (Observation (Left (RuntimeError (normalize (stripFinalNewline error)))) [] (decodeInput input (encodedInput input)))
+      else failCase ("LLVM emitter failed (" ++ showInt code ++ "): " ++ error)
+    Right artifact -> do
+      let llvm = artifact ++ "/program.ll"
+      saved <- TC.receipt service artifact
+      J.write (stem ++ ".emission.json") saved
+      writeFile (stem ++ ".llvm-source") (llvm ++ "\n")
+      O.copy llvm (stem ++ ".ll")
+      writeFile (stem ++ ".emit.err") ""
+      hash <- fileDigest llvm
+      runLinkedLLVM context stem llvm hash arguments input
+
+-- Raw erased terms have no checked xMLF serialization. Run their emitted
+-- module with the same runtime, native observation and link cache as the matrix.
+executeGeneratedLLVM : Backends -> String -> String -> IO Observation
+executeGeneratedLLVM context name llvm = do
+  let path = directory context ++ "/case-" ++ name
+  let modulePath = path ++ ".ll"
+  writeFile modulePath llvm
+  hash <- fileDigest modulePath
+  runLinkedLLVM context path modulePath hash [] (Input "" false)
+
+runLinkedLLVM context stem llvm hash arguments input = do
+  actual <- fileDigest llvm
+  assertCase (eqString actual hash) "backend LLVM changed before linking"
+  flagsFile <- getEnv "MLF_TEST_LINK_FLAGS_FILE"
+  flags <- readFile flagsFile
+  root <- getEnv "MLF_TEST_ROOT"
+  let runtime = directory context ++ "/runtime.o"
+  let selected = compilation context
+  let service = compilationService selected
+  let options = S.append (O.unpack flags) ((:) "-lm" [])
+  assertCase (S.eqList eqString options (compilationFlags selected)) "backend native options changed during the matrix"
+  result <- TC.nativeLLVMWithIdentityResult service (compilationNative selected) llvm
+    ((:) runtime ((:) (root ++ "/trace.o") [])) options
+  linked <- case result of
+    Left ((,,) code out err) -> do
+      writeFile (stem ++ ".link.out") out
+      writeFile (stem ++ ".link.err") err
+      failCase ("LLVM link failed (" ++ showInt code ++ "); see " ++ stem ++ ".link.err")
+    Right artifact -> do
+      writeFile (stem ++ ".link.out") ""
+      writeFile (stem ++ ".link.err") ""
+      ioReturn artifact
+  saved <- TC.receipt service linked
+  J.write (stem ++ ".native.json") saved
+  program <- O.executable (linked ++ "/program")
+  -- The artifact is shared; arguments, stdin, status, traces and all assertions
+  -- belong to this coordinate and always execute again.
+  observe context (stem ++ "-llvm") ((:) program arguments) input
 observe : Backends -> String -> [] String -> Input -> IO Observation
 observe context stem argv input = do
   Bytes.writeFile (stem ++ ".stdin") (encodedInput input)
@@ -157,22 +325,22 @@ observe context stem argv input = do
   supervisor <- O.exec "" (S.append ((:) host ((:) "measure" ((:) (showInt (budget context)) ((:) (stem ++ ".stdin") ((:) (stem ++ ".stdout") ((:) (stem ++ ".stderr") [])))))) argv) "" sample (sample ++ ".stderr") (budget context + 5)
   unsetEnv "MLF_TEST_TRACE"
   unsetEnv "MLF_TEST_FAIL_WRITE"
-  H.assert (supervisor == 0) "backend supervisor failed or was interrupted"
+  assertCase (supervisor == 0) "backend supervisor failed or was interrupted"
   status <- J.read sample
-  H.assert (S.not (J.getBool "timed_out" false status || J.getBool "interrupted" false status)) "backend timed out or was interrupted"
+  assertCase (S.not (J.getBool "timed_out" false status || J.getBool "interrupted" false status)) "backend timed out or was interrupted"
   let signal = case J.get "termination_signal" status of {J.Number text -> readInt text; _ -> -1}
-  H.assert (signal == 0) ("backend crashed with signal " ++ showInt signal)
+  assertCase (signal == 0) ("backend crashed with signal " ++ showInt signal)
   let code = case J.get "exit_code" status of {J.Number text -> readInt text; _ -> -1}
   diagnostics <- readFile (stem ++ ".stderr")
-  H.assert (code >= 0 && code <= 255) ("backend timed out or crashed: " ++ showInt code ++ ": " ++ diagnostics)
-  H.assert (S.not (H.contains "Sanitizer" diagnostics || H.contains "runtime error:" diagnostics)) diagnostics
+  assertCase (code >= 0 && code <= 255) ("backend timed out or crashed: " ++ showInt code ++ ": " ++ diagnostics)
+  assertCase (S.not (H.contains "Sanitizer" diagnostics || H.contains "runtime error:" diagnostics)) diagnostics
   trace <- readFile (stem ++ ".trace")
   (,) recorded unused <- parseTrace input trace
   bytes <- Bytes.readFile (stem ++ ".stdout")
   let observed = Observation (Right ()) recorded unused
-  H.assert (H.eq bytes (outputBytes observed)) "stdout and write trace disagree"
+  assertCase (H.eq bytes (outputBytes observed)) "stdout and write trace disagree"
   let written = stderrOutput observed
-  H.assert (O.starts written diagnostics) "stderr and write trace disagree"
+  assertCase (O.starts written diagnostics) "stderr and write trace disagree"
   let error = O.drop (stringLength written) diagnostics
   let result = if code == 0 then (if eqString error "" then Right () else Left error) else
         if code == 1 && O.starts "Runtime: " error then Left (normalize (stripFinalNewline (O.drop 9 error))) else
@@ -188,11 +356,11 @@ normalize message = let text = if O.starts "LLVM " message then O.drop 5 message
 parseTrace input text = traceLoop input [] (O.nonempty (H.lines text))
 traceLoop : Input -> [] Event -> [] String -> IO ((,) ([] Event) String)
 traceLoop input accumulated lines = case lines of
-  (:) line [] -> if O.starts "U " line then ioReturn ((,) (S.reverse accumulated) (decodeInput input (Bytes.fromHex (O.drop 2 line)))) else H.fail ("malformed trace: " ++ line)
+  (:) line [] -> if O.starts "U " line then ioReturn ((,) (S.reverse accumulated) (decodeInput input (Bytes.fromHex (O.drop 2 line)))) else failCase ("malformed trace: " ++ line)
   (:) line rest -> if eqString line "R" then traceLoop input ((:) ReadLine accumulated) rest else
     if O.starts "W " line then traceLoop input ((:) (bytesEvent (Bytes.fromHex (O.drop 2 line))) accumulated) rest else
-      if O.starts "E " line then traceLoop input ((:) (WriteError (Bytes.decodeText (Bytes.fromHex (O.drop 2 line)))) accumulated) rest else H.fail ("malformed trace: " ++ line)
-  [] -> H.fail "empty native event trace"
+      if O.starts "E " line then traceLoop input ((:) (WriteError (Bytes.decodeText (Bytes.fromHex (O.drop 2 line)))) accumulated) rest else failCase ("malformed trace: " ++ line)
+  [] -> failCase "empty native event trace"
 bytesEvent bytes = case Bytes.decode bytes of { Right text -> Write text; Left error -> WriteBytes bytes }
 transportNames term = let identities = IS.toList (IS.fromList (collectNames term)) in rewriteNames (M.fromList S.compareInt (S.zip identities (S.range 0 (S.length identities - 1)))) term
 collectNames : XTerm -> [] Int

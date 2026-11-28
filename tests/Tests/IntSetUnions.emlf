@@ -5,7 +5,6 @@ import MLF.Primitive (Monad, return, bind)
 import Bootstrap.Types
 import qualified Tests.Helpers as H
 import qualified Bootstrap.Std as L
-import qualified Bootstrap.Map as M
 import qualified Bootstrap.IntSet as IS
 import qualified Test.Assert as A
 import qualified Test.Case as C
@@ -19,19 +18,22 @@ check a b = do
  assert (L.eqList eqInt (IS.toList result) expected && IS.size result == L.length expected && IS.valid result)
 
 unions : A.Test ()
-unions = do
- let counts = (:) 0 ((:) 1 ((:) 2 ((:) 5 ((:) 17 ((:) 65 [])))))
- let offsets = (:) (-1152921504606846976) ((:) (-1000) ((:) 0 ((:) 3 ((:) 1152921504606846976 []))))
- let pairs = L.concatMap (\n -> L.concatMap (\m -> L.map (\offset -> (,) (L.map (\i -> 17 * i) (L.range 0 (n - 1))) (L.map (\i -> offset + 17 * i) (L.range 0 (m - 1)))) offsets) counts) counts
- let ordered = L.concatMap (\((,) a b) -> (:) ((,) a b) ((:) ((,) b a) [])) pairs
- let unique = H.distinctListPairs eqInt ordered
- A.assert (L.length ordered == 360 && L.length unique == 276) "ordered union stimulus coverage changed"
- L.mapM_ (\((,) a b) -> check a b) unique
- return ()
+unions = case unionInputs of
+ (,,) ordered unique expected -> do
+  A.assert (ordered == 360 && unique == 276) "ordered union stimulus coverage changed"
+  L.mapM_ (\((,) a b) -> check a b) expected
+
+-- Reuse the immutable stimulus inventory when the same registry is planned repeatedly.
+unionInputs : (,,) Int Int ([] ((,) ([] Int) ([] Int)))
+unionInputs =
+ let counts = (:) 0 ((:) 1 ((:) 2 ((:) 5 ((:) 17 ((:) 65 []))))) in
+ let offsets = (:) (-1152921504606846976) ((:) (-1000) ((:) 0 ((:) 3 ((:) 1152921504606846976 [])))) in
+ let pairs = L.concatMap (\n -> L.concatMap (\m -> L.map (\offset -> (,) (L.map (\i -> 17 * i) (L.range 0 (n - 1))) (L.map (\i -> offset + 17 * i) (L.range 0 (m - 1)))) offsets) counts) counts in
+ let ordered = L.concatMap (\((,) a b) -> (:) ((,) a b) ((:) ((,) b a) [])) pairs in
+ let unique = H.distinctListPairs eqInt ordered in
+ (,,) (L.length ordered) (L.length unique) unique
 
 cases : [] C.Case
 cases = (:) (C.described "runtime-library" "component" ((:) "exhaustive" []) ((:) "independent-reference" []) ((:) "regression" ((:) "conformance" []))
  (C.classified ((:) "standard-library" []) ((:) "regression" ((:) "property-based" ((:) "differential" [])))
  (C.test "int-set/union-sorted-list" "size-biased set unions agree with independent sorted lists" ((:) "containers" ((:) "oracle" [])) unions))) []
-
-suite = L.map C.toLegacy cases

@@ -31,7 +31,7 @@ module Bootstrap.CrateGraph where {
 
   data ContractHash = ContractHash W.Value String;
   data InferenceCaches = InferenceCaches (Map String Open.Environment) (Map String Open.Fragment)
-    (Map String ((,) String ByteArray)) (Maybe ContractHash) (Maybe LoweredSyntax);
+    (Map String ((,) String ByteArray)) (Maybe ContractHash) (Maybe LoweredSyntax) (Maybe EvidenceMemo);
   data State = State G.Session Source.CheckedContracts
     InferenceCaches ([] ((,,) String Open.Fragment ([] (V.Index Declaration)))) Int Int ([] Q.GroupResult) (Maybe IntArray);
   -- This bounded memo belongs to one compilation. A template is an abstract,
@@ -169,6 +169,7 @@ module Bootstrap.CrateGraph where {
       SApp f a -> templateNodesLeft (templateNodesLeft next f) a;
       SDeclScope _ body -> templateNodesLeft next body;
       SLam _ _ body -> templateNodesLeft next body;
+      SBindDictionaries names body -> templateNodesLeft (remaining - length names) body;
       SChecked _ body -> templateNodesLeft next body;
       _ -> next
     };
@@ -205,38 +206,24 @@ module Bootstrap.CrateGraph where {
       Right (rawValue (templateReferences identity) "template" canonical)
     }
   };
-  rawValueFor info declarations references group fragment = case info of {
-    Right template -> templateValue declarations template fragment;
-    Left _ -> Right (rawValue references group fragment)
-  };
-  -- Reproduce the committed encoding during ICH validation. An admitted
-  -- ordinary body may belong to a valid pre-spine generation.
-  checkedRawHash expected info declarations references group fragment = let {
-    previous = case rawValueFor info declarations references group fragment of {
-      Left e -> ioReturn (Left e); Right value -> G.hashValue value
-    }
-  } in case info of {
-    Right _ -> previous;
-    Left _ -> do {
-      hashed <- G.hashValue (checkedRawValue references group fragment);
-      case hashed of {
-        Right digest -> if eqString digest expected then ioReturn hashed
-          else previous;
-        Left _ -> ioReturn hashed
-      }
+  checkedRawHash info declarations references group fragment = case info of {
+    Left _ -> G.hashValueUsing W.indexedTextLimits (checkedRawValue references group fragment);
+    Right template -> case templateValue declarations template fragment of {
+      Left e -> ioReturn (Left e);
+      Right value -> G.hashValueUsing W.indexedTextLimits value
     }
   };
   recordRaw info declarations cached wanted reads references group fragment session =
     case info of {
       Left _ -> do {
-        recorded <- G.record wanted reads True (checkedRawValue references group fragment) session;
+        recorded <- G.recordUsing W.indexedTextLimits wanted reads True (checkedRawValue references group fragment) session;
         ioReturn (mapEither (\entry -> (,) entry cached) recorded)
       };
       Right template@(TemplateInfo identity _ _ _ _) -> do {
         encoded <- case M.lookup compareString identity cached of {
           Just payload -> ioReturn (Right payload);
           Nothing -> case templateValue declarations template fragment of {
-            Left e -> ioReturn (Left e); Right value -> G.encodeHashed value
+            Left e -> ioReturn (Left e); Right value -> G.encodeHashedUsing W.indexedTextLimits value
           }
         };
         ioReturn (mapEither (\payload -> let {
@@ -245,12 +232,12 @@ module Bootstrap.CrateGraph where {
         } in (,) (G.recordDigest wanted reads (Just digest) digest (Just bytes) session) next) encoded)
       }
     };
-  loadRaw info declarations path digest references group env slots prepared owners names =
+  loadRaw info declarations readBytes digest references group env slots prepared owners names =
     case info of {
-      Left _ -> Open.decodeTrustedIds path digest references "raw" group env
+      Left _ -> Open.decodeTrustedIdsFrom readBytes digest references "raw" group env
         (Source.expectedParameters slots prepared) (zip owners names);
       Right (TemplateInfo identity parameters members canonicalParameters canonicalMembers) -> do {
-        loaded <- Open.decodeTrustedIds path digest (templateReferences identity) "raw" "template" env
+        loaded <- Open.decodeTrustedIdsFrom readBytes digest (templateReferences identity) "raw" "template" env
           canonicalParameters (map (\((,) i ((,,) name _ _)) -> (,) i name) canonicalMembers);
         ioReturn (do {
           template <- loaded;
@@ -275,7 +262,7 @@ module Bootstrap.CrateGraph where {
   groupKey kind slots = G.key (groupQueryKind kind) (groupIdentity slots);
   datatypeKey name = G.key "Datatype" name;
   contractValue contract = W.VNode 420
-    [A.toXType (Separate.normalType (Source.contractType contract)),
+    [A.toStoredXType (Separate.normalType (Source.contractType contract)),
      A.toList A.toText (Source.contractClasses contract),A.toBool (Source.contractProtected contract)];
   -- Each input is refreshed once from current source/checked metadata. Derived
   -- nodes have explicit edges back to that authority, including empty scopes.
@@ -358,6 +345,7 @@ module Bootstrap.CrateGraph where {
   preparedLocation fuel body = if fuel <= 0 then Nothing else case body of {
     SCallSite _ span _ -> Just span;
     SLam _ _ e -> preparedLocation (fuel - 1) e;
+    SBindDictionaries names e -> preparedLocation (fuel - length names) e;
     SApp f _ -> preparedLocation (fuel - 1) f;
     -- A constructor can head a large tree without a recorded call site.
     -- An empty origin still preserves each foreign span in full.
@@ -365,6 +353,26 @@ module Bootstrap.CrateGraph where {
     SDeclScope _ e -> preparedLocation (fuel - 1) e;
     SChecked _ e -> preparedLocation (fuel - 1) e;
     _ -> Nothing
+  };
+  -- A large lambda or left application spine may reach its first location
+  -- well beyond the short probe. Find the file origin in the raw tree,
+  -- where this walk can share the syntax instead of canonicalizing it.
+  filePreparedOrigin raw = let {
+    find fuel tasks = if fuel == 0 then Nothing else case tasks of {
+      [] -> Nothing;
+      (:) term rest -> let { next = fuel - 1 } in case term of {
+        SCallSite _ span _ -> Just span;
+        SLam _ _ body -> find next ((:) body rest);
+        SApp f a -> find next ((:) a ((:) f rest));
+        SDeclScope _ body -> find next ((:) body rest);
+        SChecked _ body -> find next ((:) body rest);
+        SSourceDefinition body -> find next ((:) body rest);
+        _ -> find next rest
+      }
+    }
+  } in case find (4096 :: Int) [raw] of {
+    Just span -> span;
+    Nothing -> SourceSpan "" "" "" 0 0 0 0
   };
   -- A large application tree can repeat one file origin at every reference.
   -- P3 writes a preorder tree with delta coordinates and a bounded spelling
@@ -486,6 +494,59 @@ module Bootstrap.CrateGraph where {
   data CachedLocation = CachedLocation String | CachedLocationLeaf String String String Int String String;
   locationFragment cached = case cached of {
     CachedLocation site -> site; CachedLocationLeaf site _ _ _ _ _ -> site
+  };
+  -- Stream fixed-arity nodes and framed names for simple resolved source.
+  -- Other annotations, scopes and source origins use the general encoder.
+  simplePackedOrigin scope origin originBytes budget input header = case (,) scope origin of {
+    (,) (SourceOrigin rank globals initialDepth _ _) (SourceSpan pkg mod file _ _ _ _) -> let {
+      digit n = V.at coordinateAlphabet (V.fromInt n);
+      emitNumber n rest = let {
+        push value tail = let { next = unsignedShiftRInt value 6; part = andInt value 63 } in
+          if next == 0 then (:) (digit part) tail
+          else push next ((:) (digit (orInt part 64)) tail)
+      } in push (xorInt (shiftLInt n 1) (shiftRInt n 63)) rest;
+      emitText value rest = (:) value (emitNumber (stringLength value) rest);
+      walk nodes left tasks reversed line column =
+        if left < 0 || nodes < 0 then Nothing else case tasks of {
+          [] -> Just (concatStringList ((:) "P6" ((:) header (reverse reversed))));
+          (:) ((,,) term locals depth) rest -> let {
+            step cost fields pending = walk (nodes - 1) (left - cost) pending fields line column;
+            next body = (:) ((,,) body locals depth) rest;
+            named tag value = step (20 + stringUtf8Length value)
+              (emitText value ((:) tag reversed)) rest
+          } in case term of {
+            SApp f a -> step 25 ((:) "a" reversed) ((:) ((,,) f locals depth) (next a));
+            SLam name Nothing body -> let {
+              index = depth + 1;
+              child = M.insert compareString name depth locals
+            } in step (32 + Storage.v2IntLength depth) ((:) "l" reversed) ((:) ((,,) body child index) rest);
+            SGlobal i _ -> step 40 (emitNumber (V.toInt (rank i)) ((:) "g" reversed)) rest;
+            SVar name -> case M.lookup compareString name locals of {
+              Just index -> if Separate.managedIntrinsicName name then named "v" name
+                else step 32 (emitNumber index ((:) "b" reversed)) rest;
+              Nothing -> named "v" (Q.canonicalReference globals name)
+            };
+            SPrimitive primitive -> step 32
+              (emitNumber (A.primitiveCode primitive) ((:) "p" reversed)) rest;
+            SIntLit n -> step (16 + Storage.v2IntLength n)
+              (emitNumber n ((:) "i" reversed)) rest;
+            SBoolLit b -> step 16 ((:) (if b then "t" else "f") reversed) rest;
+            SStringLit value -> named "q" value;
+            SConstructor name -> named "k" name;
+            SSourceDefinition body -> step 25 ((:) "d" reversed) (next body);
+            SCallSite label (SourceSpan p m f sl sc el ec) body ->
+              if eqString p pkg && eqString m mod && eqString f file then let {
+                cost = 48 + originBytes + stringUtf8Length label;
+                labelField = emitText label ((:) "s" reversed);
+                afterStart = emitNumber (sc - column) (emitNumber (sl - line) labelField);
+                afterEnd = emitNumber (ec - sc) (emitNumber (el - sl) afterStart)
+              } in walk (nodes - 1) (left - cost) (next body) afterEnd sl sc
+                else Nothing;
+            _ -> Nothing
+          }
+        }
+    } in walk (min budget 65536) budget [(,,) input M.empty initialDepth] [] 0 0;
+    _ -> Nothing
   };
   packedOrigin = packedOriginIn WrittenOrigin;
   packedOriginIn initialScope origin originBytes initialBudget tree header = let {
@@ -700,10 +761,14 @@ module Bootstrap.CrateGraph where {
   };
   relativePrepared original lowered names metadata = relativePreparedWith False original lowered names metadata;
   relativePreparedWith = relativePreparedUsing packedOrigin;
-  relativePreparedUsing pack matched original lowered names metadata = case (,) original lowered of {
-    (,) [(,,) name annotation body] [(,,) nextName nextAnnotation candidate] ->
-      if templateNodesLeft 257 body > 0 || not (eqString name nextName && eqMaybe E.eqSAnnotation annotation nextAnnotation)
-      then Nothing else case preparedLocation 64 body of {
+  relativePreparedUsing pack = relativePreparedLocated pack Nothing;
+  relativePreparedLocated pack location matched original lowered names metadata = case (,) original lowered of {
+    (,) [(,,) name annotation body] [(,,) nextName nextAnnotation candidate] -> let {
+      origin = case location of { Just _ -> location; Nothing -> preparedLocation 64 body }
+    } in
+      if (not (matched && isJust location) && templateNodesLeft 257 body > 0) ||
+         not (eqString name nextName && eqMaybe E.eqSAnnotation annotation nextAnnotation)
+      then Nothing else case origin of {
         Nothing -> Nothing;
         Just span@(SourceSpan pkg mod file _ _ _ _) -> let {
           checked = case candidate of { SChecked ty inner -> (,) ("D1c" ++ Separate.pack [Q.encodeType ty]) inner; _ -> (,) "D1i" candidate };
@@ -745,15 +810,22 @@ module Bootstrap.CrateGraph where {
     lowered = map member checked;
     names = Q.referenceDefinitions table;
     metadata = Q.sourceGroupMetadataWith token candidate prepared;
+    location = case (,) owned source of {
+      (,) True [(,,) _ _ raw] -> Just (filePreparedOrigin raw);
+      _ -> Nothing
+    };
     pack = case source of {
       [(,,) _ annotation raw] -> case table of { Q.ReferenceTable _ globals ranks ->
         Q.memberTypeScope annotation (\types typeDepth ->
           let { scope = SourceOrigin (\i -> M.get Source.compareDecl i ranks) globals 0 types typeDepth } in
-          \origin bytes budget _ header -> packedOriginIn scope origin bytes budget raw header)
+          \origin bytes budget _ header -> if owned then case simplePackedOrigin scope origin bytes budget raw header of {
+            Just text -> Just text;
+            Nothing -> packedOriginIn scope origin bytes budget raw header
+          } else packedOriginIn scope origin bytes budget raw header)
       };
       _ -> packedOrigin
     }
-  } in case relativePreparedUsing pack sameSource original lowered names metadata of {
+  } in case relativePreparedLocated pack location sameSource original lowered names metadata of {
     -- A relative pair has at least 257 syntax nodes on the original
     -- application/lambda spine. Dropping a location wrapper preserves its
     -- subtree; the lowered key therefore exceeds the 256-node retention limit.
@@ -937,10 +1009,8 @@ module Bootstrap.CrateGraph where {
       ioReturn (mapEither (\digest -> (,) (G.recordDigest (G.inputKey (groupKey PreparedQuery slots))
         [] Nothing digest Nothing session) cached) answer)
     } };
-  scopeInventory prepared = case Source.groupAuthority prepared of {
-    Nothing -> W.VNode 422 [];
-    Just (Source.RootAuthority _ _ _ candidates protected) -> W.VNode 422
-      (map (\candidate -> W.VText (candidateMetadata protected candidate)) candidates)
+  scopeInventory prepared = case Source.groupEvidenceCandidates prepared of {
+    (,) candidates protected -> W.VNode 422 (map (\candidate -> W.VText (candidateMetadata protected candidate)) candidates)
   };
   scopeValue prepared dependencies = W.VNode 423
     [scopeInventory prepared,A.toList (A.toPair A.toText A.toText) (map G.edge dependencies)];
@@ -949,11 +1019,16 @@ module Bootstrap.CrateGraph where {
   rawValueWith :: (W.Value -> String -> String -> Open.Fragment -> W.Value) -> [] ((,) String String) -> String -> Open.Fragment -> W.Value;
   rawValueWith encode references group fragment = encode
     (A.toList (A.toPair A.toText A.toText) references) "raw" group fragment;
+  openFileQueries directory = G.begin (directory ++ "/query-graph-v3");
   compile = compileWithData Q.requiredDataIn;
-  compileFile = compileReading True Dependency.fileLastValueOccurrences Dependency.fileDeclarationOccurrences Q.requiredFileDataIn;
+  compileFile verify crateId compiler directory = compileFileQueries (openFileQueries directory) verify crateId compiler;
+  compileFileQueries begin = compileGroupsReading begin True
+    Dependency.fileLastValueOccurrences Dependency.fileDeclarationOccurrences Q.requiredFileDataIn;
   compileWithData = compileUsing (Dependency.valueOccurrences True) (Dependency.valueOccurrences True False);
   compileUsing = compileReading False;
-  compileReading owned occurrences declarationReads selectData verify crateId compilerHash cacheDir imports protected originalPlan =
+  compileReading owned occurrences declarationReads selectData verify crateId compilerHash directory =
+    compileGroupsReading (openFileQueries directory) owned occurrences declarationReads selectData verify crateId compilerHash;
+  compileGroupsReading begin owned occurrences declarationReads selectData verify crateId compilerHash imports protected originalPlan =
     case do {
       (,) plan open <- Source.protectedQueryPlanReading declarationReads originalPlan protected;
       inventory <- Q.prepareData (Source.planData plan);
@@ -963,7 +1038,7 @@ module Bootstrap.CrateGraph where {
       Right ((,,,) plan inventory checked steps)
     } of {
       Left e -> ioReturn (Left e);
-      Right ((,,,) plan inventory checked steps) -> startGroupUsing owned occurrences declarationReads selectData verify crateId compilerHash cacheDir
+      Right ((,,,) plan inventory checked steps) -> startGroupWith Nothing begin owned occurrences declarationReads selectData verify crateId compilerHash
         "source" inventory (Source.planData plan) checked steps
     };
   -- The already-lowered fallback has no unsigned-root evidence finalization.
@@ -971,7 +1046,9 @@ module Bootstrap.CrateGraph where {
   -- Preserve its existing conservative (protected, no source-class slots)
   -- calling contract, including mixed source/dictionary recursive groups.
   -- Standalone named callers own no resolver or class-lowering table.
-  compileLowered verify crateId compilerHash cacheDir imports datatypes members =
+  compileLowered verify crateId compilerHash cacheDir =
+    compileNamedQueries Nothing (openFileQueries cacheDir) verify crateId compilerHash;
+  compileNamedQueries scriptEntry begin verify crateId compilerHash imports datatypes members =
     case Dependency.declarationGroups members of {
       Left e -> ioReturn (Left e);
       Right groups -> let {
@@ -979,24 +1056,30 @@ module Bootstrap.CrateGraph where {
         ids = V.indices (Dependency.symbolNodes base);
         scope = Source.declarationScope base ids [] (concatMap (compose (map fst) Separate.unitBindings) imports)
       } in case traverseEither (traverseEither (Source.requireDecl scope)) groups of {
-        Left e -> ioReturn (Left e); Right grouped -> startLowered scope (zip ids members) grouped
-          verify crateId compilerHash cacheDir imports datatypes
+        Left e -> ioReturn (Left e); Right grouped -> startLoweredQueries scriptEntry begin scope (zip ids members) grouped
+          verify crateId compilerHash imports datatypes
       }
     };
   -- Only actual resolved inputs enter this boundary. Class lowering has
   -- already allocated all selectors and dictionaries. The fallback uses
   -- that exact table and traverses the final, rewritten expression edges.
-  compileLoweredIn lowered verify crateId compilerHash cacheDir imports = case Inference.loweredDeclarationTable lowered of {
-    Nothing -> ioReturn (Left "resolved lowered group has no declaration table");
+  compileLoweredIn lowered verify crateId compilerHash directory =
+    compileLoweredQueries (openFileQueries directory) lowered verify crateId compilerHash;
+  compileLoweredQueries begin lowered verify crateId compilerHash imports = case Inference.loweredDeclarationTable lowered of {
+    Nothing -> compileNamedQueries (case lowered of { Inference.ScriptDeclarations entry _ -> Just entry; _ -> Nothing })
+      begin verify crateId compilerHash imports
+      (Inference.loweredData lowered) (Inference.loweredValues lowered);
     Just generation -> let { entries = Inference.loweredIdValues lowered;
       scope = Source.loweredScope generation (map fst entries)
     } in case Surface.indexedMemberGroups entries of {
       Left e -> ioReturn (Left e);
-      Right grouped -> startLowered scope entries grouped verify crateId compilerHash cacheDir imports
+      Right grouped -> startLoweredQueries Nothing begin scope entries grouped verify crateId compilerHash imports
         (Inference.loweredData lowered)
     }
   };
-  startLowered scope entries grouped verify crateId compilerHash cacheDir imports datatypes = case do {
+  startLowered scope entries grouped verify crateId compilerHash directory =
+    startLoweredQueries Nothing (openFileQueries directory) scope entries grouped verify crateId compilerHash;
+  startLoweredQueries scriptEntry begin scope entries grouped verify crateId compilerHash imports datatypes = case do {
     inventory <- Q.prepareData datatypes;
     types <- foldM Inference.mergeExternal M.empty (concatMap Separate.unitBindings imports);
     checked <- Source.installContracts scope (M.map (\ty -> Source.SourceContract ty [] True) types);
@@ -1011,36 +1094,81 @@ module Bootstrap.CrateGraph where {
     };
     Right ((,,) inventory checked (map (\ids -> (,) ids (prepare ids)) grouped))
   } of { Left e -> ioReturn (Left e); Right ((,,) inventory checked steps) ->
-    start verify crateId compilerHash cacheDir "lowered" inventory datatypes checked steps
+    startGroupWith scriptEntry begin False (Dependency.valueOccurrences True) (Dependency.valueOccurrences True False)
+      Q.requiredDataIn verify crateId compilerHash (case scriptEntry of { Nothing -> "lowered"; Just _ -> "script-expression" }) inventory datatypes checked steps
   };
   start = startWithData Q.requiredDataIn;
   startWithData = startUsing (Dependency.valueOccurrences True) (Dependency.valueOccurrences True False);
   startUsing = startGroupUsing False;
-  startGroupUsing owned occurrences declarationReads selectData verify crateId compilerHash cacheDir flavor inventory datatypes contracts groups = do {
+  startGroupUsing owned occurrences declarationReads selectData verify crateId compilerHash directory =
+    startGroupWith Nothing (openFileQueries directory) owned occurrences declarationReads selectData verify crateId compilerHash;
+  startGroupWith scriptEntry begin owned occurrences declarationReads selectData verify crateId compilerHash flavor inventory datatypes contracts groups = do {
         statistics <- G.profile;
         graphStarted <- G.clock statistics;
         auditSetting <- getEnv "MLF_QUERY_SEMANTIC_AUDIT";
-        started <- G.begin (cacheDir ++ "/query-graph-v3")
+        started <- begin
           (Separate.pack [crateId,compilerHash,Q.sourceQueryFormat,"open-fragment-checker-1/finish-receipt-1",flavor]);
         case started of { Left e -> ioReturn (Left e); Right session -> do {
-          let { initial = case contracts of { Source.CheckedContracts _ indexed _ -> indexed } };
+          let { initial = Source.checkedIndexed contracts };
           G.elapsed statistics 0 graphStarted;
-          runCheckedGroups owned occurrences declarationReads selectData verify (eqString auditSetting "1") (Separate.compactOpenGroupName crateId) inventory initial ((,) Nothing Nothing) groups
-            (State session contracts (InferenceCaches M.empty M.empty M.empty Nothing Nothing) [] 0 0 [] statistics)
+          runCheckedGroups scriptEntry owned occurrences declarationReads selectData verify (eqString auditSetting "1") (Separate.compactOpenGroupName crateId) inventory initial ((,) Nothing Nothing) groups
+            (State session contracts (InferenceCaches M.empty M.empty M.empty Nothing Nothing Nothing) [] 0 0 [] statistics)
         } }
     };
   runGroups verify audit crateId = runGroupsWithOwner verify audit (Separate.compactOpenGroupName crateId);
   runGroupsWithOwner = runGroupsUsing Q.requiredDataIn;
   runGroupsUsing = runGroupsReading (Dependency.valueOccurrences True) (Dependency.valueOccurrences True False);
-  runGroupsReading = runCheckedGroups False;
-  runCheckedGroups owned occurrences declarationReads selectData verify audit groupName inventory initial scopeHashes groups state = case groups of {
+  runGroupsReading = runCheckedGroups Nothing False;
+  data CheckedRoute = OrdinaryCheck | SharedArgumentCheck | GroupedRootCheck;
+  data CheckedStep = ReplayOrdinary | CheckedStep ((,) (Maybe RebuiltHash) (Maybe RebuiltHash)) State;
+  -- Rejection is a source/evidence decision. Cache, hash, input and publication
+  -- errors remain errors on both paths. A rejected step never returns its
+  -- session or its pending raw/evidence payloads to the caller.
+  rejectedStep trial message = if trial then ioReturn (Right ReplayOrdinary) else ioReturn (Left message);
+  runCheckedGroups scriptEntry owned occurrences declarationReads selectData verify audit groupName inventory initial scopeHashes groups state = case groups of {
     [] -> ioReturn (Right state);
     (:) ((,) owners prepare) rest -> case state of {
-      State session contracts (InferenceCaches contexts templates payloads contractHash preparedCache) objects inferred reused reports statistics ->
-        let { scope = Source.checkedScope contracts; names = map (Source.declName scope) owners } in
-        case bindEither (prepare contracts) (Source.slotPreparedWith (occurrences False) contracts owners) of {
-          Left e -> ioReturn (Left e);
-          Right ((,) slots prepared) -> do {
+      State _ contracts _ _ _ _ _ _ -> let {
+        readGroup input = bindEither (prepare input) (Source.slotPreparedWith (occurrences False) contracts owners);
+        step = runOneCheckedGroup scriptEntry owned occurrences declarationReads selectData verify audit groupName inventory initial scopeHashes owners state
+      } in case readGroup contracts of {
+        Left e -> ioReturn (Left e); Right ordinary@((,) slots prepared) -> do {
+          let { original = step OrdinaryCheck ordinary;
+            indexed = owned && Source.usesIndexedTerms (Source.slotScope slots);
+            tryStep route admitted alternate fallback = case alternate of {
+              Right actual -> if admitted (snd actual) then do {
+                tried <- step route actual;
+                case tried of { Right ReplayOrdinary -> fallback; _ -> ioReturn tried }
+              } else fallback;
+              Left _ -> fallback
+            };
+            shareArguments = if indexed && Source.sharedArgumentCandidate contracts slots prepared
+              then tryStep SharedArgumentCheck (Source.sharedArgumentReduction prepared)
+                (readGroup (Source.TrialChecked contracts)) original
+              else original
+          };
+          selected <- if indexed then case Source.groupedPreparedRoot prepared of {
+            Just compact -> do {
+              tried <- step GroupedRootCheck ((,) slots compact);
+              case tried of { Right ReplayOrdinary -> shareArguments; _ -> ioReturn tried }
+            };
+            Nothing -> shareArguments
+          } else shareArguments;
+          case selected of {
+            Left e -> ioReturn (Left e);
+            Right ReplayOrdinary -> ioReturn (Left "ordinary checking requested a replay");
+            Right (CheckedStep hashes next) -> runCheckedGroups scriptEntry owned occurrences declarationReads selectData verify audit groupName inventory initial hashes rest next
+          }
+        }
+      }
+    }
+  };
+  runOneCheckedGroup scriptEntry owned occurrences declarationReads selectData verify audit groupName inventory initial scopeHashes owners state route ((,) slots prepared) =
+    let { trial = case route of { OrdinaryCheck -> False; _ -> True };
+          grouped = case route of { GroupedRootCheck -> True; _ -> False }
+    } in case state of {
+      State session contracts (InferenceCaches contexts templates payloads contractHash preparedCache evidenceMemo) objects inferred reused reports statistics ->
+        let { scope = Source.checkedScope contracts; names = map (Source.declName scope) owners } in do {
             let { declarations = selectData inventory (Source.groupMembers prepared)
                     (append (Source.groupBindings prepared) (Source.groupCandidateBindings prepared));
               group = groupName names;
@@ -1091,12 +1219,12 @@ module Bootstrap.CrateGraph where {
                           Just node -> case G.nodePayload node of {
                             Nothing -> ioReturn (Left "query result is absent");
                             Just digest -> do {
-                              loaded <- loadRaw template declarations (G.payloadPath active digest) digest
+                              loaded <- loadRaw template declarations (G.readPayloadBytes active digest) digest
                                 references group env slots prepared owners names;
                               case loaded of {
                                 Left e -> ioReturn (Left e);
                                 Right fragment -> do {
-                                  fingerprint <- if verify then checkedRawHash digest template declarations references group fragment
+                                  fingerprint <- if verify then checkedRawHash template declarations references group fragment
                                     else ioReturn (Right digest);
                                   ioReturn (do {
                                     actual <- fingerprint;
@@ -1116,7 +1244,7 @@ module Bootstrap.CrateGraph where {
                         inferStarted <- G.clock statistics;
                         let { hit = case cached of { Right _ -> True; Left _ -> False };
                           bind reads = Surface.bindIndexedMembersWith (Dependency.occurrenceGlobalIds reads);
-                          compiler = if owned then Inference.compileFileGroupIndexedWith (bind Dependency.fileLastDeclarationOccurrences)
+                          compiler = if owned then Inference.compileFileGroupIn env (bind Dependency.fileLastDeclarationOccurrences)
                             else Inference.compileOpenGroupIndexedWith (bind declarationReads);
                           compile = compileIndexedMemoUsing compiler;
                           raw = case cached of {
@@ -1131,14 +1259,16 @@ module Bootstrap.CrateGraph where {
                                   members <- indexed;
                                   compile (Left reason) templates group currentParameters declarations members
                                 }
-                              } else mapEither (\fragment -> (,) fragment templates) (Inference.compileOpenGroup group
+                              } else mapEither (\fragment -> (,) fragment templates) (Inference.compileNamedOpenGroup scriptEntry group
                                 [Q.dependencyInterface (Source.groupBindings prepared)] declarations (Source.groupMembers prepared));
-                              canonical <- Source.canonicalCheckedOpen (fst inferredResult);
+                              restored <- if grouped then Source.restoreRootDictionarySpine prepared (fst inferredResult)
+                                else Right (fst inferredResult);
+                              canonical <- Source.canonicalCheckedOpen restored;
                               Source.validatePreparedOpen slots prepared canonical;
                               Right ((,) canonical (snd inferredResult))
                             }
                           } };
-                        case raw of { Left e -> ioReturn (Left e); Right ((,) fragment nextTemplates) -> do {
+                        case raw of { Left e -> rejectedStep trial e; Right ((,) fragment nextTemplates) -> do {
                           recorded <- if hit then case previous of {
                             Just node -> ioReturn (Right ((,) ((,) node active) payloads));
                             Nothing -> ioReturn (Left "missing validated source query")
@@ -1147,14 +1277,15 @@ module Bootstrap.CrateGraph where {
                           finishStarted <- G.clock statistics;
                           case recorded of { Left e -> ioReturn (Left e); Right ((,) ((,) rawNode fourth) nextPayloads) ->
                             case Source.prepareOpenFinish slots contracts prepared fragment of {
-                              Left e -> ioReturn (Left e);
+                              Left e -> rejectedStep trial e;
                               Right finish -> do {
-                                evidence <- resolveRequests env slots ((:) (G.edge scopeNode) (map G.edge dataNodes))
-                                  (Source.openFinishRequests finish) fourth;
-                                case evidence of { Left e -> ioReturn (Left e); Right ((,,) answers evidenceReads afterEvidence) ->
+                                evidence <- resolveRequestsBatch evidenceMemo trial env slots ((:) (G.edge scopeNode) (map G.edge dataNodes))
+                                  (Source.openFinishRequestBatch finish) fourth;
+                                case evidence of { Left e -> ioReturn (Left e); Right ((,,,) answers evidenceReads afterEvidence nextEvidenceMemo) ->
                                 case Source.completeOpenFinish contracts finish answers of {
-                                Left e -> ioReturn (Left e);
-                                Right (Source.OpenFinalGroup body delta) -> do {
+                                Left e -> rejectedStep trial e;
+                                Right completed@(Source.OpenFinalGroup body delta) -> if trial && not grouped && not (Source.fullyDischarged completed)
+                                  then ioReturn (Right ReplayOrdinary) else do {
                                 let { final = Source.openFinalObject fragment body };
                                 demanded <- case Source.finalParameterIds slots contracts final of {
                                   Left e -> ioReturn (Left e);
@@ -1177,13 +1308,13 @@ module Bootstrap.CrateGraph where {
                                     evidenceReads delta reads afterInputs };
                                 case supplied of { Left e -> ioReturn (Left e); Right ((,) next nextContractHash) -> do {
                                     G.elapsed statistics 3 finishStarted;
-                                    runCheckedGroups owned occurrences declarationReads selectData verify audit groupName inventory initial ((,) inventoryHash scopeHash) rest
-                                      (State next (Source.publishContracts contracts delta) (InferenceCaches currentContexts nextTemplates nextPayloads nextContractHash nextPreparedCache)
+                                    ioReturn (Right (CheckedStep ((,) inventoryHash scopeHash)
+                                      (State next (Source.publishContracts contracts delta) (InferenceCaches currentContexts nextTemplates nextPayloads nextContractHash nextPreparedCache nextEvidenceMemo)
                                         ((:) ((,,) group final (map fst delta)) objects)
                                         (inferred + if hit then 0 else 1) (reused + if hit then 1 else 0)
                                         ((:) (Q.GroupResult group names hit
                                           (Separate.fingerprint (Q.list Q.encodeSourceContract (map (\((,) i c) -> (,) (Source.declName scope i) c) (sortedDelta slots delta))))
-                                          (G.nodeHash rawNode)) reports) statistics)
+                                          (G.nodeHash rawNode)) reports) statistics)))
                                   } }
                                 }
                                 }
@@ -1200,9 +1331,7 @@ module Bootstrap.CrateGraph where {
               }
             } }
           }
-        }
-    }
-  };
+    };
   -- One canonical content address for a fragment and its ordered environment,
   -- regardless of how it was produced. KeepRawBody proves the body is exactly
   -- the one obtained from InferScc. A changed environment invalidates reuse.
@@ -1214,8 +1343,8 @@ module Bootstrap.CrateGraph where {
       Source.AdaptedBody _ -> False
     }; rawHash = G.nodeHash rawNode } in
     if same && not recheck then ioReturn (Right rawHash) else do {
-      hashed <- if same then checkedRawHash rawHash template declarations finalRefs group final
-        else G.hashValue (rawValue finalRefs group final);
+      hashed <- if same then checkedRawHash template declarations finalRefs group final
+        else G.hashValueUsing W.indexedTextLimits (rawValue finalRefs group final);
       ioReturn (do { digest <- hashed;
         ensure (not same || eqString digest rawHash) "retained final fragment SHA mismatch";
         Right digest })
@@ -1330,9 +1459,40 @@ module Bootstrap.CrateGraph where {
       Right ((,) name (XName (0 - index - 1) stable))
     }) (zip (range 0 (length ids - 1)) (zip ids candidates))
   };
+  -- The provider still reads its own Scope query key. Stored evidence may
+  -- share a proof across owners with exactly the same scope content and data
+  -- dependencies. The individual ordered reads are checked before decoding.
+  evidencePayloadReads refs = case refs of {
+    (:) ((,) key digest) rest -> case Separate.unpack key of {
+      Right ["Scope",_] -> (:) ((,) (G.key "EvidenceScopeContent" "") digest) rest;
+      _ -> refs
+    };
+    [] -> []
+  };
+  sameEvidenceReads = eqList (eqPair eqString eqString);
+  data StoredEvidence = StoredEvidence W.Value XTerm String ByteArray;
+  data EvidenceMemo = EvidenceMemo ([] ((,) String String))
+    ([] Boundary.Candidate) ([] ((,) XName XName)) StoredEvidence;
+  sameEvidenceName a b = X.equalName a b && eqString (X.nameHint a) (X.nameHint b);
+  sameEvidenceCandidate a b = case (,) (Boundary.candidateTriple a) (Boundary.candidateTriple b) of {
+    (,) ((,,) role _ ty) ((,,) other _ expected) -> Evidence.sameRole role other &&
+      sameContractValue (A.toXType ty) (A.toXType expected)
+  };
+  reverseEvidenceNames = map (\((,) a b) -> (,) b a);
+  evidenceForBatch memo refs candidates aliases = case memo of {
+    Just (EvidenceMemo oldRefs oldCandidates oldAliases (StoredEvidence goal proof digest bytes)) ->
+      if sameEvidenceReads oldRefs refs && eqList sameEvidenceCandidate oldCandidates candidates &&
+        eqList (\a b -> sameEvidenceName (snd a) (snd b)) oldAliases aliases
+      then Just (StoredEvidence goal (renameEvidence (reverseEvidenceNames aliases) proof) digest bytes)
+      else Nothing;
+    Nothing -> Nothing
+  };
+  persistEvidenceMemo refs candidates aliases (StoredEvidence goal proof digest bytes) =
+    EvidenceMemo refs candidates aliases (StoredEvidence goal (renameEvidence aliases proof) digest bytes);
+  renameEvidence aliases proof = let { names = M.fromList X.compareName aliases } in
+    Separate.mapTerm (\n -> M.findWithDefault X.compareName n n names) (\a -> a) proof;
   evidenceValue goal references aliases answer = let {
-    names = M.fromList X.compareName aliases;
-    canonical = mapOptional (Separate.mapTerm (\n -> M.findWithDefault X.compareName n n names) (\a -> a)) answer
+    canonical = mapOptional (renameEvidence aliases) answer
   } in W.VNode 426 [A.toXType (Separate.normalType goal),
     A.toList (A.toPair A.toText A.toText) references,A.toMaybe A.toXTerm canonical];
   decodeEvidence graph goal references aliases = do {
@@ -1344,7 +1504,8 @@ module Bootstrap.CrateGraph where {
         ensure (T.alphaEq savedGoal goal) "evidence goal changed";
         raw <- A.decodeGraphValue (A.ShapeList (A.ShapePair A.ShapeText A.ShapeText)) graph rs;
         savedReferences <- A.expectList (A.expectPair A.expectText A.expectText) raw;
-        ensure (eqList (eqPair eqString eqString) savedReferences references) "evidence environment changed";
+        ensure (sameEvidenceReads savedReferences references ||
+          sameEvidenceReads savedReferences (evidencePayloadReads references)) "evidence environment changed";
         decoded <- A.decodeGraphValue (A.ShapeMaybe A.ShapeXTerm) graph p;
         proof <- A.expectMaybe A.expectXTerm decoded;
         let { replacements = M.fromList X.compareName (map (\((,) a b) -> (,) b a) aliases) };
@@ -1353,47 +1514,107 @@ module Bootstrap.CrateGraph where {
       _ -> Left "invalid stable evidence record"
     }
   };
-  resolveRequests env slots dependencies requests session = case requests of {
+  resolveRequests = resolveRequestsUsing False;
+  resolveRequestsUsing trial env slots dependencies requests session = case requests of {
     [] -> ioReturn (Right ((,,) [] [] session));
-    (:) ((,,) ordinal goal candidates) rest -> case evidenceNames slots candidates of {
-      Left e -> ioReturn (Left e); Right aliases -> do {
-      let { wanted = evidenceKey (EvidenceQuery slots ordinal goal);
-        validated = G.validate wanted session; previous = fst validated; current = snd validated };
-      cached <- case previous of {
-        Nothing -> ioReturn (Left "dirty evidence query");
-        Just node -> case G.nodePayload node of {
-          Nothing -> ioReturn (Left "missing evidence payload");
-          Just digest -> do {
-            read <- G.readValue (G.payloadPath current digest) (Just digest);
-            ioReturn (bindEither read (\graph -> decodeEvidence graph goal dependencies aliases))
-          }
+    (:) ((,,) ordinal goal candidates) rest -> do {
+      first <- resolveRequestsBatch Nothing trial env slots dependencies
+        (Boundary.RequestBatch candidates [(,) ordinal goal]) session;
+      case first of {
+        Left e -> ioReturn (Left e);
+        Right ((,,,) answers reads next _) -> do {
+          following <- resolveRequestsUsing trial env slots dependencies rest next;
+          ioReturn (mapEither (\((,,) tail more final) ->
+            (,,) (append answers tail) (append reads more) final) following)
         }
-      };
-      let { answer = case cached of {
-        Right value -> Right value;
-        Left _ -> case Evidence.resolveDictionaryDetailed (Open.dataEnvironment env) M.empty
-          (map Boundary.candidateTriple candidates) goal of {
-          Left (Evidence.NoEntailment _) -> Right Nothing;
-          Left (Evidence.InvalidEvidence message) -> Left message;
-          Right proof -> Right (Just proof)
-        }
-      } };
-      case answer of { Left e -> ioReturn (Left e); Right proof -> do {
-        recorded <- case cached of {
-          Right _ -> case previous of {
-            Just node -> ioReturn (Right ((,) node current));
-            Nothing -> ioReturn (Left "evidence validation invariant")
-          };
-          Left _ -> G.record wanted dependencies True (evidenceValue goal dependencies aliases proof) current
-        };
-        case recorded of { Left e -> ioReturn (Left e); Right ((,) node next) -> do {
-          tail <- resolveRequests env slots dependencies rest next;
-          ioReturn (mapEither (\((,,) answers edges final) ->
-            (,,) ((:) ((,) ordinal proof) answers) ((:) (G.edge node) edges) final) tail)
-        } }
-      } }
-    } }
+      }
+    }
   };
+  -- The checked plan supplies one ordered candidate environment for all its
+  -- requests. Admit that environment and map its binders once, then record
+  -- each source site with its complete current reads.
+  resolveRequestsBatch memo trial env slots dependencies (Boundary.RequestBatch candidates requests) session =
+    case requests of {
+      [] -> ioReturn (Right ((,,,) [] [] session memo));
+      _ -> case evidenceNames slots candidates of {
+        Left e -> ioReturn (Left e);
+        Right aliases -> let {
+          refs = evidencePayloadReads dependencies;
+          enabled = not trial && length candidates <= 64;
+          retained = if enabled then evidenceForBatch memo refs candidates aliases else Nothing;
+          group = groupIdentity slots;
+          resolver = Evidence.resolveDictionaryDetailed (Open.dataEnvironment env) M.empty
+            (map Boundary.candidateTriple candidates);
+          walk proofMemo remaining active = case remaining of {
+            [] -> ioReturn (Right ((,,,) [] [] active (case proofMemo of {
+              Nothing -> memo;
+              Just proof -> Just (persistEvidenceMemo refs candidates aliases proof)
+            })));
+            (:) ((,) ordinal goal) rest -> do {
+              let { normal = Separate.normalType goal; goalValue = A.toXType normal;
+                wanted = G.key "Evidence" (Separate.pack [group, showInt ordinal, Pretty.prettyType normal]);
+                validated = G.validateExpected wanted dependencies active;
+                previous = fst validated; current = snd validated;
+                publish digest bytes = G.recordDigest wanted dependencies (Just digest) digest (Just bytes) current;
+                proceed proof next ((,) node updated) = do {
+                  tail <- walk next rest updated;
+                  ioReturn (mapEither (\((,,,) answers edges final remembered) ->
+                    (,,,) ((:) ((,) ordinal proof) answers) ((:) (G.edge node) edges) final remembered) tail)
+                };
+                fresh = case resolver goal of {
+                  Left (Evidence.NoEntailment _) -> Right Nothing;
+                  Left (Evidence.InvalidEvidence message) -> if trial then Right Nothing else Left message;
+                  Right proof -> Right (Just proof)
+                };
+                record = case fresh of {
+                  Left e -> ioReturn (Left e);
+                  Right proof -> do {
+                    encoded <- G.encodeHashed (evidenceValue goal refs aliases proof);
+                    case encoded of {
+                      Left e -> ioReturn (Left e);
+                      Right ((,) digest bytes) -> do {
+                        next <- case proof of {
+                          Just checked -> if not enabled then ioReturn proofMemo else do {
+                            size <- lengthByteArray bytes;
+                            ioReturn (if size <= 65536 then case contractHashBudget 1 128 goalValue of {
+                              Just _ -> Just (StoredEvidence goalValue checked digest bytes);
+                              Nothing -> proofMemo
+                            } else proofMemo)
+                          };
+                          Nothing -> ioReturn proofMemo
+                        };
+                        proceed proof next (publish digest bytes)
+                      }
+                    }
+                  }
+                }
+              };
+              cached <- case previous of {
+                Nothing -> ioReturn (Left "dirty evidence query");
+                Just node -> case G.nodePayload node of {
+                  Nothing -> ioReturn (Left "missing evidence payload");
+                  Just digest -> do {
+                    read <- G.readPayloadValue current digest;
+                    ioReturn (bindEither read (\graph -> decodeEvidence graph goal dependencies aliases))
+                  }
+                }
+              };
+              case cached of {
+                Right proof -> case previous of {
+                  Just node -> proceed proof proofMemo ((,) node current);
+                  Nothing -> ioReturn (Left "evidence validation invariant")
+                };
+                Left _ -> case proofMemo of {
+                  Just (StoredEvidence saved proof digest bytes) -> if sameContractValue saved goalValue
+                    then proceed (Just proof) proofMemo (publish digest bytes) else record;
+                  Nothing -> record
+                }
+              }
+            }
+          }
+        } in walk retained requests session
+      }
+    };
   -- The standalone source-root boundary publishes only after every SCC has
   -- completed. CrateSession uses compile/result and owns the later IO boundary.
   compileSourceGroups verify crateId directory imports protected plan = do {

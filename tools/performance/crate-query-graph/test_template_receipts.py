@@ -74,7 +74,7 @@ def changed(value, index, replacement):
 def write_fixture(root, f):
     prefix = root / 'unit'
     cache = root / 'cache'
-    directory = cache / 'query-graph-v2'
+    directory = cache / 'query-graph-v3'
     (directory / 'results').mkdir(parents=True)
     (directory / 'CURRENT').write_text('fixture pointer is not read by this API')
     payload = tree_document([n(425, f['references'], f['original'])], 6)
@@ -374,7 +374,7 @@ class TemplateReceiptTests(unittest.TestCase):
     def test_raw_and_finish_digests_are_rejected_even_under_python_O(self):
         def corrupt(prefix, cache, nodes):
             raw = next(v for k, v in nodes.items() if k.startswith('8:InferScc'))
-            path = cache / 'query-graph-v2/results' / (raw['sha'] + '.mlfqr')
+            path = cache / 'query-graph-v3/results' / (raw['sha'] + '.mlfqr')
             path.write_bytes(path.read_bytes() + b'bad')
         with self.assertRaisesRegex(Invalid, 'raw payload commitment'):
             self.check(fixture(), corrupt)
@@ -390,34 +390,33 @@ class TemplateReceiptTests(unittest.TestCase):
 
     def test_forged_templates_preserve_exact_graph_closure_for_actual_reader_controls(self):
         from artifact_binary_typed import unpack
-        for version in (1, 2, 3):
-            for mode in ('owner', 'member', 'source-key', 'scheme-key'):
-                with self.subTest(version=version, mode=mode), tempfile.TemporaryDirectory() as temp:
-                    prefix, cache, nodes = write_fixture(Path(temp), fixture())
-                    directory = cache / 'query-graph-v2'
-                    (directory / 'generations').mkdir()
-                    raw = column_generation(nodes, 'App.out') if version == 3 else verify.index_bytes('fixture', nodes, version=version)
-                    current = h(raw)
-                    (directory / 'generations' / (current + '.mlfqg')).write_bytes(raw)
-                    (directory / 'CURRENT').write_bytes(tree_document([s(current)], 6))
-                    key = next(key for key in nodes if unpack(key)[0] == 'InferScc')
-                    forged = forge_template_generation(cache, current, key, mode)
-                    self.assertNotEqual(forged, current)
-                    actual, damaged = verify.graph(cache)
-                    self.assertEqual(actual, forged)
-                    replacement = damaged[key]['sha']
-                    self.assertEqual(damaged, verify.replace_result(nodes, key, replacement))
-                    self.assertEqual((directory / 'generations' / (current + '.mlfqg')).read_bytes(), raw)
-                    # Typed framing/closure remains valid. The source-key
-                    # mismatch is intentionally left to the actual compiler's
-                    # current-source admission rather than a self-attested key.
+        for mode in ('owner', 'member', 'source-key', 'scheme-key'):
+            with self.subTest(mode=mode), tempfile.TemporaryDirectory() as temp:
+                prefix, cache, nodes = write_fixture(Path(temp), fixture())
+                directory = cache / 'query-graph-v3'
+                (directory / 'generations').mkdir()
+                raw = column_generation(nodes, 'App.out')
+                current = h(raw)
+                (directory / 'generations' / (current + '.mlfqg')).write_bytes(raw)
+                (directory / 'CURRENT').write_bytes(tree_document([s(current)], 6))
+                key = next(key for key in nodes if unpack(key)[0] == 'InferScc')
+                forged = forge_template_generation(cache, current, key, mode)
+                self.assertNotEqual(forged, current)
+                actual, damaged = verify.graph(cache)
+                self.assertEqual(actual, forged)
+                replacement = damaged[key]['sha']
+                self.assertEqual(damaged, verify.replace_result(nodes, key, replacement))
+                self.assertEqual((directory / 'generations' / (current + '.mlfqg')).read_bytes(), raw)
+                # Typed framing/closure remains valid. The source-key
+                # mismatch is intentionally left to the actual compiler's
+                # current-source admission rather than a self-attested key.
 
     def test_signed_template_attacks_preserve_v3_graph_and_target_fields(self):
         from query_generation import Generation
         for mode in ('owner', 'member', 'source-key', 'scheme-key', 'signature-key'):
             with self.subTest(mode=mode), tempfile.TemporaryDirectory() as temp:
                 f = signed_fixture(); prefix, cache, nodes = write_fixture(Path(temp), f)
-                directory = cache / 'query-graph-v2'
+                directory = cache / 'query-graph-v3'
                 (directory / 'generations').mkdir()
                 raw = column_generation(nodes, f['owner']); current = h(raw)
                 (directory / 'generations' / (current + '.mlfqg')).write_bytes(raw)

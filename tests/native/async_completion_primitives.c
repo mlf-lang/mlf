@@ -2,6 +2,7 @@
  * driver invocation. C callbacks stand in for generated typed source closures;
  * source inference/checking/parity is covered by fixtures/async-completion. */
 #include "../../runtime/mlf_runtime.h"
+#include "test_case_events.h"
 #include "../../runtime/mlf_process_supervisor.h"
 #include <gc/gc.h>
 #include <stdio.h>
@@ -14,7 +15,7 @@ static MlfValue *n(const char *s) { return mlf_integer(s); }
 static MlfValue *unit(void) { return mlf_prim1(0,mlf_constructor(0,0)); }
 static void require(int ok,const char *message) {
     ++checks;
-    if(!ok) { fprintf(stderr,"primitive integration stage %u: %s\n",stage,message); exit(1); }
+    if(!ok) { fprintf(stderr,"primitive integration stage %u: %s\n",stage,message); mlf_case_result("fail", 1); exit(1); }
 }
 static void expect_int(MlfValue *v,const char *s) {
     require(mlf_truth(mlf_eq_int(v,n(s))),"unexpected integer");
@@ -97,7 +98,11 @@ static MlfValue *next(void) {
     return mlf_prim2(1,op,mlf_closure(after,mlf_env_new(0)));
 }
 int main(void) {
+    const char *id = "native-completion-primitives/ordered-io-driver";
+    if (!mlf_case_selected(id)) return 64;
+    mlf_case_start(id);
     int status=mlf_run(next(),1);
+    mlf_case_result(status ? "fail" : "pass", status);
     printf("Native completion primitives: %u checks, %u callbacks passed.\n",checks,callbacks);
     return status;
 }

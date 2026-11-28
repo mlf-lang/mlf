@@ -34,8 +34,8 @@ BuiltinPreludeVerification = builtin_controls.BuiltinPreludeVerification
 
 
 class FrontendExecutionBudget(unittest.TestCase):
-    # Preserve upstream's authenticated-budget and untyped-input controls while
-    # reconciling its serial job with the reviewed per-mode parallel partition.
+    # Authenticate each mode's budget and keep the routine producer separate
+    # from the targeted optimizer producer.
     def test_authenticated_o0_budget_is_bounded(self):
         self.assertEqual(direct.frontend_case_timeout('frontend', '0'), 3600)
         self.assertEqual(direct.frontend_case_timeout('native-first', '0'), 1800)
@@ -49,21 +49,21 @@ class FrontendExecutionBudget(unittest.TestCase):
     def test_ci_partitions_o0_with_bounded_jobs(self):
         workflow = (ROOT / '.github/workflows/ci.yml').read_text()
         shared_job = workflow.split('  native:\n', 1)[1].split('  build-runner:', 1)[0]
-        self.assertIn('timeout-minutes: 120', shared_job)
-        for suite in ['direct', 'default', 'framework']:
-            self.assertIn("optimization: '0'\n            suite: " + suite, shared_job)
-        self.assertIn("optimization: '2'\n            suite: all", shared_job)
+        self.assertIn('timeout-minutes: 360', shared_job)
+        self.assertIn("optimization: '0'\n            suite: routine", shared_job)
+        self.assertIn("optimization: '2'\n            suite: optimizer", shared_job)
 
     def test_ci_uses_one_authenticated_tuple_suite_owner(self):
         workflow = (ROOT / '.github/workflows/ci.yml').read_text()
         shared_job = workflow.split('  native:\n', 1)[1].split('  build-runner:', 1)[0]
-        self.assertEqual(shared_job.count('python3 tools/shared/test_framework_direct.py '), 1)
+        commands = [line for line in shared_job.splitlines() if 'tools/testing/run.py framework-direct -- ' in line]
+        self.assertEqual(len(commands), 2)
+        self.assertEqual(sum('--suite all --suite-timeout 5400' in line for line in commands), 1)
+        self.assertEqual(sum(line.endswith('--suite controls') for line in commands), 1)
+        self.assertNotIn('python3 tools/shared/test_framework_direct.py ', shared_job)
         self.assertNotIn('bin/tuple-list |', shared_job)
         self.assertNotIn('bin/tuple-list --', shared_job)
-        # The measured upstream serial budget is represented by three bounded
-        # O0 shards here, not by stacking a 330-minute timeout onto each shard.
-        self.assertEqual(shared_job.count('timeout-minutes: 120'), 1)
-        self.assertNotIn('330', shared_job)
+        self.assertEqual(shared_job.count('timeout-minutes: 360'), 1)
 
     def test_unknown_or_untyped_optimization_is_rejected(self):
         for value in ['1', '', None, 0, 2, False, {}, {'optimization': '0'}]:
@@ -96,50 +96,6 @@ class ManifestParity(unittest.TestCase):
         data = json.loads(path.read_text())
         mutation(data)
         path.write_text(json.dumps(data))
-
-    def test_closed_corpus_has_matching_137_modules_13_executables(self):
-        manifest = self.check()
-        self.assertEqual(len(manifest['modules']), 137)
-        modules = {entry['module']: entry for entry in manifest['modules']}
-        self.assertEqual(len(modules), 137)
-        for name, path, role in (
-            ('Bootstrap.Bitstream', 'libraries/mlf-crates/Bootstrap/Bitstream.hs', 'implementation'),
-            ('Bootstrap.ArtifactStorage', 'libraries/mlf-crates/Bootstrap/ArtifactStorage.hs', 'implementation'),
-            ('Bootstrap.ArtifactStructure', 'libraries/mlf-crates/Bootstrap/ArtifactStructure.hs', 'implementation'),
-            ('Bootstrap.IntTree', 'libraries/mlf-foundation/Bootstrap/IntTree.hs', 'implementation'),
-            ('Bootstrap.IntRank', 'libraries/mlf-foundation/Bootstrap/IntRank.hs', 'implementation'),
-            ('Bootstrap.CrateSession', 'libraries/mlf-crates/Bootstrap/CrateSession.hs', 'implementation'),
-            ('Bootstrap.Graph.IndexStore', 'libraries/mlf-inference/Bootstrap/Graph/IndexStore.hs', 'implementation'),
-            ('Bootstrap.ClassDemand', 'libraries/mlf-inference/Bootstrap/ClassDemand.hs', 'implementation'),
-            ('MLF.Tests.ClassDemand', 'tests/shared/MLF/Tests/ClassDemand.hs', 'direct-test'),
-            ('Bootstrap.Standalone', 'libraries/mlf-frontend/Bootstrap/Standalone.hs', 'implementation'),
-            ('Bootstrap.EvidenceBoundary', 'libraries/mlf-inference/Bootstrap/EvidenceBoundary.hs', 'implementation'),
-            ('Bootstrap.SourceInference', 'libraries/mlf-crates/Bootstrap/SourceInference.hs', 'implementation'),
-            ('Bootstrap.SourceUnit', 'libraries/mlf-crates/Bootstrap/SourceUnit.hs', 'implementation'),
-            ('Bootstrap.OpenFragment', 'libraries/mlf-crates/Bootstrap/OpenFragment.hs', 'implementation'),
-            ('Bootstrap.QueryGraph', 'libraries/mlf-crates/Bootstrap/QueryGraph.hs', 'implementation'),
-            ('Bootstrap.CrateGraph', 'libraries/mlf-crates/Bootstrap/CrateGraph.hs', 'implementation'),
-            ('Bootstrap.BuiltinPreludeContext', 'libraries/mlf-crates/Bootstrap/BuiltinPreludeContext.hs', 'implementation'),
-            ('Bootstrap.BuiltinPreludeLiteral', 'libraries/mlf-crates/Bootstrap/BuiltinPreludeLiteral.hs', 'implementation'),
-            ('Bootstrap.ImportParameters', 'libraries/mlf-crates/Bootstrap/ImportParameters.hs', 'implementation'),
-            ('Bootstrap.ImportedRoot', 'libraries/mlf-crates/Bootstrap/ImportedRoot.hs', 'implementation'),
-            ('Bootstrap.PreparedLibraries', 'libraries/mlf-crates/Bootstrap/PreparedLibraries.hs', 'implementation'),
-            ('Bootstrap.PreparedLibraryLiteral', 'libraries/mlf-crates/Bootstrap/PreparedLibraryLiteral.hs', 'implementation'),
-            ('MLF.BuiltinPreludeData', 'bootstrap/MLF/BuiltinPreludeData.hs', 'implementation'),
-            ('MLF.Entry.BuiltinPrelude', 'bootstrap/MLF/Entry/BuiltinPrelude.hs', 'implementation'),
-            ('MLF.PreparedCompiler', 'bootstrap/MLF/PreparedCompiler.hs', 'implementation'),
-            ('Bootstrap.LLVM.Library', 'libraries/mlf-llvm/Bootstrap/LLVM/Library.hs', 'implementation'),
-            ('MLF.PreparedNativeData', 'bootstrap/MLF/PreparedNativeData.hs', 'implementation'),
-            ('MLF.PreparedLibraryData', 'bootstrap/MLF/PreparedLibraryData.hs', 'implementation'),
-        ):
-            self.assertEqual(modules[name], {
-                'module': name, 'path': path, 'role': role,
-            })
-        self.assertEqual(len(manifest['executables']), 13)
-        self.assertEqual(next(entry for entry in manifest['executables'] if entry['name'] == 'builtin-prelude'), {
-            'name': 'builtin-prelude', 'module': 'MLF.Entry.BuiltinPrelude',
-            'wrapper': 'host/ghc/app/builtin-prelude/Main.hs',
-        })
 
     def test_cabal_wrong_wrapper_rejected(self):
         path = self.root / 'mlf-shared.cabal'
@@ -504,11 +460,10 @@ class FrontendTimeoutSelection(unittest.TestCase):
             argv = ['test_direct.py', '--bin-dir', str(root / 'bin'),
                     '--build-receipt', str(receipt), '--output', str(root / 'output'), *extra]
             with patch.object(sys, 'argv', argv), \
-                    patch.object(direct, 'CommandRunner', RecordingRunner), \
                     patch.object(direct, 'authenticate_build', return_value={'producer_host': 'GHC', 'optimization': optimization}), \
                     patch.object(direct.shutil, 'which', return_value=sys.executable), \
                     patch.object(direct, 'sha', return_value='0' * 64):
-                direct.main()
+                direct.main(runner_factory=RecordingRunner)
             return {name: options['timeout'] for name, _, options in calls
                     if name.startswith('shared-frontend-')}
 

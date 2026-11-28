@@ -12,12 +12,16 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from pathlib import Path
 
 from build import DEMAND_FLAGS, EXHAUSTIVENESS_FLAGS, PACKAGES
 from test_direct import CommandRunner, authenticate_build, sha
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / 'tools/testing'))
+from receipt_selection import identity, select
+
 FIXTURE = ROOT / 'tools/shared/fixtures/item4/SourceFieldLayouts.hs'
 # Authored independently of fixture parsing and execution. Exact order, count,
 # wording and terminal banner are mandatory; a partial run is never a pass.
@@ -100,6 +104,7 @@ def main():
     parser.add_argument('--build-timeout', type=int, default=120)
     parser.add_argument('--run-timeout', type=int, default=600)
     args = parser.parse_args()
+    selected = select('source-field-layouts/', EXPECTED_CHECKS)
     for name, maximum in [('build_timeout', 300), ('run_timeout', 1200)]:
         if not 1 <= getattr(args, name) <= maximum:
             parser.error(name.replace('_', '-') + ' must be between 1 and ' + str(maximum))
@@ -116,6 +121,9 @@ def main():
         'native_or_llvm_campaign': False, 'compiler_modules_rebuilt': False,
         'strict_stderr': True, 'commands': [],
     }
+
+    if selected:
+        record.update(scope='focused', selected_ids=[identity('source-field-layouts/', selected)])
 
     def save():
         temporary = output / 'receipt.json.new'
@@ -195,18 +203,23 @@ def main():
         work = output / 'work'
         if work.exists():
             raise ValueError('source/cache controls require an absent work directory')
-        result = runner.run('source-field-layouts', [executable, work], timeout=args.run_timeout)
-        verify_inventory(result.stdout)
-        record.update(passing_checks=55, passing_inventory=EXPECTED_CHECKS,
-                      production_and_frozen_target_checks=True,
-                      serialized_target_roundtrip_and_erasure=True,
-                      source_and_fallback_cold_warm_parity=True,
-                      exact_legacy_imported_layouts=True,
-                      legacy_selector_entry_rejection_explicit=True,
-                      ordinary_selector_entry_success=True,
-                      source_class_headers_and_dictionary_canonical=True,
-                      source_class_producer_consumer_cold_warm=True,
-                      source_class_method_use_42=True)
+        arguments = [executable, work, '--exact', selected] if selected else [executable, work]
+        expected = ('PASS ' + selected + '\n').encode() if selected else None
+        result = runner.run('source-field-layouts', arguments, expected=expected, timeout=args.run_timeout)
+        if selected:
+            record.update(passing_checks=1, passing_inventory=[selected])
+        else:
+            verify_inventory(result.stdout)
+            record.update(passing_checks=55, passing_inventory=EXPECTED_CHECKS,
+                          production_and_frozen_target_checks=True,
+                          serialized_target_roundtrip_and_erasure=True,
+                          source_and_fallback_cold_warm_parity=True,
+                          exact_legacy_imported_layouts=True,
+                          legacy_selector_entry_rejection_explicit=True,
+                          ordinary_selector_entry_success=True,
+                          source_class_headers_and_dictionary_canonical=True,
+                          source_class_producer_consumer_cold_warm=True,
+                          source_class_method_use_42=True)
         check_producer()
         record.update(complete=True, status='passed')
     except BaseException as error:
@@ -240,7 +253,9 @@ def main():
         save()
         if integrity_error is not None and 'error' not in record:
             raise integrity_error
-    print(str(output / 'receipt.json') + ': passed (55 checks)')
+    count = record['passing_checks']
+    unit = 'check' if count == 1 else 'checks'
+    print(f"{output / 'receipt.json'}: passed ({count} {unit})")
 
 
 if __name__ == '__main__':

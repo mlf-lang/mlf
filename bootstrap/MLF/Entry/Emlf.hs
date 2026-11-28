@@ -13,17 +13,22 @@ module MLF.Entry.Emlf where {
   import qualified Bootstrap.Std as L;
   import qualified Bootstrap.Compiler as C;
   import qualified MLF.PreparedCompiler as Prepared;
+  import qualified Package.DependencyMode as Mode;
   import qualified MLF.NativeBuild as NativeBuild;
   import qualified Bootstrap.X.Check as Check;
   import qualified Bootstrap.X.Checked as Checked;
   import qualified Bootstrap.X.Parser as Parse;
   import qualified Bootstrap.X.Pretty as Pretty;
+  import qualified Bootstrap.X.Type as TargetType;
   import qualified Bootstrap.Runtime as Runtime;
   import qualified Bootstrap.LLVM as LLVM;
   import qualified Bootstrap.Crate as Crate;
   import qualified Bootstrap.CrateSession as CrateSession;
   import qualified Bootstrap.CrateArtifact as CrateArtifact;
   import qualified Bootstrap.CrateCodegen as CrateCodegen;
+  import qualified MLF.CrateNativeCommand as NativeCommand;
+  import qualified Package.Json as J;
+  import qualified Package.OS as O;
   data Command =
     PrintSource Bool |
     RunSource |
@@ -33,7 +38,6 @@ module MLF.Entry.Emlf where {
     RunProgramTarget |
     EmitTarget |
     EmitIOTarget;
-  data Source = SourceFile String | SourceText String String | SourceStdin;
   fatal :: forall a. String -> IO a;
   fatal message = ioBind (putErr (message ++ "\n")) (\ignored -> exitWith 1);
   main =
@@ -122,33 +126,70 @@ module MLF.Entry.Emlf where {
     _ -> fatal crateUsage
   };
   compileCrateLLVMCommand verifyAll arguments = case arguments of {
-    ["-Zincremental-verify-ich", file, "-o", prefix] -> compileCrateLLVMCommand True [file,"-o",prefix];
-    [file,"-o",prefix,"-Zincremental-verify-ich"] -> compileCrateLLVMCommand True [file,"-o",prefix];
-    [file,"-o",prefix] -> compileCrateLLVMUsing verifyAll file prefix Nothing;
-    [file,"-o",prefix,"--codegen-cache",cache,"--query-report",report] ->
-      compileCrateLLVMUsing verifyAll file prefix (Just ((,) cache report));
+    ["-Zincremental-verify-ich", file, "-o", prefix] -> compileCrateLLVMCommand True [file, "-o", prefix];
+    [file, "-o", prefix, "-Zincremental-verify-ich"] -> compileCrateLLVMCommand True [file, "-o", prefix];
+    _ -> crateLLVMArguments (compileCrateLLVMInSession CrateSession.freshSession verifyAll) arguments
+  };
+  compileCratePlanCommand plan = crateLLVMArguments (\file prefix report -> do {
+    result <- CrateSession.loadPlan Prepared.installCompilerPrelude plan;
+    case result of {
+      Left message -> fatal message;
+      Right session -> compileCrateLLVMInSession session False file prefix report
+    }
+  });
+  data CrateEmission = DirectLLVM | CachedLLVM String String | NativeLLVM NativeCommand.Plan String;
+  crateLLVMArguments :: (String -> String -> CrateEmission -> IO ()) -> [] String -> IO ();
+  crateLLVMArguments compile arguments = case arguments of {
+    [file, "-o", prefix] -> compile file prefix DirectLLVM;
+    [file, "-o", prefix, "--codegen-cache", cache, "--query-report", report] ->
+      compile file prefix (CachedLLVM cache report);
+    (:) file ((:) "-o" ((:) prefix options)) -> case NativeCommand.arguments options of {
+      Just ((,) plan report) -> compile file prefix (NativeLLVM plan report);
+      Nothing -> fatal crateUsage
+    };
     _ -> fatal crateUsage
   };
-  compileCrateLLVMUsing verifyAll file prefix cacheReport = do {
-      result <- CrateSession.compileSpecFileRetainedUsingInstaller verifyAll Prepared.installCompilerPrelude file prefix;
-      case result of {
-        Left message -> fatal message;
-        Right compiled -> do {
-          linked <- Prepared.linkCompiledCrate compiled;
-          case linked of { Left message -> fatal message;
-            Right checked -> case cacheReport of {
-              Nothing -> printLLVM (LLVM.emitCheckedChunks False checked);
-              Just ((,) cache report) -> emitCachedCrate cache (Just report) checked
-            } }
-        }
-      }
+  requireResult :: forall a. Either String a -> IO a;
+  requireResult result = case result of {
+    Left message -> fatal message;
+    Right value -> ioReturn value
+  };
+  compileCrateLLVMInSession session verifyAll file prefix emission = do {
+    compiled <- ioBind (CrateSession.compileInSession session verifyAll Prepared.installCompilerPrelude file prefix) requireResult;
+    let { retained = CrateSession.sessionObjects session;
+          link = ioBind (Prepared.linkCompiledCrateRetaining retained compiled) requireResult };
+    case emission of {
+      DirectLLVM -> do { checked <- link; printLLVM (emitExecutable checked) };
+      CachedLLVM cache report -> do {
+        checked <- link;
+        emitCachedCrateUsing
+          (CrateCodegen.emitCrateCheckedUsing (ioReturn (CrateSession.compiledCompilerDigest compiled)))
+          cache (Just report) checked
+      };
+      NativeLLVM plan report -> ioBind (NativeCommand.emitRetained plan report prefix retained
+        (CrateSession.compiledInterfaces compiled) (CrateSession.compiledObject compiled)) printChunks
+    }
   };
   runArgs :: PreludeMode -> [] String -> [] String -> IO ();
   runArgs mode paths arguments = case arguments of {
+    ["--test-parity-batch", request] -> testParityBatch request;
+    (:) "--compile-crate-plan" ((:) plan rest) -> compileCratePlanCommand plan rest;
     (:) "--compile-crate-to-llvm-gc" rest -> compileCrateLLVMCommand False rest;
+    (:) "--crate-library-to-llvm" rest -> case rest of {
+      [file, "--native-identity", identity, "--native-contract", contract] -> ioBind (NativeCommand.emitLibrary file identity contract) printChunks;
+      _ -> fatal crateUsage
+    };
+    (:) "--crate-to-native-llvm" rest -> case rest of {
+      (:) file options -> case NativeCommand.arguments options of {
+        Just ((,) plan report) -> ioBind (NativeCommand.emitFile plan report file) printChunks;
+        Nothing -> fatal crateUsage
+      };
+      _ -> fatal crateUsage
+    };
     (:) "-Zincremental-verify-ich" ((:) "--compile-crate-to-llvm-gc" rest) -> compileCrateLLVMCommand True rest;
     (:) "-Zincremental-verify-ich" ((:) "--compile-crate" rest) -> compileCrateCommand True rest;
     (:) "--compile" rest -> NativeBuild.run mode paths rest;
+    ["--native-target-flags", triple] -> putStrLn (J.render (J.stringArray (O.nativeTargetFlags triple)));
     ["--native-install-info"] -> do {
       result <- Prepared.nativeInstallInfo;
       case result of {
@@ -156,10 +197,13 @@ module MLF.Entry.Emlf where {
         Right info -> putStrLn info
       }
     };
-    ["--emit-native-library-llvm"] -> printLLVM Prepared.emitNativeLibraryChunks;
-    ["--native-library-metadata"] -> case Prepared.nativeLibraryMetadata of {
-      Left message -> fatal message;
-      Right info -> putStrLn info
+    ["--emit-native-library-llvm"] -> ioBind Prepared.emitNativeLibraryChunks printLLVM;
+    ["--native-library-metadata"] -> do {
+      result <- Prepared.nativeLibraryMetadata;
+      case result of {
+        Left message -> fatal message;
+        Right info -> putStrLn info
+      }
     };
     (:) "--emit-native-llvm" rest -> nativeSourceCommand mode paths rest;
     _ -> if executableBuildArguments arguments then NativeBuild.run mode paths arguments
@@ -172,439 +216,49 @@ module MLF.Entry.Emlf where {
       (stringLength first > 0 && stringCodeAt first 0 /= 45)
   };
   runOrdinaryArgs :: PreludeMode -> [] String -> [] String -> IO ();
-  runOrdinaryArgs mode paths arguments =
-    let {
-      matchValueShared6 = arguments
-    } in
-    case matchValueShared6 of {
-      (:) matchValueShared7 matchValueShared8 ->
-        if MLF.Primitive.eqString matchValueShared7 "--implementation-identity"
-        then case matchValueShared8 of {
-               [] -> putStrLn ("MLF/shared-haskell-v1 " ++ producerHost);
-               _ -> sourceCommand mode paths (PrintSource False) [] arguments
-             }
-        else if MLF.Primitive.eqString matchValueShared7 "--check-shared"
-             then let {
-                    files = matchValueShared8
-                  } in
-                  checkSharedFiles files
-             else if MLF.Primitive.eqString matchValueShared7 "--version"
-                  then case matchValueShared8 of {
-                         [] -> putStrLn ("emlf " ++ Version.version);
-                         _ -> sourceCommand mode paths (PrintSource False) [] arguments
-                       }
-                  else if MLF.Primitive.eqString matchValueShared7 "--help"
-                       then case matchValueShared8 of {
-                              [] -> putStr usage;
-                              _ -> sourceCommand mode paths (PrintSource False) [] arguments
-                            }
-                       else if MLF.Primitive.eqString matchValueShared7 "--llvm-runtime"
-                            then case matchValueShared8 of {
-                                   [] ->
-                                     do {
-                                       path <- runtimePath;
-                                       putStrLn path
-                                     };
-                                   _ -> sourceCommand mode paths (PrintSource False) [] arguments
-                                 }
-                            else if MLF.Primitive.eqString matchValueShared7 "--compile-crate"
-                                 then compileCrateCommand False matchValueShared8
-                                 else if MLF.Primitive.eqString matchValueShared7 "--show-crate"
-                                      then case matchValueShared8 of {
-                                             (:) matchValueShared31 matchValueShared32 ->
-                                               case matchValueShared32 of {
-                                                 [] ->
-                                                   let {
-                                                     file = matchValueShared31
-                                                   } in
-                                                   do {
-                                                     result <- CrateArtifact.showInterfaceFile file;
-                                                     case result of {
-                                                       Left message -> fatal message;
-                                                       Right text -> putStr text
-                                                     }
-                                                   };
-                                                 _ ->
-                                                   sourceCommand mode paths (PrintSource False) []
-                                                     arguments
-                                               };
-                                             _ ->
-                                               sourceCommand mode paths (PrintSource False) []
-                                                 arguments
-                                           }
-                                      else if MLF.Primitive.eqString matchValueShared7
-                                                "--crate-to-llvm"
-                                           then case matchValueShared8 of {
-                                                  (:) matchValueShared21 matchValueShared22 ->
-                                                    case matchValueShared22 of {
-                                                      [] ->
-                                                        let {
-                                                          file = matchValueShared21
-                                                        } in
-                                                        crateCommand EmitSource [] file;
-                                                      (:) matchValueShared23 matchValueShared24 ->
-                                                        if MLF.Primitive.eqString matchValueShared23
-                                                             "--cache"
-                                                        then case matchValueShared24 of {
-                                                               (:) matchValueShared25 matchValueShared26 ->
-                                                                 case matchValueShared26 of {
-                                                                   [] ->
-                                                                     let {
-                                                                       file = matchValueShared21
-                                                                     } in
-                                                                     let {
-                                                                       cache = matchValueShared25
-                                                                     } in
-                                                                     cachedCrateCommand cache file;
-                                                                   (:) matchValueShared27 matchValueShared28 ->
-                                                                     if MLF.Primitive.eqString
-                                                                          matchValueShared27
-                                                                          "--query-report"
-                                                                     then case matchValueShared28 of {
-                                                                            (:) matchValueShared29 matchValueShared30 ->
-                                                                              case matchValueShared30 of {
-                                                                                [] ->
-                                                                                  let {
-                                                                                    file =
-                                                                                      matchValueShared21
-                                                                                  } in
-                                                                                  let {
-                                                                                    cache =
-                                                                                      matchValueShared25
-                                                                                  } in
-                                                                                  let {
-                                                                                    report =
-                                                                                      matchValueShared29
-                                                                                  } in
-                                                                                  cachedCrateReportCommand
-                                                                                    cache
-                                                                                    file
-                                                                                    report;
-                                                                                _ ->
-                                                                                  sourceCommand mode
-                                                                                    paths
-                                                                                    (PrintSource
-                                                                                       False)
-                                                                                    []
-                                                                                    arguments
-                                                                              };
-                                                                            _ ->
-                                                                              sourceCommand mode
-                                                                                paths
-                                                                                (PrintSource False)
-                                                                                []
-                                                                                arguments
-                                                                          }
-                                                                     else sourceCommand mode paths
-                                                                            (PrintSource False)
-                                                                            []
-                                                                            arguments;
-                                                                   _ ->
-                                                                     sourceCommand mode paths
-                                                                       (PrintSource False)
-                                                                       []
-                                                                       arguments
-                                                                 };
-                                                               _ ->
-                                                                 sourceCommand mode paths
-                                                                   (PrintSource False)
-                                                                   []
-                                                                   arguments
-                                                             }
-                                                        else sourceCommand mode paths
-                                                               (PrintSource False)
-                                                               []
-                                                               arguments;
-                                                      _ ->
-                                                        sourceCommand mode paths (PrintSource False)
-                                                          []
-                                                          arguments
-                                                    };
-                                                  _ ->
-                                                    sourceCommand mode paths (PrintSource False) []
-                                                      arguments
-                                                }
-                                           else if MLF.Primitive.eqString matchValueShared7
-                                                     "--crate-to-llvm-gc"
-                                                then case matchValueShared8 of {
-                                                       (:) matchValueShared11 matchValueShared12 ->
-                                                         case matchValueShared12 of {
-                                                           [] ->
-                                                             let {
-                                                               file = matchValueShared11
-                                                             } in
-                                                             crateCommand EmitSource [] file;
-                                                           (:) matchValueShared13 matchValueShared14 ->
-                                                             if MLF.Primitive.eqString
-                                                                  matchValueShared13
-                                                                  "--cache"
-                                                             then case matchValueShared14 of {
-                                                                    (:) matchValueShared15 matchValueShared16 ->
-                                                                      case matchValueShared16 of {
-                                                                        [] ->
-                                                                          let {
-                                                                            file =
-                                                                              matchValueShared11
-                                                                          } in
-                                                                          let {
-                                                                            cache =
-                                                                              matchValueShared15
-                                                                          } in
-                                                                          cachedCrateCommand cache
-                                                                            file;
-                                                                        (:) matchValueShared17 matchValueShared18 ->
-                                                                          if MLF.Primitive.eqString
-                                                                               matchValueShared17
-                                                                               "--query-report"
-                                                                          then case matchValueShared18 of {
-                                                                                 (:) matchValueShared19 matchValueShared20 ->
-                                                                                   case matchValueShared20 of {
-                                                                                     [] ->
-                                                                                       let {
-                                                                                         file =
-                                                                                           matchValueShared11
-                                                                                       } in
-                                                                                       let {
-                                                                                         cache =
-                                                                                           matchValueShared15
-                                                                                       } in
-                                                                                       let {
-                                                                                         report =
-                                                                                           matchValueShared19
-                                                                                       } in
-                                                                                       cachedCrateReportCommand
-                                                                                         cache
-                                                                                         file
-                                                                                         report;
-                                                                                     _ ->
-                                                                                       sourceCommand
-                                                                                         mode
-                                                                                         paths
-                                                                                         (PrintSource
-                                                                                            False)
-                                                                                         []
-                                                                                         arguments
-                                                                                   };
-                                                                                 _ ->
-                                                                                   sourceCommand
-                                                                                     mode
-                                                                                     paths
-                                                                                     (PrintSource
-                                                                                        False)
-                                                                                     []
-                                                                                     arguments
-                                                                               }
-                                                                          else sourceCommand mode
-                                                                                 paths
-                                                                                 (PrintSource False)
-                                                                                 []
-                                                                                 arguments;
-                                                                        _ ->
-                                                                          sourceCommand mode paths
-                                                                            (PrintSource False)
-                                                                            []
-                                                                            arguments
-                                                                      };
-                                                                    _ ->
-                                                                      sourceCommand mode paths
-                                                                        (PrintSource False)
-                                                                        []
-                                                                        arguments
-                                                                  }
-                                                             else sourceCommand mode paths
-                                                                    (PrintSource False)
-                                                                    []
-                                                                    arguments;
-                                                           _ ->
-                                                             sourceCommand mode paths
-                                                               (PrintSource False)
-                                                               []
-                                                               arguments
-                                                         };
-                                                       _ ->
-                                                         sourceCommand mode paths
-                                                           (PrintSource False)
-                                                           []
-                                                           arguments
-                                                     }
-                                                else if MLF.Primitive.eqString matchValueShared7
-                                                          "--link-crate"
-                                                     then case matchValueShared8 of {
-                                                            (:) matchValueShared9 matchValueShared10 ->
-                                                              case matchValueShared10 of {
-                                                                [] ->
-                                                                  let {
-                                                                    file = matchValueShared9
-                                                                  } in
-                                                                  crateCommand (PrintSource False)
-                                                                    []
-                                                                    file;
-                                                                _ ->
-                                                                  sourceCommand mode paths
-                                                                    (PrintSource False)
-                                                                    []
-                                                                    arguments
-                                                              };
-                                                            _ ->
-                                                              sourceCommand mode paths
-                                                                (PrintSource False)
-                                                                []
-                                                                arguments
-                                                          }
-                                                     else if MLF.Primitive.eqString
-                                                               matchValueShared7
-                                                               "--run-crate"
-                                                          then let {
-                                                                 rest = matchValueShared8
-                                                               } in
-                                                               case splitArguments rest of {
-                                                                 (,) ((:) file []) args ->
-                                                                   crateCommand RunSource args file;
-                                                                 _ -> fatal usage
-                                                               }
-                                                          else if MLF.Primitive.eqString
-                                                                    matchValueShared7
-                                                                    "--type"
-                                                               then let {
-                                                                      rest = matchValueShared8
-                                                                    } in
-                                                                    sourceCommand mode paths
-                                                                      (PrintSource True)
-                                                                      []
-                                                                      rest
-                                                               else if MLF.Primitive.eqString
-                                                                         matchValueShared7
-                                                                         "--emit-llvm"
-                                                                    then let {
-                                                                           rest = matchValueShared8
-                                                                         } in
-                                                                         sourceCommand mode paths
-                                                                           EmitSource
-                                                                           []
-                                                                           rest
-                                                                    else if MLF.Primitive.eqString
-                                                                              matchValueShared7
-                                                                              "--emit-llvm-gc"
-                                                                         then let {
-                                                                                rest =
-                                                                                  matchValueShared8
-                                                                              } in
-                                                                              sourceCommand mode
-                                                                                paths
-                                                                                EmitSource
-                                                                                []
-                                                                                rest
-                                                                         else if MLF.Primitive.eqString
-                                                                                   matchValueShared7
-                                                                                   "--check"
-                                                                              then let {
-                                                                                     rest =
-                                                                                       matchValueShared8
-                                                                                   } in
-                                                                                   targetCommand
-                                                                                     CheckTarget
-                                                                                     []
-                                                                                     rest
-                                                                              else if MLF.Primitive.eqString
-                                                                                        matchValueShared7
-                                                                                        "--xmlf-to-llvm"
-                                                                                   then let {
-                                                                                          rest =
-                                                                                            matchValueShared8
-                                                                                        } in
-                                                                                        targetCommand
-                                                                                          EmitTarget
-                                                                                          []
-                                                                                          rest
-                                                                                   else if MLF.Primitive.eqString
-                                                                                             matchValueShared7
-                                                                                             "--xmlf-to-llvm-gc"
-                                                                                        then let {
-                                                                                               rest =
-                                                                                                 matchValueShared8
-                                                                                             } in
-                                                                                             targetCommand
-                                                                                               EmitTarget
-                                                                                               []
-                                                                                               rest
-                                                                                        else if MLF.Primitive.eqString
-                                                                                                  matchValueShared7
-                                                                                                  "--xmlf-to-llvm-io"
-                                                                                             then let {
-                                                                                                    rest =
-                                                                                                      matchValueShared8
-                                                                                                  } in
-                                                                                                  targetCommand
-                                                                                                    EmitIOTarget
-                                                                                                    []
-                                                                                                    rest
-                                                                                             else if MLF.Primitive.eqString
-                                                                                                       matchValueShared7
-                                                                                                       "--xmlf-to-llvm-io-gc"
-                                                                                                  then let {
-                                                                                                         rest =
-                                                                                                           matchValueShared8
-                                                                                                       } in
-                                                                                                       targetCommand
-                                                                                                         EmitIOTarget
-                                                                                                         []
-                                                                                                         rest
-                                                                                                  else if MLF.Primitive.eqString
-                                                                                                            matchValueShared7
-                                                                                                            "--run"
-                                                                                                       then let {
-                                                                                                              rest =
-                                                                                                                matchValueShared8
-                                                                                                            } in
-                                                                                                            case splitArguments
-                                                                                                                   rest of {
-                                                                                                              (,) source arguments ->
-                                                                                                                sourceCommand
-                                                                                                                  mode
-                                                                                                                  paths
-                                                                                                                  RunSource
-                                                                                                                  arguments
-                                                                                                                  source
-                                                                                                            }
-                                                                                                       else if MLF.Primitive.eqString
-                                                                                                                 matchValueShared7
-                                                                                                                 "--run-xmlf"
-                                                                                                            then let {
-                                                                                                                   rest =
-                                                                                                                     matchValueShared8
-                                                                                                                 } in
-                                                                                                                 case splitArguments
-                                                                                                                        rest of {
-                                                                                                                   (,) source arguments ->
-                                                                                                                     targetCommand
-                                                                                                                       RunTarget
-                                                                                                                       arguments
-                                                                                                                       source
-                                                                                                                 }
-                                                                                                            else if MLF.Primitive.eqString
-                                                                                                                      matchValueShared7
-                                                                                                                      "--run-program-xmlf"
-                                                                                                                 then let {
-                                                                                                                        rest =
-                                                                                                                          matchValueShared8
-                                                                                                                      } in
-                                                                                                                      case splitArguments
-                                                                                                                             rest of {
-                                                                                                                        (,) source arguments ->
-                                                                                                                          targetCommand
-                                                                                                                            RunProgramTarget
-                                                                                                                            arguments
-                                                                                                                            source
-                                                                                                                      }
-                                                                                                                 else sourceCommand
-                                                                                                                        mode
-                                                                                                                        paths
-                                                                                                                        (PrintSource
-                                                                                                                           False)
-                                                                                                                        []
-                                                                                                                        arguments;
-      _ -> sourceCommand mode paths (PrintSource False) [] arguments
+  runOrdinaryArgs mode paths arguments = let {
+    source = sourceCommand mode paths;
+    runWith action rest = case splitArguments rest of {
+      (,) input args -> action args input
     };
+    emitCrate rest = case rest of {
+      [file] -> crateCommand EmitSource [] file;
+      [file, "--cache", cache] -> cachedCrateUsing cache file Nothing;
+      [file, "--cache", cache, "--query-report", report] -> cachedCrateUsing cache file (Just report);
+      _ -> fatal usage
+    }
+  } in case arguments of {
+    ["--help"] -> putStr usage;
+    ["--help", "tools"] -> putStr toolsUsage;
+    ["--version"] -> putStrLn ("emlf " ++ Version.version);
+    ["--implementation-identity"] -> putStrLn ("MLF/shared-haskell-v1 " ++ producerHost);
+    ["--llvm-runtime"] -> do { path <- runtimePath; putStrLn path };
+    (:) "--check-shared" files -> checkSharedFiles files;
+    (:) "--type" rest -> source (PrintSource True) [] rest;
+    (:) "--run" rest -> runWith (source RunSource) rest;
+    (:) "--emit-llvm" rest -> source EmitSource [] rest;
+    (:) "--emit-llvm-gc" rest -> source EmitSource [] rest;
+    (:) "--check" rest -> targetCommand CheckTarget [] rest;
+    (:) "--run-xmlf" rest -> runWith (targetCommand RunTarget) rest;
+    (:) "--run-program-xmlf" rest -> runWith (targetCommand RunProgramTarget) rest;
+    (:) "--xmlf-to-llvm" rest -> targetCommand EmitTarget [] rest;
+    (:) "--xmlf-to-llvm-gc" rest -> targetCommand EmitTarget [] rest;
+    (:) "--xmlf-to-llvm-io" rest -> targetCommand EmitIOTarget [] rest;
+    (:) "--xmlf-to-llvm-io-gc" rest -> targetCommand EmitIOTarget [] rest;
+    (:) "--compile-crate" rest -> compileCrateCommand False rest;
+    ["--show-crate", file] -> do {
+      result <- CrateArtifact.showInterfaceFile file;
+      case result of { Left message -> fatal message; Right text -> putStr text }
+    };
+    ["--link-crate", file] -> crateCommand (PrintSource False) [] file;
+    (:) "--run-crate" rest -> case splitArguments rest of {
+      (,) [file] args -> crateCommand RunSource args file;
+      _ -> fatal usage
+    };
+    (:) "--crate-to-llvm" rest -> emitCrate rest;
+    (:) "--crate-to-llvm-gc" rest -> emitCrate rest;
+    _ -> source (PrintSource False) [] arguments
+  };
   -- The frozen legacy seed bridge uses this native identity. The final shared
   -- source reads the host-specific constant from the stable primitive facade.
   producerHost :: String;
@@ -635,8 +289,6 @@ module MLF.Entry.Emlf where {
     };
   -- All CLI crate routes use the same admitted Prelude and closed-program
   -- linking path, so retained and disk roots share exact codegen cache keys.
-  cachedCrateCommand cache file = cachedCrateUsing cache file Nothing;
-  cachedCrateReportCommand cache file report = cachedCrateUsing cache file (Just report);
   cachedCrateUsing cache file report = do {
     linked <- Prepared.linkCrateFile file;
     case linked of {
@@ -644,8 +296,10 @@ module MLF.Entry.Emlf where {
       Right checked -> emitCachedCrate cache report checked
     }
   };
-  emitCachedCrate cache report checked = do {
-    generated <- CrateCodegen.emitCrateChecked cache False checked;
+  emitCachedCrate = emitCachedCrateUsing CrateCodegen.emitCrateChecked;
+  emitCachedCrateUsing generate cache report checked = do {
+    _ <- requireResult (checkExecutable checked);
+    generated <- generate cache False checked;
     case generated of {
       Left message -> fatal message;
       Right value -> case report of {
@@ -673,9 +327,12 @@ module MLF.Entry.Emlf where {
           putStrLn (Pretty.prettyTerm (Checked.term checked));
           Host.writePhaseProfile profilePath profile
         };
-        RunSource -> do { Host.writePhaseProfile profilePath profile; execute args (Checked.term checked) };
+        RunSource -> do { Host.writePhaseProfile profilePath profile; runExecutable args checked };
         EmitSource -> do {
-          prepared <- LLVM.prepareCheckedProfiled profile False checked;
+          prepared <- case checkExecutable checked of {
+            Left message -> ioReturn (Left message);
+            Right () -> LLVM.prepareCheckedProfiled profile False checked
+          };
           case prepared of {
             Left message -> do { Host.writePhaseProfile profilePath profile; fatal message };
             Right entry -> do {
@@ -689,106 +346,96 @@ module MLF.Entry.Emlf where {
     }
   };
   splitArguments :: [] String -> (,) ([] String) ([] String);
-  splitArguments arguments =
-    let {
-      matchValueShared39 = arguments
-    } in
-    case matchValueShared39 of {
-      [] -> (,) [] [];
-      (:) matchValueShared40 matchValueShared41 ->
-        if MLF.Primitive.eqString matchValueShared40 "--"
-        then let {
-               rest = matchValueShared41
-             } in
-             (,) [] rest
-        else let {
-               rest = matchValueShared41
-             } in
-             let {
-               a = matchValueShared40
-             } in
-             case splitArguments rest of {
-               (,) source program -> (,) ((:) a source) program
-             }
-    };
-  parseSource :: Bool -> [] String -> Either String Source;
-  parseSource expression arguments =
-    let {
-      matchValueShared42 = arguments
-    } in
-    case matchValueShared42 of {
-      [] -> Right SourceStdin;
-      (:) matchValueShared43 matchValueShared44 ->
-        if MLF.Primitive.eqString matchValueShared43 "-"
-        then case matchValueShared44 of {
-               [] -> Right SourceStdin;
-               _ -> Left usage
-             }
-        else if MLF.Primitive.eqString matchValueShared43 "--expr"
-             then case matchValueShared44 of {
-                    (:) matchValueShared45 matchValueShared46 ->
-                      case matchValueShared46 of {
-                        [] ->
-                          let {
-                            text = matchValueShared45
-                          } in
-                          if expression then Right (SourceText "<expression>" text) else Left usage;
-                        _ -> Left usage
-                      };
-                    [] ->
-                      let {
-                        file = matchValueShared43
-                      } in
-                      if ((stringLength file >= 2) && eqString (stringSlice file 0 2) "--")
-                      then Left usage
-                      else Right (SourceFile file);
-                    _ -> Left usage
-                  }
-             else case matchValueShared44 of {
-                    [] ->
-                      let {
-                        file = matchValueShared43
-                      } in
-                      if ((stringLength file >= 2) && eqString (stringSlice file 0 2) "--")
-                      then Left usage
-                      else Right (SourceFile file);
-                    _ -> Left usage
-                  };
-      _ -> Left usage
-    };
+  splitArguments arguments = case arguments of {
+    [] -> (,) [] [];
+    (:) "--" rest -> (,) [] rest;
+    (:) arg rest -> case splitArguments rest of {
+      (,) input program -> (,) ((:) arg input) program
+    }
+  };
+  parseSource :: Bool -> [] String -> Either String Prepared.Source;
+  parseSource allowExpression arguments = case arguments of {
+    [] -> Right Prepared.SourceStdin;
+    ["-"] -> Right Prepared.SourceStdin;
+    ["--expr", text] -> if allowExpression then Right (Prepared.SourceText "<expression>" text) else Left usage;
+    [file] -> if O.starts "--" file then Left usage else Right (Prepared.SourceFile file);
+    _ -> Left usage
+  };
   sourceCommand :: PreludeMode -> [] String -> Command -> [] String -> [] String -> IO ();
-  sourceCommand mode paths command programArguments arguments =
-    case parseSource True arguments of {
-      Left message -> fatal message;
-      Right source ->
-        do {
-          compiled <-
-            case source of {
-              SourceFile file -> Prepared.compileFileWithPrelude mode paths file;
-              SourceText file input -> Prepared.compileSourceWithImports mode paths file input;
-              SourceStdin ->
-                do {
-                  input <- getContents;
-                  Prepared.compileSourceWithImports mode paths "<stdin>" input
-                }
-            };
-          case compiled of {
-            Left error -> fatal (C.prettyError error);
-            Right result ->
-              case command of {
-                PrintSource onlyType ->
-                  do {
-                    putStrLn ((if onlyType then "" else "-- type: ") ++ Prepared.sourceType result);
-                    if onlyType
-                    then ioReturn ()
-                    else putStrLn (Pretty.prettyTerm (Prepared.compiledTerm result))
-                  };
-                RunSource -> execute programArguments (Prepared.compiledTerm result);
-                EmitSource -> printLLVM (LLVM.emitCheckedChunks False (Prepared.checkedTerm result));
-                _ -> fatal "invalid source command"
-              }
-          }
+  sourceCommand mode paths command args arguments = case parseSource True arguments of {
+    Left message -> fatal message;
+    Right source -> do {
+      compiled <- Prepared.compileSourceWithDecisions Mode.emit mode paths source;
+      case compiled of {
+        Left error -> fatal (C.prettyError error);
+        Right result -> case command of {
+          PrintSource True -> putStrLn (Prepared.sourceType result);
+          PrintSource False -> do {
+            putStrLn ("-- type: " ++ Prepared.sourceType result);
+            putStrLn (Pretty.prettyTerm (Prepared.compiledTerm result))
+          };
+          RunSource -> runExecutable args (Prepared.checkedTerm result);
+          EmitSource -> printLLVM (emitExecutable (Prepared.checkedTerm result));
+          _ -> fatal "invalid source command"
         }
+      }
+    }
+  };
+  -- Use the normal file compiler, printer and target checker with each row's
+  -- own import paths. Runtime effects still exercise the actual CLI children.
+  testParityBatch :: String -> IO ();
+  testParityBatch request =
+    do {
+      manifest <- J.read request;
+      L.mapM_ testParityRow (J.values manifest)
+    };
+  testParityRow :: J.Json -> IO ();
+  testParityRow row =
+    do {
+      let {
+        source = J.getText "source" "" row;
+        stem = J.getText "stem" "" row;
+        mode = if J.getBool "no_prelude" False row then NoImplicitPrelude else ImplicitPrelude;
+        paths = J.getStrings "include_dirs" row
+      };
+      compiled <- Prepared.compileSourceAndDecisions mode paths (Prepared.SourceFile source);
+      let {
+        -- Only decisions produced by the source compiler can precede program stderr.
+        metadata = case compiled of {
+          Right ((,) _ rows) -> if J.has "expected_stdout" row
+            then J.set "dependency_stderr" (J.str (L.unlines (L.map Mode.line rows))) J.empty else J.empty;
+          Left _ -> J.empty
+        };
+        result = case compiled of {
+          Left error -> (,,,) 1 (C.prettyError error ++ "\n") "" (Right "");
+          Right ((,) value _) ->
+            let {
+              target = "-- type: " ++ Prepared.sourceType value ++ "\n" ++
+                Pretty.prettyTerm (Prepared.compiledTerm value) ++ "\n";
+              checked = case Parse.parseTerm (stem ++ ".xmlf") target of {
+                Left error -> Left error;
+                Right term -> case Check.checkClosed term of {
+                  Left error -> Left error;
+                  Right ty -> Right (Pretty.prettyType ty ++ "\n")
+                }
+              }
+            } in (,,,) 0 "" target checked
+        }
+      };
+      case result of {
+        (,,,) status diagnostic target checked -> do {
+          writeFile (stem ++ ".xmlf") target;
+          writeFile (stem ++ ".stderr") diagnostic;
+          case checked of {
+            Left error -> do { writeFile (stem ++ ".self.err") (error ++ "\n"); writeFile (stem ++ ".self.out") "" };
+            Right ty -> do { writeFile (stem ++ ".self.err") ""; writeFile (stem ++ ".self.out") ty }
+          };
+          putStrLn (J.render (J.set "id" (J.get "id" row)
+            (J.set "compile_exit" (J.num status)
+              (J.set "candidate_check_exit"
+                (J.num (case checked of { Left _ -> 1; Right _ -> 0 })) metadata))))
+        }
+      }
     };
   -- Native emission retains the normal source parser and diagnostics. The
   -- prepared adapter authenticates its fixed installation before producing
@@ -797,77 +444,52 @@ module MLF.Entry.Emlf where {
   nativeSourceCommand mode paths arguments = case parseSource True arguments of {
     Left message -> fatal message;
     Right source -> do {
-      result <- case source of {
-        SourceFile file -> Prepared.emitNativeFileChunks mode paths file;
-        SourceText file input -> Prepared.emitNativeSourceChunks mode paths file input;
-        SourceStdin -> do {
-          input <- getContents;
-          Prepared.emitNativeSourceChunks mode paths "<stdin>" input
-        }
-      };
+      result <- Prepared.compileNativeWithDecisions Mode.emit mode paths source;
       case result of {
         Left error -> fatal (C.prettyError error);
-        Right chunks -> printLLVM (Right chunks)
+        Right native -> printChunks (Prepared.nativeChunks native)
       }
     }
   };
-  load :: Source -> IO ((,) String String);
-  load source =
-    case source of {
-      SourceFile file ->
-        do {
-          present <- fileExists file;
-          if present
-          then do {
-                 input <- readFile file;
-                 ioReturn ((,) file input)
-               }
-          else fatal ("file does not exist: " ++ file)
-        };
-      SourceText file input -> ioReturn ((,) file input);
-      SourceStdin ->
-        do {
-          input <- getContents;
-          ioReturn ((,) "<stdin>" input)
-        }
-    };
   targetCommand :: Command -> [] String -> [] String -> IO ();
-  targetCommand command programArguments arguments =
-    case parseSource False arguments of {
-      Left message -> fatal message;
-      Right source ->
-        do {
-          boundValueShared47 <- load source;
-          case boundValueShared47 of {
-            (,) file input ->
-              do {
-                case Parse.parseTerm file input of {
-                  Left message -> fatal message;
-                  Right term ->
-                    case command of {
-                      CheckTarget ->
-                        case Check.checkClosed term of {
-                          Left message -> fatal message;
-                          Right ty -> putStrLn (Pretty.prettyType ty)
-                        };
-                      RunTarget -> execute programArguments term;
-                      RunProgramTarget ->
-                        do {
-                          result <- Runtime.runProgramWithArguments programArguments term;
-                          case result of {
-                            Left message -> panic message;
-                            Right ignored -> ioReturn ()
-                          }
-                        };
-                      EmitTarget -> printLLVM (LLVM.emitLLVMChunks term);
-                      EmitIOTarget -> printLLVM (LLVM.emitLLVMIOChunks term);
-                      _ -> fatal "invalid target command"
-                    }
-                }
-              }
+  targetCommand command args arguments = case parseSource False arguments of {
+    Left message -> fatal message;
+    Right source -> do {
+      loaded <- Prepared.readSource source;
+      case loaded of {
+        Left message -> fatal message;
+        Right ((,) file input) -> case Parse.parseTerm file input of {
+          Left message -> fatal message;
+          Right term -> case command of {
+            CheckTarget -> case Check.checkClosed term of {
+              Left message -> fatal message;
+              Right ty -> putStrLn (Pretty.prettyType ty)
+            };
+            RunTarget -> execute args term;
+            RunProgramTarget -> do {
+              result <- Runtime.runProgramWithArguments args term;
+              case result of { Left message -> panic message; Right _ -> ioReturn () }
+            };
+            EmitTarget -> printLLVM (LLVM.emitLLVMChunks term);
+            EmitIOTarget -> printLLVM (LLVM.emitLLVMIOChunks term);
+            _ -> fatal "invalid target command"
           }
         }
-    };
+      }
+    }
+  };
+  checkExecutable :: Checked.CheckedTerm -> Either String ();
+  checkExecutable checked = TargetType.checkExecutableType (Checked.typeOf checked);
+  emitExecutable :: Checked.CheckedTerm -> Either String ([] String);
+  emitExecutable checked = do {
+    checkExecutable checked;
+    LLVM.emitCheckedChunks False checked
+  };
+  runExecutable :: [] String -> Checked.CheckedTerm -> IO ();
+  runExecutable args checked = do {
+    _ <- requireResult (checkExecutable checked);
+    execute args (Checked.term checked)
+  };
   execute :: [] String -> XTerm -> IO ();
   execute args term =
     do {
@@ -927,16 +549,53 @@ module MLF.Entry.Emlf where {
           if (c && h) then canonicalPath (path ++ "/runtime/mlf_runtime.c") else chooseRuntime rest
         }
     };
+  usage :: String;
   usage =
-    ("emlf --version\n       emlf --implementation-identity\n       emlf --check-shared FILE... (grammar and name resolution only)\n" ++
-     (crateUsage ++ (nativeUsage ++ baseUsage)));
-  nativeUsage :: String;
-  nativeUsage =
-    "Executable compilation: emlf [--no-prelude] [-i DIR ...] SOURCE -o OUTPUT [--build-dir FRESH]\n       emlf --compile SOURCE -o OUTPUT\nStandard libraries and runtime are reused automatically; user code is freshly compiled with one Clang -O2 job.\nInstalled native libraries: emlf --native-install-info\n       emlf [-i DIR ...] --emit-native-llvm [FILE | --expr SOURCE]\n       emlf --emit-native-library-llvm\n       emlf --native-library-metadata\nNative IR requires the authenticated link inputs from --native-install-info. Library emission and metadata commands are installation build steps.\n";
+    "Usage: emlf [--no-prelude] [-i DIR ...] FILE -o OUTPUT [--build-dir FRESH]\n" ++
+    "       emlf [--no-prelude] [-i DIR ...] [ACTION] [INPUT]\n\n" ++
+    "Compile a file to an executable with -o. Build a package or workspace with mlfpkg build.\n" ++
+    "For the actions below, INPUT is a file, --expr SOURCE, or - for standard input.\n" ++
+    "Omit INPUT to read standard input. Use -i to add a module search directory and --no-prelude to disable the implicit Prelude.\n\n" ++
+    "  emlf [INPUT]                     Write checked xMLF with its inferred source type.\n" ++
+    "  emlf --type [INPUT]              Check the source and print its inferred type.\n" ++
+    "  emlf --run [INPUT] [-- ARG ...]  Run an IO program and pass it arguments.\n" ++
+    "  emlf --emit-llvm [INPUT]         Write LLVM IR.\n\n" ++
+    "With xMLF input\n" ++
+    "  emlf --check [XMLF_FILE]                   Print the checked target type.\n" ++
+    "  emlf --run-xmlf [XMLF_FILE] [-- ARG ...]   Run an IO program.\n" ++
+    "  emlf --xmlf-to-llvm [XMLF_FILE]            Write LLVM IR.\n\n" ++
+    "Use emlf --version for the compiler version or emlf --help tools for stage and package commands.\n\n" ++
+    -- Released package managers and benchmark tools probe these exact words.
+    "Tool capabilities: --implementation-identity --compile-crate-to-llvm-gc --compile-crate-plan --codegen-cache --query-report --native-target-flags --crate-library-to-llvm --crate-to-native-llvm --native-plan-sha256\n";
+  toolsUsage :: String;
+  toolsUsage =
+    "Source and xMLF stages\n" ++
+    "  emlf --check-shared FILE...                 Check shared grammar and name resolution.\n" ++
+    "  emlf --run-program-xmlf [XMLF_FILE] [-- ARG ...]\n" ++
+    "  emlf --xmlf-to-llvm-io [XMLF_FILE]          Require an IO entry point.\n" ++
+    "  emlf --llvm-runtime                        Print the path to the C runtime.\n" ++
+    "The --emit-llvm and --xmlf-to-llvm commands, including --xmlf-to-llvm-io, accept a -gc suffix.\n" ++
+    "Link their LLVM output with the C runtime, GMP and BDWGC.\n\n" ++
+    crateUsage ++ "\nInstalled native libraries\n" ++
+    "  emlf --native-install-info\n" ++
+    "  emlf [-i DIR ...] --emit-native-llvm [FILE | --expr SOURCE]\n" ++
+    "  emlf --emit-native-library-llvm\n" ++
+    "  emlf --native-library-metadata\n" ++
+    "  emlf --native-target-flags TRIPLE\n" ++
+    "Use the link inputs from --native-install-info with --emit-native-llvm.\n\n" ++
+    "Executable compilation also accepts emlf --compile FILE -o OUTPUT.\n" ++
+    "Compiler identity\n  emlf --implementation-identity\n";
   crateUsage :: String;
   crateUsage =
-    "Crate compilation: emlf [-Zincremental-verify-ich] --compile-crate SPEC -o PREFIX\n       emlf [-Zincremental-verify-ich] --compile-crate-to-llvm-gc SPEC -o PREFIX [ --codegen-cache DIR --query-report FILE ]\n       emlf --show-crate FILE.mlfci\n       emlf --link-crate FILE.mlfci\n       emlf --run-crate FILE.mlfci [-- ARGS...]\n       emlf --crate-to-llvm[-gc] FILE.mlfci [--cache DIR [ --query-report FILE ]]\n";
-  baseUsage :: String;
-  baseUsage =
-    "Usage: emlf [--no-prelude] [-i DIR ...] [--type] [FILE | --expr SOURCE]\n       emlf --check [XMLF_FILE]\n       emlf [--no-prelude] [-i DIR ...] --run [FILE | --expr SOURCE] [-- ARG ...]\n       emlf --run-xmlf [XMLF_FILE] [-- ARG ...]\n       emlf [--no-prelude] [-i DIR ...] --emit-llvm [FILE | --expr SOURCE]\n       emlf --xmlf-to-llvm [XMLF_FILE]\n       emlf [--no-prelude] [-i DIR ...] --emit-llvm-gc [FILE | --expr SOURCE]\n       emlf --xmlf-to-llvm[-io]-gc [XMLF_FILE]\n       emlf --llvm-runtime\nWith no FILE, read eMLF from standard input.\nImports load Foo.Bar from marked Foo/Bar.hs or legacy Foo/Bar.emlf beside the entry or in -i roots; ambiguous duplicates are rejected.\nThe standard prelude supplies Monad and Monad IO; --no-prelude disables it.\nAll LLVM commands emit the compact BDWGC ABI; -gc spellings are aliases.\nLink LLVM IR with clang, runtime/mlf_runtime.c, GMP and BDWGC.\n"
+    "Crate compilation\n" ++
+    "  emlf [-Zincremental-verify-ich] --compile-crate SPEC -o PREFIX\n" ++
+    "  emlf [-Zincremental-verify-ich] --compile-crate-to-llvm-gc SPEC -o PREFIX [--codegen-cache DIR --query-report FILE]\n" ++
+    "  emlf --compile-crate-plan PLAN SPEC -o PREFIX [--codegen-cache DIR --query-report FILE]\n" ++
+    "  emlf --crate-library-to-llvm FILE.mlfci --native-identity SHA256 --native-contract FILE\n" ++
+    "  emlf --crate-to-native-llvm FILE.mlfci --native-dependencies PLAN --native-plan-sha256 SHA256 --native-target TARGET.json --native-report FILE\n" ++
+    "  The retained crate commands accept the same native plan options.\n" ++
+    "  emlf --show-crate FILE.mlfci\n" ++
+    "  emlf --link-crate FILE.mlfci\n" ++
+    "  emlf --run-crate FILE.mlfci [-- ARG ...]\n" ++
+    "  emlf --crate-to-llvm[-gc] FILE.mlfci [--cache DIR [--query-report FILE]]\n"
 }

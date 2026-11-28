@@ -24,6 +24,24 @@ Windows x64 and Linux x64 alongside Apple Silicon on macOS 26+.
 See [installation and releases](docs/releases.md) for platform dependencies,
 checksums, installation and validation coverage.
 
+## Compile a program
+
+With a compiler installation that includes the native runtime and standard
+library, compile a file to an executable with `emlf Main.emlf -o main`.
+Use `emlf --type Main.emlf` to print the inferred type or `emlf --run Main.emlf`
+to interpret an IO program. A file can import modules without a package manifest.
+For an expression, try `emlf --type --expr '42'`.
+
+In a package, use `mlfpkg build` or `mlfpkg build --target NAME`. The package
+manager prefers compatible native objects for executable links, reuses
+checked IR when needed, and compiles sources when a checked implementation is
+missing. It reports each dependency's choice and reason on stderr. The same
+decisions appear in the build report under `dependency_modes`.
+For an intermediate result, `emlf Main.emlf` writes checked xMLF and
+`emlf --emit-llvm Main.emlf` writes LLVM IR. `emlf --help tools` lists the
+stage commands available to build tools. See [compiler roots and
+caching](docs/compiler-entry-unification.md).
+
 ## Build and run
 
 The [developer commands](CONTRIBUTING.md#developer-commands) cover native builds, tests and benchmarks from one entry point.
@@ -111,7 +129,7 @@ Inferred-type agreement and source-erasure checks remain enabled for every
 new inference query.
 
 See the [crate migration ledger](docs/crate-migration.md) for accepted measurements
-and the [validation record](docs/crate-validation.json) for all six native groups,
+and the [validation record](https://github.com/mlf-lang/mlf/blob/0704d216b8cf6d887d3737efa30a2eae3c152f0a/docs/crate-validation.json) for all six native groups,
 fresh self-hosting and the exact source/tool configuration. The [earlier bootstrap memory report](tools/profile/results/2026-10-19-bootstrap-memory/README.md)
 describes the previous per-module pipeline; its results are historical.
 
@@ -211,8 +229,10 @@ its fixed standard library and runtime:
 .mlf-build/snake
 ```
 
-Each invocation freshly checks and compiles the user program, runs one ordinary
-Clang `-O2` job, and links the installed objects. `--compile SOURCE -o OUTPUT`
+File compilation reuses checked declaration groups under
+`.mlf-build/cache/source-roots/` in the working directory. Each native invocation
+emits LLVM for the user root, compiles it with Clang `-O2`, and links the
+installed objects. `--compile SOURCE -o OUTPUT`
 is an equivalent spelling. By default, a fresh hidden `.emlf-<output>-N`
 directory beside the output retains the IR, object, process logs and
 `receipt.json`, including selected standard-library exports and any fallback
@@ -237,8 +257,8 @@ clang -O2 -std=c11 .mlf-build/snake.ll "$MLF_RUNTIME" \
 it does not rerun source inference. It also accepts standard input. To compile
 eMLF directly through the same checked xMLF boundary, use
 `emlf --emit-llvm examples/snake.emlf` or `emlf --emit-llvm --expr 'printInt 42'`.
-Both commands write only LLVM IR to standard output. `--no-prelude` also
-applies to `--emit-llvm`.
+Both commands write only LLVM IR to standard output. The source entry must
+have type `IO ()`. `--no-prelude` also applies to `--emit-llvm`.
 
 For a manifest-driven native executable, the package manager builds, links,
 and runs the selected target:
@@ -259,8 +279,9 @@ with `./mlfpkg --clang /absolute/path/to/clang-mlf build`.
 The generated module contains native closure and case functions, `mlf_entry`,
 and `main`. It supports the complete current xMLF term syntax, including
 recursive dictionaries, polymorphism after checked erasure, lazy constructor
-fields, and IO. An `IO a` entry executes the action and discards its result;
-a pure entry evaluates to weak head normal form without printing a value.
+fields, and IO. With `--xmlf-to-llvm`, an `IO a` entry executes the action and
+discards its result. A pure entry evaluates to weak head normal form without
+printing a value.
 Known saturated functions use native workers, with conservative demand
 analysis to avoid unnecessary thunks. Partial applications and lazy fields
 retain their call-by-need behavior. Small integers and nullary constructors
@@ -274,7 +295,9 @@ each bind. All native programs use compact BDWGC allocation and collection durin
 pure evaluation. Pointer-bearing values, environments and arrays are traced;
 GMP limbs use atomic collector allocations. The runtime requires a 64-bit ABI.
 Both default LLVM commands and their `-gc` aliases emit this single ABI; link
-GMP, BDWGC and libm. Old standard-layout LLVM/object files must be regenerated.
+GMP, BDWGC and libm. The compiler and installed native libraries require
+`mlf_require_runtime_v5_abi`. Rebuild LLVM and native objects produced by an
+earlier compiler before linking them against the current runtime.
 See [the migration record](docs/compact-only.md) for dependencies and validation.
 
 The native `backends` group runs every backend behavior test through both the
@@ -1052,11 +1075,11 @@ do {
 ```
 
 Run it with `"$EMLF_BIN" --run examples/io-hello.emlf`. Ordinary
-compilation, `--type`, and `--check` perform no program IO. `--run` checks the
-generated target before executing its final action; the action's result is
-discarded. The entry point must have type `IO a` (possibly universally
-quantified). Runtime IO errors, including EOF, are reported on standard error
-and cause a nonzero exit. Console output is flushed before the next action.
+compilation, `--type`, and `--check` perform no program IO. Source and crate
+executables require an entry of type `IO ()`. `--run` checks the generated
+target before executing that action. Runtime IO errors, including EOF, are
+reported on standard error and cause a nonzero exit. Console output is flushed
+before the next action.
 
 | Operation | Type |
 | --- | --- |
@@ -1389,7 +1412,7 @@ compilation, and linking; exact-executable runtime warm-up is applied equally
 to C and MLF. Every observed maximum MLF time divided by the corresponding
 minimum C time also remained below its limit.
 
-The later [crate migration acceptance](docs/crate-validation.json) uses reproducible
+The later [crate migration acceptance](https://github.com/mlf-lang/mlf/blob/0704d216b8cf6d887d3737efa30a2eae3c152f0a/docs/crate-validation.json) uses reproducible
 O2 profiling of the compiler and runtime, trained only on fifteen existing language
 examples. Its fresh six-group validation and full nine-workload, three-sample
 median gates pass the same 3x compilation / 2x runtime limits. See the

@@ -4,11 +4,12 @@
 module Main where
 
 import Prelude
-import Control.Monad (unless, forM_, void)
+import Control.Monad (unless, when, forM_, void)
 import Data.IORef (newIORef, modifyIORef', readIORef)
-import Data.List (isInfixOf, sort)
+import Data.List (isInfixOf, isPrefixOf, sort)
 import System.Directory (createDirectoryIfMissing, removeFile)
 import System.Environment (getArgs)
+import System.Exit (exitSuccess)
 import System.IO (hSetBuffering, stdout, BufferMode(LineBuffering))
 import qualified Bootstrap.Types as T
 import qualified Bootstrap.Data as D
@@ -218,7 +219,7 @@ legacyCrate retainMethodQuantifier = do
 
 -- The payload remains well typed under either layout, so these failures cannot
 -- be explained by an ill-typed body, a stale checksum, or a broken wire frame.
-forgeryChecks check = do
+forgeryChecks base check selected = do
   let quantified = T.DataDecl "Forged" [] [T.ConstructorDecl "Forged" [vacantField]]
       canonical = T.DataDecl "Forged" [] [T.ConstructorDecl "Forged" [intField]]
       forged header payload =
@@ -233,37 +234,38 @@ forgeryChecks check = do
     (Q.queryKey "forged" "compiler" [] [] [quantified] /=
       Q.queryKey "forged" "compiler" [] [] [canonical])
   forM_ [("quantified header / canonical payload",quantified,canonical),
-         ("canonical header / quantified payload",canonical,quantified)] $ \(label,header,payload) -> do
-    let object = forged header payload
-        key = Q.queryKey "forged" "compiler" [] [] [header]
-        artifact = crate header header [object]
-        matching = forged payload payload
-    checkedTarget (label ++ " valid target control") unit (U.objectTerm object)
-    check (label ++ ": exact cache context rejects")
-      (rejects "cached datatype context mismatch"
-        (Q.validateCached "ForgedFragment" [] [header] [] object))
-    check (label ++ ": encoded cache rejects")
-      (rejects "cached datatype context mismatch"
-        (Q.decodeCached key "ForgedFragment" [] [header] [] (Q.encodeCached key object)))
-    check (label ++ ": expected cache metadata rejects opposite layout")
-      (rejects "cached datatype metadata mismatch"
-        (Q.validateCached "ForgedFragment" [] [header] [] matching))
-    check (label ++ ": pooled object rejects")
-      (rejects "duplicate crate pooled datatype"
-        (A.decodeObject (A.objectInterface artifact) (A.encodeObject artifact)))
-    check (label ++ ": linker rejects exact header/payload mismatch")
-      (rejects "inference fragment datatype context mismatch"
-        (A.linkObjects [artifact] (A.crateId (A.objectInterface artifact))))
-    check (label ++ ": source/lowered metadata mismatch rejects")
-      (rejects "crate lowered datatype metadata mismatch"
-        (A.validateLayouts [A.objectInterface (crate header payload [])]))
-
+         ("canonical header / quantified payload",canonical,quantified)] $ \(label,header,payload) ->
+    when (maybe True ((label ++ ": ") `isPrefixOf`) selected) $ do
+      let object = forged header payload
+          key = Q.queryKey "forged" "compiler" [] [] [header]
+          artifact = crate header header [object]
+          matching = forged payload payload
+      checkedTarget (label ++ " valid target control") unit (U.objectTerm object)
+      check (label ++ ": exact cache context rejects")
+        (rejects "cached datatype context mismatch"
+          (Q.validateCached "ForgedFragment" [] [header] [] object))
+      let path = B.literal (base ++ "/forged.mlfq")
+      Q.writeLoweredCache path key object >>= right "write binary lowered cache"
+      decoded <- Q.readLoweredCache key "ForgedFragment" [] [header] [] path
+      check (label ++ ": encoded cache rejects") (rejects "cached datatype context mismatch" decoded)
+      check (label ++ ": expected cache metadata rejects opposite layout")
+        (rejects "cached datatype metadata mismatch"
+          (Q.validateCached "ForgedFragment" [] [header] [] matching))
+      check (label ++ ": pooled object rejects")
+        (rejects "duplicate crate pooled datatype"
+          (A.decodeObject (A.objectInterface artifact) (A.encodeObject artifact)))
+      check (label ++ ": linker rejects exact header/payload mismatch")
+        (rejects "inference fragment datatype context mismatch"
+          (A.linkObjects [artifact] (A.crateId (A.objectInterface artifact))))
+      check (label ++ ": source/lowered metadata mismatch rejects")
+        (rejects "crate lowered datatype metadata mismatch"
+          (A.validateLayouts [A.objectInterface (crate header payload [])]))
 
 -- Fresh class ownership crosses the same real crate/metadata/cache boundaries
 -- as fresh datatype ownership. Do not normalize these headers in the fixture:
 -- Crate.prepareCrate must transform the original parsed source before building
 -- its SourcePlan, generated dictionary inventory and legacy lowering recipe.
-freshSourceClassChecks check base builtinPath savedBuiltin = do
+freshSourceClassChecks check selected base builtinPath savedBuiltin = do
   let body = unlines
         ["class SourceTag a where { leading :: forall dead. a -> Int; nested :: a -> (forall unused. Int) }",
          "instance SourceTag Int where { leading x = x; nested x = x }",
@@ -302,10 +304,11 @@ freshSourceClassChecks check base builtinPath savedBuiltin = do
   check "fresh source class fallback dictionary uses the same canonical contract"
     (sameInventory (I.loweredData (C.preparedLowered prepared)) exactLayouts)
   (producer,coldProducer) <- compile spec imports prepared
-  (producerWarm,warmProducer) <- compile spec imports prepared
-  check "fresh source class producer cold/warm artifacts are byte-identical"
-    (cold coldProducer && warm warmProducer producer &&
-      A.encodeObject producerWarm == A.encodeObject producer)
+  when (maybe True (== "fresh source class producer cold/warm artifacts are byte-identical") selected) $ do
+    (producerWarm,warmProducer) <- compile spec imports prepared
+    check "fresh source class producer cold/warm artifacts are byte-identical"
+      (cold coldProducer && warm warmProducer producer &&
+        A.encodeObject producerWarm == A.encodeObject producer)
   let iface = A.objectInterface producer
       a = T.XTyVar 0
       selectorType = T.XForall a T.XBot
@@ -313,7 +316,8 @@ freshSourceClassChecks check base builtinPath savedBuiltin = do
       selectorAgrees method = case lookup (B.v_concatString "select_" method) (A.crateBindings iface) of
         Just ty -> XT.alphaEq ty selectorType
         Nothing -> False
-  checkFragments "fresh source class producer fragments" producer
+  when (maybe True (== "fresh source class emitted header dictionary and selector schemes agree") selected)
+    (checkFragments "fresh source class producer fragments" producer)
   check "fresh source class emitted header dictionary and selector schemes agree"
     (canonicalHeader (A.crateClasses iface) &&
       sameData (A.crateLoweredData iface) [canonicalDictionary] &&
@@ -332,35 +336,30 @@ freshSourceClassChecks check base builtinPath savedBuiltin = do
     (null (C.preparedData consumerPrepared) && null (C.preparedClasses consumerPrepared) &&
       sameInventory (SI.planData (sourcePlan consumerPrepared)) exactLayouts)
   (consumer,coldConsumer) <- compile consumerSpec consumerImports consumerPrepared
-  (consumerWarm,warmConsumer) <- compile consumerSpec consumerImports consumerPrepared
-  check "fresh source class consumer cold/warm artifacts are byte-identical"
-    (cold coldConsumer && warm warmConsumer consumer &&
-      A.encodeObject consumerWarm == A.encodeObject consumer &&
-      XT.alphaEq (valueScheme (A.objectInterface consumer) "ClassConsumer" "main") int &&
-      XT.alphaEq (valueScheme (A.objectInterface consumer) "ClassConsumer" "copied") int)
+  when (maybe True (== "fresh source class consumer cold/warm artifacts are byte-identical") selected) $ do
+    (consumerWarm,warmConsumer) <- compile consumerSpec consumerImports consumerPrepared
+    check "fresh source class consumer cold/warm artifacts are byte-identical"
+      (cold coldConsumer && warm warmConsumer consumer &&
+        A.encodeObject consumerWarm == A.encodeObject consumer &&
+        XT.alphaEq (valueScheme (A.objectInterface consumer) "ClassConsumer" "main") int &&
+        XT.alphaEq (valueScheme (A.objectInterface consumer) "ClassConsumer" "copied") int)
   (_,savedConsumer) <- saveReload base "ClassConsumer" consumer
   checkFragments "fresh source class consumer fragments" savedConsumer
   linkedInt "fresh source class saved method applications"
     [savedBuiltin,savedProducer,savedConsumer] savedConsumer
   check "fresh source class saved method applications check and evaluate to 42" True
 
-main = do
-  hSetBuffering stdout LineBuffering
-  args <- getArgs
-  let base = one "work directory argument" args
-  createDirectoryIfMissing True base
-  count <- newIORef (0 :: Int)
-  let check label condition = do
-        require label condition
-        modifyIORef' count (+1)
-        putStrLn ("PASS " ++ label)
-      producerBody = unlines
+forgeryCase label =
+  label == "checked-layout key retains dead quantifiers" ||
+  any (`isPrefixOf` label)
+    ["quantified header / canonical payload: ", "canonical header / quantified payload: "]
+
+producerChecks check selected base builtinPath savedBuiltin = do
+  let producerBody = unlines
         ["data V = V (forall a. Int)",
          "made = V 42", "constructor = V",
          "extract v = case v of { V n -> n }",
          "extracted = extract made"]
-  builtin <- right "compile checked builtin dependency" A.builtinPrelude
-  (builtinPath,savedBuiltin) <- saveReload base "Builtin" builtin
   let builtinLayouts = A.crateLoweredData (A.objectInterface savedBuiltin)
   (producerSpec,producerImports,producerPrepared) <-
     prepare base "Producer" "" producerBody [builtinPath]
@@ -392,27 +391,29 @@ main = do
       XT.alphaEq (valueScheme producerIface "Producer" "constructor") (T.XArrow int vtype) &&
       XT.alphaEq (valueScheme producerIface "Producer" "extract") (T.XArrow vtype int) &&
       XT.alphaEq (valueScheme producerIface "Producer" "extracted") int)
-  checkFragments "producer fragments" producer
+  when (maybe True (== "producer targets pass production/frozen/roundtrip/erasure") selected) (checkFragments "producer fragments" producer)
   check "producer targets pass production/frozen/roundtrip/erasure" True
-  (producerWarm,warmProducer) <- compile producerSpec producerImports producerPrepared
-  check "producer warm source cache reuses every fragment" (warm warmProducer producer)
-  check "producer cold/warm objects are byte-identical" (A.encodeObject producerWarm == A.encodeObject producer)
+  when (maybe True (`elem` ["producer warm source cache reuses every fragment", "producer cold/warm objects are byte-identical"]) selected) $ do
+    (producerWarm,warmProducer) <- compile producerSpec producerImports producerPrepared
+    check "producer warm source cache reuses every fragment" (warm warmProducer producer)
+    check "producer cold/warm objects are byte-identical" (A.encodeObject producerWarm == A.encodeObject producer)
   (producerPath,savedProducer) <- saveReload base "Producer" producer
   check "saved producer preserves exact canonical layout"
     (sameData (A.crateData (A.objectInterface savedProducer)) [canonical])
-  (fallbackProducer,coldFallback) <- compile (fallbackSpec producerSpec) producerImports (fallback producerPrepared)
-  (fallbackWarm,warmFallback) <- compile (fallbackSpec producerSpec) producerImports (fallback producerPrepared)
-  check "actual fallback query route has cold/warm reuse"
-    (cold coldFallback && warm warmFallback fallbackProducer)
-  check "fallback public/lowered layouts remain canonical"
-    (sameData (A.crateData (A.objectInterface fallbackProducer)) [canonical] &&
-      sameData (A.crateLoweredData (A.objectInterface fallbackProducer)) [canonical])
-  check "fallback constructor and extraction schemes equal source SCC schemes"
-    (all (\name -> XT.alphaEq (valueScheme (A.objectInterface fallbackProducer) "Producer" name)
-      (valueScheme producerIface "Producer" name)) ["made","constructor","extract","extracted"])
-  checkFragments "fallback producer fragments" fallbackProducer
-  check "fallback targets pass production/frozen/roundtrip/erasure and warm parity"
-    (A.encodeObject fallbackWarm == A.encodeObject fallbackProducer)
+  when (maybe True fallbackCase selected) $ do
+    (fallbackProducer,coldFallback) <- compile (fallbackSpec producerSpec) producerImports (fallback producerPrepared)
+    (fallbackWarm,warmFallback) <- compile (fallbackSpec producerSpec) producerImports (fallback producerPrepared)
+    check "actual fallback query route has cold/warm reuse"
+      (cold coldFallback && warm warmFallback fallbackProducer)
+    check "fallback public/lowered layouts remain canonical"
+      (sameData (A.crateData (A.objectInterface fallbackProducer)) [canonical] &&
+        sameData (A.crateLoweredData (A.objectInterface fallbackProducer)) [canonical])
+    check "fallback constructor and extraction schemes equal source SCC schemes"
+      (all (\name -> XT.alphaEq (valueScheme (A.objectInterface fallbackProducer) "Producer" name)
+        (valueScheme producerIface "Producer" name)) ["made","constructor","extract","extracted"])
+    when (maybe True (== "fallback targets pass production/frozen/roundtrip/erasure and warm parity") selected) (checkFragments "fallback producer fragments" fallbackProducer)
+    check "fallback targets pass production/frozen/roundtrip/erasure and warm parity"
+      (A.encodeObject fallbackWarm == A.encodeObject fallbackProducer)
   removeFile (base ++ "/Producer.emlf")
   let consumerBody = "import Producer\nmain = extract (constructor 42)\ncopy = extracted\n"
   (consumerSpec,consumerImports,consumerPrepared) <-
@@ -421,15 +422,19 @@ main = do
     (null (C.preparedData consumerPrepared) &&
       containsLayout canonical (SI.planData (sourcePlan consumerPrepared)))
   (consumer,coldConsumer) <- compile consumerSpec consumerImports consumerPrepared
-  (consumerWarm,warmConsumer) <- compile consumerSpec consumerImports consumerPrepared
-  check "consumer source SCC cache has cold/warm reuse"
-    (cold coldConsumer && warm warmConsumer consumer)
-  check "consumer cold/warm bytes and imported schemes remain exact"
-    (A.encodeObject consumerWarm == A.encodeObject consumer &&
-      XT.alphaEq (valueScheme (A.objectInterface consumer) "Consumer" "main") int)
+  when (maybe True (`elem` ["consumer source SCC cache has cold/warm reuse",
+                           "consumer cold/warm bytes and imported schemes remain exact"]) selected) $ do
+    (consumerWarm,warmConsumer) <- compile consumerSpec consumerImports consumerPrepared
+    check "consumer source SCC cache has cold/warm reuse"
+      (cold coldConsumer && warm warmConsumer consumer)
+    check "consumer cold/warm bytes and imported schemes remain exact"
+      (A.encodeObject consumerWarm == A.encodeObject consumer &&
+        XT.alphaEq (valueScheme (A.objectInterface consumer) "Consumer" "main") int)
   (_,savedConsumer) <- saveReload base "Consumer" consumer
-  linkedInt "saved producer/consumer" [savedBuiltin,savedProducer,savedConsumer] savedConsumer
+  when (maybe True (== "saved producer/consumer link, check, roundtrip and erase to 42") selected) (linkedInt "saved producer/consumer" [savedBuiltin,savedProducer,savedConsumer] savedConsumer)
   check "saved producer/consumer link, check, roundtrip and erase to 42" True
+
+legacyChecks check selected base builtinPath savedBuiltin = do
   (legacy,legacyData,legacyDictionary,legacyClass) <- legacyCrate True
   (legacyPath,savedLegacy) <- saveReload base "Legacy" legacy
   let legacyIface = A.objectInterface savedLegacy
@@ -462,10 +467,12 @@ main = do
     (containsLayout legacyData (I.loweredData (C.preparedLowered mixedPrepared)) &&
       containsLayout legacyDictionary (I.loweredData (C.preparedLowered mixedPrepared)) &&
       containsLayout local (I.loweredData (C.preparedLowered mixedPrepared)))
+  when (selected /= Nothing) (invalidContextCheck check local)
   (mixed,coldMixed) <- compile mixedSpec mixedImports mixedPrepared
-  (mixedWarm,warmMixed) <- compile mixedSpec mixedImports mixedPrepared
-  check "mixed exact-context source cache has cold/warm reuse"
-    (cold coldMixed && warm warmMixed mixed && A.encodeObject mixedWarm == A.encodeObject mixed)
+  when (maybe True (== "mixed exact-context source cache has cold/warm reuse") selected) $ do
+    (mixedWarm,warmMixed) <- compile mixedSpec mixedImports mixedPrepared
+    check "mixed exact-context source cache has cold/warm reuse"
+      (cold coldMixed && warm warmMixed mixed && A.encodeObject mixedWarm == A.encodeObject mixed)
   check "mixed owned artifact does not re-export or rewrite imported layouts"
     (sameData (A.crateData (A.objectInterface mixed)) [local] &&
       sameData (A.crateLoweredData (A.objectInterface mixed)) [local])
@@ -475,25 +482,30 @@ main = do
   check "legacy selector entry adaptation rejects instead of rewriting checked ABI"
     (rejects legacyEntryReason (A.linkObjects [savedBuiltin,savedLegacy,savedMixed]
       (A.crateId (A.objectInterface savedMixed))))
-  linkedLibrary "legacy/local saved library" [savedBuiltin,savedLegacy] savedMixed
-    [legacyData,legacyDictionary,local]
+  when (maybe True (== "legacy/local saved library links with both exact checked layouts") selected)
+    (linkedLibrary "legacy/local saved library" [savedBuiltin,savedLegacy] savedMixed
+      [legacyData,legacyDictionary,local])
   check "legacy/local saved library links with both exact checked layouts" True
   (mixedFallback,coldMixedFallback) <- compile (fallbackSpec mixedSpec) mixedImports (fallback mixedPrepared)
   (mixedFallbackWarm,warmMixedFallback) <- compile (fallbackSpec mixedSpec) mixedImports (fallback mixedPrepared)
   check "mixed fallback query route has cold/warm reuse"
     (cold coldMixedFallback && warm warmMixedFallback mixedFallback &&
       A.encodeObject mixedFallbackWarm == A.encodeObject mixedFallback)
-  require "fallback entry must not silently rewrite legacy selector ABI"
-    (rejects legacyEntryReason (A.linkObjects [savedBuiltin,savedLegacy,mixedFallback]
-      (A.crateId (A.objectInterface mixedFallback))))
-  linkedLibrary "legacy/local fallback library" [savedBuiltin,savedLegacy] mixedFallback
-    [legacyData,legacyDictionary,local]
+  when (maybe True (== "mixed fallback preserves legacy ABI through checked library linking") selected) $ do
+    require "fallback entry must not silently rewrite legacy selector ABI"
+      (rejects legacyEntryReason (A.linkObjects [savedBuiltin,savedLegacy,mixedFallback]
+        (A.crateId (A.objectInterface mixedFallback))))
+    linkedLibrary "legacy/local fallback library" [savedBuiltin,savedLegacy] mixedFallback
+      [legacyData,legacyDictionary,local]
   check "mixed fallback preserves legacy ABI through checked library linking" True
   reloadedLegacy <- A.readInterface legacyPath >>= right "reread unchanged legacy metadata"
   check "imported metadata, semantic fingerprint and class ABI remain byte-exact"
     (A.encodeInterface reloadedLegacy == legacyBytes &&
       A.semanticFingerprint reloadedLegacy == legacyFingerprint &&
       map U.prettyClass (A.crateClasses reloadedLegacy) == [U.prettyClass legacyClass])
+  pure local
+
+ordinaryChecks check base builtinPath savedBuiltin = do
   -- A separate positive closure differs only in the imported method's dead
   -- quantifier. The original saved legacy metadata above is never rewritten.
   (ordinary,ordinaryData,ordinaryDictionary,ordinaryClass) <- legacyCrate False
@@ -508,14 +520,65 @@ main = do
     (cold ordinaryCold && containsLayout ordinaryData (SI.planData (sourcePlan ordinaryPrepared)) &&
       containsLayout ordinaryDictionary (SI.planData (sourcePlan ordinaryPrepared)) &&
       map U.prettyClass (A.crateClasses (A.objectInterface savedOrdinary)) == [U.prettyClass ordinaryClass])
-  let invalid = T.DataDecl "Invalid" [] [T.ConstructorDecl "Invalid"
-        [T.Quantified "unused" T.Star (T.Applied "Int" [intField])]]
+
+illKindedField = T.DataDecl "Invalid" [] [T.ConstructorDecl "Invalid"
+  [T.Quantified "unused" T.Star (T.Applied "Int" [intField])]]
+
+invalidFieldCheck check =
   check "fresh-source canonicalizer validates original ill-kinded fields"
-    (case D.canonicalSourceDeclarations [] [invalid] of T.Left _ -> True; _ -> False)
+    (case D.canonicalSourceDeclarations [] [illKindedField] of T.Left _ -> True; _ -> False)
+
+invalidContextCheck check local =
   check "fresh-source canonicalizer validates original checked context"
-    (case D.canonicalSourceDeclarations [invalid] [local] of T.Left _ -> True; _ -> False)
-  forgeryChecks check
-  freshSourceClassChecks check base builtinPath savedBuiltin
-  total <- readIORef count
-  require "source field-layout fixture check inventory changed" (total == 55)
-  putStrLn "item4 source field layouts: passed (55 checks; source/fallback, saved imports, cold/warm, exact legacy ABI, bidirectional forgery rejection, fresh source classes)"
+    (case D.canonicalSourceDeclarations [illKindedField] [local] of T.Left _ -> True; _ -> False)
+
+fallbackCase label = any (`isPrefixOf` label) ["actual fallback ", "fallback "]
+
+producerCase label = any (`isPrefixOf` label)
+  [ "fresh producer ", "source plan ", "legacy lowering recipe ", "producer "
+  , "construction, ", "saved producer", "actual fallback ", "fallback "
+  , "metadata-only consumer ", "consumer "
+  ]
+
+main = do
+  hSetBuffering stdout LineBuffering
+  args <- getArgs
+  (base, selected) <- case args of
+    [work] -> pure (work, Nothing)
+    [work, "--exact", label] -> pure (work, Just label)
+    _ -> fail "usage: source-field-layouts WORK [--exact LABEL]"
+  createDirectoryIfMissing True base
+  count <- newIORef (0 :: Int)
+  let check label condition = when (maybe True (== label) selected) $ do
+        require label condition
+        modifyIORef' count (+1)
+        putStrLn ("PASS " ++ label)
+        when (selected /= Nothing) exitSuccess
+  -- Forged source and payload fixtures have no dependency on checked crates.
+  when (maybe False forgeryCase selected) (forgeryChecks base check selected >> fail "unknown forgery control")
+  when (selected == Just "fresh-source canonicalizer validates original ill-kinded fields")
+    (invalidFieldCheck check)
+  builtin <- right "compile checked builtin dependency" A.builtinPrelude
+  (builtinPath,savedBuiltin) <- saveReload base "Builtin" builtin
+  when (maybe False ("fresh source class " `isPrefixOf`) selected)
+    (freshSourceClassChecks check selected base builtinPath savedBuiltin >> fail "unknown source class control")
+  case selected of
+    Nothing -> do
+      producerChecks check selected base builtinPath savedBuiltin
+      local <- legacyChecks check selected base builtinPath savedBuiltin
+      ordinaryChecks check base builtinPath savedBuiltin
+      invalidFieldCheck check
+      invalidContextCheck check local
+      forgeryChecks base check selected
+      freshSourceClassChecks check selected base builtinPath savedBuiltin
+      total <- readIORef count
+      require "source field-layout fixture check inventory changed" (total == 55)
+      putStrLn "item4 source field layouts: passed (55 checks; source/fallback, saved imports, cold/warm, exact legacy ABI, bidirectional forgery rejection, fresh source classes)"
+    Just label -> do
+      if producerCase label then producerChecks check selected base builtinPath savedBuiltin
+      else if label == "ordinary imported-selector entry adaptation succeeds with exact checked ABI"
+      then ordinaryChecks check base builtinPath savedBuiltin
+      else do
+        _ <- legacyChecks check selected base builtinPath savedBuiltin
+        pure ()
+      fail ("unknown source-field-layouts case: " ++ label)

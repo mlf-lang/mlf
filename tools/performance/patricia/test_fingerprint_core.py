@@ -1,5 +1,12 @@
-"""Fail-closed checks for direct and worker/wrapper Int64 Core proofs."""
+"""Int64 Core checks and qualification dispatch; native semantics run separately."""
+import hashlib
+import json
+from pathlib import Path
+import shutil
+import tempfile
+import types
 import unittest
+from unittest.mock import Mock, patch
 import run_fingerprint as fingerprint
 
 
@@ -112,6 +119,134 @@ class CoreProofTests(unittest.TestCase):
         counts['mlf/fingerprintIntStep/131'] = 1
         with self.assertRaises(ValueError):
             fingerprint.verify_no_retired_rules(counts, '2')
+
+
+class ProbeCompilerOptions(unittest.TestCase):
+    def test_current_probes_submit_the_selected_optimization_to_ghc(self):
+        class ReachedCompiler(Exception):
+            pass
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            host = root / 'host/ghc'
+            host.mkdir(parents=True)
+            guard = types.SimpleNamespace(sha=lambda path: hashlib.sha256(path.read_bytes()).hexdigest())
+            build = {'ghc': {'path': 'recording-ghc'}, 'cc': {'path': 'recording-cc'}}
+            for opt in ('0', '2'):
+                commands = []
+
+                def run(label, argv, cwd=root):
+                    if argv[0] == 'recording-ghc':
+                        commands.append(list(map(str, argv)))
+                        raise ReachedCompiler
+
+                with self.subTest(optimization=opt), self.assertRaises(ReachedCompiler):
+                    fingerprint.run_probe(guard, root, fingerprint.CONTROLS, root, build, {}, {}, opt, run)
+                self.assertEqual(len(commands), 1)
+                flags = [flag for flag in commands[0] if flag in ('-O', '-O0', '-O1', '-O2')]
+                self.assertEqual(flags[-1:], ['-O' + opt])
+                self.assertIn('-dcore-lint', commands[0])
+
+
+class QualificationControls(unittest.TestCase):
+    """Exercise the real dispatcher and receipt checks with bounded stage doubles."""
+
+    def setUp(self):
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        self.root = Path(temporary.name)
+        self.source = self.root / 'source'
+        self.producer = self.root / 'producer'
+        self.controls = self.root / 'controls'
+        self.out = self.root / 'output'
+        (self.source / 'host/ghc').mkdir(parents=True)
+        (self.source / 'host/ghc/Host.hs').write_text('current host source\n')
+        (self.producer / 'objects').mkdir(parents=True)
+        self.object = self.producer / 'objects/Module.o'
+        self.object.write_bytes(b'ordinary producer object')
+        (self.producer / 'receipt.json').write_text('{}\n')
+        shutil.copytree(fingerprint.CONTROLS, self.controls)
+
+        def sha(path):
+            return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+
+        def check_pins(pins):
+            for path, digest in pins.items():
+                fingerprint.require(sha(path) == digest, 'input changed')
+
+        self.build = {'host_inputs': {}, 'object_inputs': {'objects/Module.o': sha(self.object)}}
+        self.guard = types.SimpleNamespace(
+            authenticate=Mock(return_value=self.build), sha=sha,
+            load=lambda path: json.loads(path.read_text()),
+            save=lambda path, value: path.write_text(json.dumps(value)), check_pins=check_pins)
+        self.stages = []
+
+        def probe(H, source, controls, out, build, host_hashes, expectations, opt, run):
+            self.stages.append('current-O' + opt)
+            return {'optimization': opt, 'complete': True}
+
+        def separate(H, source, producer, out, build, object_hashes, run):
+            self.stages.append('actual-separate')
+            return {'only_Separate_recompiled': True}
+
+        self.probe = self.enterContext(patch.object(fingerprint, 'run_probe', side_effect=probe))
+        self.separate = self.enterContext(patch.object(fingerprint, 'run_separate', side_effect=separate))
+
+    def qualify(self, planned):
+        return fingerprint.qualify(self.guard, self.source, self.producer, self.out,
+                                   planned, controls=self.controls)
+
+    def receipt(self):
+        return json.loads((self.out / 'checks/receipt.json').read_text())
+
+    def test_complete_dispatch_preserves_stages_and_input_checks(self):
+        result = self.qualify(fingerprint.LABELS)
+        self.assertEqual(self.stages, ['current-O0', 'current-O2', 'actual-separate'])
+        self.assertEqual(result['checks'], result['planned_checks'])
+        self.assertTrue(result['complete'])
+        self.assertTrue(result['immutable_inputs_verified_after'])
+        self.assertTrue(result['producer_outputs_immutable'])
+        self.assertEqual(self.guard.authenticate.call_count, 2)
+        self.assertEqual(self.receipt(), result)
+
+    def test_exact_selection_runs_only_the_selected_stage(self):
+        for label in fingerprint.LABELS:
+            with self.subTest(label=label):
+                self.out = self.root / label
+                self.stages.clear()
+                result = self.qualify([label])
+                self.assertEqual(self.stages, [label])
+                self.assertEqual(result['checks'], [label])
+                self.assertEqual('actual_source' in result, label == 'actual-separate')
+                self.assertEqual(len(result['runs']), int(label != 'actual-separate'))
+
+    def test_failed_stage_stops_dispatch_and_keeps_incomplete_receipt(self):
+        self.probe.side_effect = [{'optimization': '0'}, ValueError('compiler failed')]
+        with self.assertRaisesRegex(ValueError, 'compiler failed'):
+            self.qualify(fingerprint.LABELS)
+        self.separate.assert_not_called()
+        result = self.receipt()
+        self.assertFalse(result['complete'])
+        self.assertEqual(result['checks'], ['current-O0'])
+        self.assertIn('compiler failed', result['error'])
+
+    def test_changed_control_input_is_rejected_after_execution(self):
+        def change(*args):
+            (self.controls / 'Oracle.hs').write_text('changed during qualification\n')
+            return {'optimization': '0'}
+        self.probe.side_effect = change
+        with self.assertRaisesRegex(ValueError, 'input changed'):
+            self.qualify(['current-O0'])
+        self.assertFalse(self.receipt()['complete'])
+
+    def test_changed_producer_object_is_rejected_after_execution(self):
+        def change(*args):
+            self.object.write_bytes(b'changed ordinary object')
+            return {'optimization': '0'}
+        self.probe.side_effect = change
+        with self.assertRaisesRegex(ValueError, 'qualified producer objects changed'):
+            self.qualify(['current-O0'])
+        self.assertFalse(self.receipt()['complete'])
 
 
 if __name__ == "__main__":

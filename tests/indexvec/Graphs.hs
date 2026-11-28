@@ -2,10 +2,11 @@
 module Main where
 
 import Control.Exception (ErrorCall, displayException, evaluate, try)
-import Control.Monad (forM_, unless)
+import Control.Monad (filterM, forM_, unless)
 import Data.Bits (testBit)
 import Data.List (intercalate, isInfixOf, nub, sort)
 import qualified Data.Map.Strict as Map
+import Data.Maybe (listToMaybe)
 import qualified Data.Set as Set
 import qualified Bootstrap.ArtifactStorage as Storage
 import qualified Bootstrap.ArtifactStructure as Structure
@@ -13,6 +14,8 @@ import qualified Bootstrap.Bitstream as W
 import qualified Bootstrap.BuiltinPreludeLiteral as BuiltinLiteral
 import qualified Bootstrap.Constraint as C
 import qualified Bootstrap.Graph as Graph
+import qualified Bootstrap.Graph.Solver as Solver
+import qualified Bootstrap.ClassDemand as Demand
 import qualified Bootstrap.Classes as Classes
 import qualified Bootstrap.Compiler as Compiler
 import qualified Bootstrap.CompilerCore as CompilerCore
@@ -25,6 +28,7 @@ import qualified Bootstrap.Dependency as D
 import qualified Bootstrap.Desugar as Desugar
 import qualified Bootstrap.Elaborate as Elaborate
 import qualified Bootstrap.Evidence as Evidence
+import qualified Bootstrap.EvidenceBoundary as EvidenceBoundary
 import qualified Bootstrap.Fresh as Fresh
 import qualified Bootstrap.IntMap as IntMap
 import qualified Bootstrap.Layout as Layout
@@ -36,8 +40,14 @@ import qualified Bootstrap.SourceInference as Source
 import qualified Bootstrap.Surface as Surface
 import qualified Bootstrap.QueryGraph as Q
 import qualified Bootstrap.InferenceUnit as Inference
+import qualified Bootstrap.ImportedRoot as ImportedRoot
 import qualified Bootstrap.OpenFragment as Open
 import qualified Bootstrap.Separate as Separate
+import qualified Test.Assert as Assert
+import qualified Test.Case as Case
+import qualified Test.CaseSelection as Selection
+import qualified Bootstrap.X.Traversal as Traversal
+import qualified Bootstrap.LLVM.FunctionPolicy as Policy
 import qualified Bootstrap.LLVM.Analysis as Analysis
 import qualified Bootstrap.LLVM.Codegen as Codegen
 import qualified Bootstrap.LLVM.Optimize as Optimize
@@ -51,6 +61,7 @@ import qualified Bootstrap.IndexVec as V
 import qualified Bootstrap.IntSet as I
 import qualified Bootstrap.Parser as Parser
 import qualified Bootstrap.Primitive as Primitives
+import qualified Bootstrap.Std as Std
 import qualified Bootstrap.Map as M
 import qualified Bootstrap.Module as Modules
 import qualified Bootstrap.Types as T
@@ -105,6 +116,18 @@ package name deps mods = P.Package (H.literal ("/packages/" ++ name ++ "/mlf-pac
              ("dependencies",J.Object [(H.literal n,J.empty) | n <- deps])]) mods
 modl owner name deps = P.Module name owner (H.v_concatString name ".hs") deps
 
+permissionMemoPages = do
+  let observed n = Prim.runST $ do
+        memo <- Graph.newPermissionMemo n (0 :: H.Int)
+        let indices = [0,511,512,1024,n-1]
+        before <- mapM (Graph.readPermissionMemo memo) indices
+        forM_ (zip indices [1..]) $ \(i,v) -> Graph.writePermissionMemo memo i v
+        after <- mapM (Graph.readPermissionMemo memo) (reverse indices)
+        hole <- Graph.readPermissionMemo memo 1023
+        pure (before,after,hole)
+  forM_ [4095,4096,4101,4609] $ \n -> check "permission memo page boundaries"
+    ([0,0,0,0,0],[5,4,3,2,1],0) (observed n)
+
 groupedMergePermissions = do
   let run grouped parents permissions members = Prim.runST $ do
         let count=fromIntegral (length parents)
@@ -114,7 +137,7 @@ groupedMergePermissions = do
         forM_ (zip3 [0..] parents permissions) $ \(i,parent,permission) -> do
           Prim.writeSTArray raised i parent
           Prim.writeSTArray cache i (T.Just permission)
-        let state=Graph.DensePermissions 0 unused unused unused unused unused cache
+        let state=Graph.DensePermissions 0 unused unused unused unused unused (Graph.FlatMemo cache)
             checkClass=if grouped then Graph.denseCheckClassMerges else Graph.denseCheckMerges
         result <- checkClass 0 raised state members
         pure (case result of T.Left err -> Left (H.unpack err); T.Right () -> Right ())
@@ -178,6 +201,626 @@ denseRaisedAncestors = do
   forM_ [low,low+1,low+2] $ \wanted ->
     check "indexed lifting preserves missing and self-only ancestor diagnostics"
       (solve False wanted) (solve True wanted)
+
+denseTypeBinderAncestorChecks :: IO ()
+denseTypeBinderAncestorChecks = do
+  let nodes = IntMap.fromList
+        [(0,T.Node (T.GGen 1) T.Nothing T.Flexible),
+         (1,typeNode (T.GArr 2 3) 0), (2,typeNode (T.GArr 100 5) 1),
+         (3,typeNode T.GBot 1), (4,typeNode T.GBot 1), (5,typeNode T.GBot 2)]
+      typeNode tag parent = T.Node tag (T.Just parent) T.Flexible
+      inspect entries = case Graph.validateGraph (Graph.mkGraph entries (IntMap.singleton 100 4) 101) of
+        T.Left reason -> Left (H.unpack reason)
+        T.Right () -> Right ()
+  check "the structural stack witnesses an indirect type binder through an alias" (Right ()) (inspect nodes)
+  check "an unreachable type-bound node is still rejected"
+    (Left "a type binder must structurally contain its node") (inspect (IntMap.insert 6 (typeNode T.GBot 1) nodes))
+  check "the structural witness preserves missing child diagnostics" (Left "missing graph node 4")
+    (inspect (IntMap.delete 4 nodes))
+
+denseBindingValidationOrderChecks :: IO ()
+denseBindingValidationOrderChecks = forM_ [1,100003] $ \stride -> do
+  let at n = n * stride
+      root = T.Node (T.GGen (at 1)) T.Nothing T.Flexible
+      bound parent = T.Node T.GBot (T.Just (at parent)) T.Flexible
+      inspect entries = case Graph.validateGraph (Graph.mkGraph (IntMap.fromList entries) IntMap.empty (at 8)) of
+        T.Left reason -> Left (H.unpack reason)
+        T.Right () -> Right ()
+      valid = [(at 0,root), (at 1,bound 0)]
+      missing = [(at 0,root), (at 1,bound 7)]
+  check "binding traversal accepts a complete tree" (Right ()) (inspect valid)
+  check "binding traversal diagnoses an absent parent before checking edges" (Left "missing binder")
+    (inspect missing)
+  check "duplicate roots precede the absent parent diagnostic" (Left "graph must have one binding root")
+    (inspect (missing ++ [(at 2,root)]))
+  check "binding traversal still rejects a disconnected cycle" (Left "cyclic binding tree")
+    (inspect (valid ++ [(at 2,bound 3), (at 3,bound 2)]))
+
+solvedTypeBoundsChecks :: IO ()
+solvedTypeBoundsChecks = do
+  let node tag parent = T.Node tag parent T.Flexible
+      graph = Graph.mkGraph (IntMap.fromList
+        [(0,node (T.GGen 1) T.Nothing), (1,node (T.GArr 90 20) (T.Just 0)),
+         (20,node (T.GArr 50 30) (T.Just 1)), (30,T.Node (T.GCon "Int" []) (T.Just 20) T.Rigid),
+         (50,node T.GBot (T.Just 20)), (90,node T.GBot (T.Just 1)), (100,node T.GBot (T.Just 0))])
+        IntMap.empty 101
+      right answer = case answer of
+        T.Left reason -> fail (H.unpack reason)
+        T.Right result -> pure result
+      ids context n = [i | (T.XTyVar i,_) <- Elaborate.boundsAtIn context n]
+  preparedSolver <- right (Solver.prepare graph)
+  indexed <- right (Solver.finishNormalized preparedSolver)
+  let simple = Elaborate.prepareTypes (Solver.solverGraph indexed)
+      prepared = Elaborate.prepareSolvedTypes indexed
+      roots = [0,1,20,30,50,90,100]
+  check "indexed bounds agree with structural postorder" (map (ids simple) roots) (map (ids prepared) roots)
+  check "index order follows the structural edges" [90,20] (ids prepared 1)
+  check "a singleton bound uses the local graph node" [50] (ids prepared 20)
+  check "an unreachable existential does not become a quantifier" [] (ids prepared 0)
+
+scopeProjectionChecks :: IO ()
+scopeProjectionChecks = do
+  let parents = Map.fromList
+        [(17,17), (4,17), (-2,4), (11,-2), (6,11), (8,4), (22,17), (13,22), (-5,-5), (5,-5)]
+      gen (n,parent) = (n,T.Node (T.GGen n) (if n == parent then T.Nothing else T.Just parent) T.Flexible)
+      index = Solver.indexScopes (T.Graph (IntMap.fromList (map gen (Map.toList parents))) IntMap.empty 23)
+      ancestors n = n : if n == parent then [] else ancestors parent
+        where parent = parents Map.! n
+      common a b = take 1 (filter (`elem` ancestors b) (ancestors a))
+      projected seeds = seeds ++ map (last . ancestors) seeds ++
+        concat [common a b | a <- seeds, b <- seeds, a < b]
+      reference seeds =
+        let selected = Set.fromList (projected seeds)
+            nearest = listToMaybe . filter (`Set.member` selected) . tail . ancestors
+        in [(n,nearest n) | n <- Set.toAscList selected]
+      hostMaybe T.Nothing = Nothing
+      hostMaybe (T.Just n) = Just n
+  -- Enumerate every boundary in a branching forest with sparse, signed IDs.
+  -- The oracle uses parent walks and all pairs, independent of DFS ordering.
+  forM_ (filterM (const [False,True]) (Map.keys parents)) $ \seeds ->
+    check ("scope projection for " ++ show seeds) (reference seeds)
+      [(n,hostMaybe parent) | (n,parent) <- IntMap.toList (Solver.projectScopes index (I.fromList seeds))]
+
+capturedGivenChecks :: IO ()
+capturedGivenChecks = do
+  let source = H.literal (unlines
+        ["class Score a where { score : a -> Int };"
+        ,"instance Score Int where { score = \\n -> addInt n 10 };"
+        ,"instance Score Bool where { score = \\b -> if b then 100 else 0 };"
+        ,"let rec { loop fuel x = if eqInt fuel 0 then score x else"
+        ,"  let helper = \\y -> addInt (score y) (loop (subInt fuel 1) x) in"
+        ,"  addInt (helper 1) (helper true) } in loop 1 3"])
+  compiled <- Compiler.compile "CapturedGivens.emlf" source >>= \outcome -> case outcome of
+    T.Left err -> fail (H.unpack (CompilerCore.prettyError err))
+    T.Right result -> pure result
+  let term = Compiler.compiledTerm compiled
+  case Runtime.prepare False term of
+    T.Left message -> fail (H.unpack message)
+    T.Right (datatypes,_) -> case Runtime.integer
+      (Runtime.evaluate datatypes (Runtime.REnv M.empty) (X.erase term)) of
+        T.Left message -> fail (H.unpack message)
+        T.Right result -> check "a captured given preserves each owned dictionary specialization" 137 result
+
+inferredDictionaryPrefixChecks :: IO ()
+inferredDictionaryPrefixChecks = do
+  let a = T.XTyVar 10
+      b = T.XTyVar 11
+      d1 = T.XName 12 "first"
+      d2 = T.XName 13 "second"
+      dictionary v = T.XCon "DictTest" [T.XVar v]
+      first = dictionary a
+      registry = M.fromList H.v_compareString [("Test", "DictTest")]
+      labels = [("first", "Test", "DictTest"), ("second", "Test", "DictTest")]
+      quantified = T.XForall a T.XBot . T.XForall b T.XBot
+      abstracted = T.XTypeAbs a T.XBot . T.XTypeAbs b T.XBot
+      scheme second = quantified (T.XArrow first (T.XArrow second second))
+      rhs second = abstracted (T.XAbs d1 first (T.XAbs d2 second (T.XVarTerm d2)))
+      right (T.Right value) = pure value
+      right (T.Left message) = fail (H.unpack message)
+      compact second = right (EvidenceBoundary.compactInferredPrefix registry labels (scheme second) (rhs second))
+  shared <- compact first
+  case shared of
+    T.Nothing -> fail "identical inferred predicates retained two dictionary parameters"
+    T.Just (target, term, classes) -> do
+      check "one inferred class remains" ["Test"] (map H.unpack classes)
+      check "only one dictionary arrow remains" True
+        (XT.alphaEq target (quantified (T.XArrow first first)))
+      datatypes <- right (Data.validateDeclarations [T.DataDecl "DictTest" ["a"] [T.ConstructorDecl "TestDict" []]])
+      actual <- right (XCheck.inferWithData datatypes (T.XEnv M.empty M.empty) term)
+      check "compacted dictionary alias checks" True (XT.alphaEq actual target)
+  let concrete = T.XCon "DictTest" [T.XCon "Int" []]
+      headName = T.XName 80 "identity"
+      headType = T.XForall a T.XBot (T.XArrow concrete concrete)
+      env = T.XEnv M.empty (M.singleton headName headType)
+      originalType = T.XArrow concrete (T.XArrow concrete concrete)
+      rows = [("Int",False,T.XVarTerm d2)]
+  datatypes <- right (Data.validateDeclarations [T.DataDecl "DictTest" ["a"] [T.ConstructorDecl "TestDict" []]])
+  forM_ [T.XInstantiationSpine headName rows, X.expandInstantiationSpine headName rows,
+         T.XInstantiationSpine d2 []] $ \body -> do
+    let original = T.XAbs d1 concrete (T.XAbs d2 concrete body)
+    before <- right (XCheck.inferWithData datatypes env original)
+    check "dictionary spine fixture is well typed" True (XT.alphaEq before originalType)
+    compacted <- right (EvidenceBoundary.compactInferredPrefix registry labels originalType original)
+    case compacted of
+      T.Just (ty,term,[_]) -> do
+        after <- right (XCheck.inferWithData datatypes env term)
+        check "spine heads and operands refer to the retained dictionary" True
+          (XT.alphaEq ty after && XT.alphaEq ty (T.XArrow concrete concrete))
+      _ -> fail "expected exactly one retained dictionary"
+  distinct <- compact (dictionary b)
+  case distinct of
+    T.Nothing -> pure ()
+    T.Just _ -> fail "distinct type variables shared an inferred dictionary"
+  let ambient = T.XName 70 "unused"
+      candidates = [(T.InstanceEvidence, "instance", first)]
+      term = T.XIntTerm 0
+  [candidate] <- right (Source.candidateParameters [(ambient, first)] term candidates)
+  check "definition-site evidence reserves unused ambient names" 71
+    (X.nameId (EvidenceBoundary.candidateName candidate))
+  case Source.candidateParameters [(T.XName 9223372036854775807 "unused", first)] term candidates of
+    T.Left message -> check "evidence identity exhaustion" "evidence identity supply exhausted" (H.unpack message)
+    T.Right _ -> fail "definition-site evidence identity wrapped"
+
+dictionaryApplicationChecks :: IO ()
+dictionaryApplicationChecks = do
+  let names = map (H.literal . ("given" ++) . show) [0..7 :: Int]
+      formals = map (H.literal . ("parameter" ++) . show) [0..7 :: Int]
+      values = concat [[T.SIntLit n,T.SBoolLit enabled] |
+        (n,enabled) <- [(2,True),(3,False),(5,False),(7,True)]]
+      apply f = foldl T.SApp (T.SPrimitive f)
+      contribution (number,flag) = apply T.PIfThenElse [T.SVar flag,T.SVar number,T.SIntLit 0]
+      body = foldl (\a b -> apply T.PAddInt [a,b]) (T.SIntLit 0)
+        (map contribution (zip (takeEveryOther formals) (takeEveryOther (drop 1 formals))))
+      takeEveryOther (a:_:rest) = a : takeEveryOther rest
+      takeEveryOther xs = xs
+      abstraction given result = T.SLam given T.Nothing result
+      callee = foldr abstraction body formals
+      plain = foldl T.SApp (T.SVar "consume") (map T.SVar names)
+      grouped = T.SApplyDictionaries (T.LexicalRef "consume") names
+      replacements = M.fromList H.v_compareString [(last names,"Evidence")]
+      lambdaArguments call = foldl T.SApp (foldr abstraction call names) values
+      letArguments call = foldr (uncurry T.SLet) call (zip names values)
+      run into call = do
+        compiled <- case CompilerCore.finishCompilation (T.SProgram [] (T.SLet "consume" callee (into call)),M.empty) of
+          T.Left err -> fail (H.unpack (CompilerCore.prettyError err))
+          T.Right result -> pure result
+        case Runtime.integer (Runtime.evaluate Data.emptyDataEnv (Runtime.REnv M.empty)
+          (X.erase (CompilerCore.compiledTerm compiled))) of
+          T.Left message -> fail (H.unpack message)
+          T.Right value -> pure value
+  forM_ [lambdaArguments,letArguments] $ \arguments -> do
+    plainValue <- run arguments plain
+    check "ordinary mixed-argument application" 9 plainValue
+    groupedValue <- run arguments grouped
+    check "implicit application preserves argument order and types" plainValue groupedValue
+  check "a dictionary placeholder receives the same evidence as an ordinary variable" True
+    (Equality.eqSExpr (Classes.closeWanted replacements [] plain) (Classes.closeWanted replacements [] grouped))
+
+variableApplicationChecks :: IO ()
+variableApplicationChecks = do
+  let identity = T.SLam "x" T.Nothing (T.SVar "x")
+      local = T.SVar "f"
+      call = T.SApp local
+      binding rhs body = T.SLet "f" rhs body
+      int n = T.SIntLit n
+      boolean = T.SBoolLit True
+      route generate body = case generate (T.SProgram [] body) of
+        T.Right constraints -> case C.form (C.skeleton constraints) of
+          T.FBinding _ _ use _ -> case C.form use of
+            T.FApplyVariable _ _ _ _ -> pure True
+            T.FApply _ _ _ _ -> pure False
+            _ -> fail "unexpected variable application form"
+          _ -> fail "missing application binding"
+        T.Left message -> fail (H.unpack message)
+      ordinary = binding identity (call (int 3))
+      slot = V.fromInt 7
+      declared = T.SDeclScope [slot] (binding identity (T.SApp (T.SGlobal slot "f") (int 3)))
+      barrier = T.SLetRec [("g",T.InferRecursive,identity)] (T.SApp (T.SVar "g") (int 3))
+  forM_ [ordinary,declared] $ \program -> do
+    check "file call instantiates the named scheme directly" True =<< route C.generateFileProgram program
+    check "reference call retains the variable generalization" False =<< route C.generateProgram program
+  forM_ [binding boolean (call (int 3)),binding identity (call barrier),
+         binding identity (call (iterate call (int 3) !! 8))] $ \program ->
+    check "unknown arrow, recursive operand, and deep operand retain ordinary application" False
+      =<< route C.generateFileProgram program
+  let choose condition yes no = foldl T.SApp (T.SPrimitive T.PIfThenElse) [condition,yes,no]
+      independent = binding identity (choose (call boolean) (call (int 17)) (int 0))
+  forM_ [C.generateFileProgram,C.generateProgram] $ \generate -> do
+    result <- case CompilerCore.finishCompilationWith generate (T.SProgram [] independent,M.empty) of
+      T.Left problem -> fail (H.unpack (CompilerCore.prettyError problem))
+      T.Right result -> pure result
+    check "independent calls preserve the checked result type" True
+      (XT.alphaEq (CompilerCore.inferredType result) (T.XCon "Int" []))
+    case Runtime.integer (Runtime.evaluate Data.emptyDataEnv (Runtime.REnv M.empty)
+      (X.erase (CompilerCore.compiledTerm result))) of
+      T.Left problem -> fail (H.unpack problem)
+      T.Right value -> check "independent Bool and Int calls evaluate" 17 value
+
+recursiveBatchAdmissionChecks :: IO ()
+recursiveBatchAdmissionChecks = do
+  let declaration index hint = T.DeclRef (V.fromInt index) hint
+      first = declaration 1 "first"
+      second = declaration 2 "second"
+      imported = declaration 3 "imported"
+      local = T.LexicalRef "local"
+      given = T.LexicalRef "compilerGiven0"
+      variable (T.DeclRef slot hint) = T.CGlobal slot hint
+      variable (T.LexicalRef hint) = T.CVar hint
+      member owner body = [(owner, T.InferRecursive, body)]
+      literal = T.CInt 1
+      emptyScope = C.BindingEnv M.empty M.empty
+      term = T.XName 10 "reference"
+      graph = Graph.mkGraph (IntMap.fromList
+        [(0, T.Node (T.GGen 1) T.Nothing T.Flexible),
+         (1, T.Node (T.GCon "Int" []) (T.Just 0) T.Rigid),
+         (2, T.Node (T.GGen 1) (T.Just 0) T.Flexible)]) IntMap.empty 11
+      admits scope body = C.closedRecursiveBatch graph scope [member first body, member second literal]
+      sizes = map length . C.independentRecursiveBatches
+      closed = C.bindTerm emptyScope imported (T.Poly term 0)
+      open = C.bindTerm emptyScope imported (T.Poly term 2)
+      captured = C.bindTerm emptyScope given (T.Mono term 1)
+      candidates ref = T.CandidateEnvironment 0 [(T.GivenEvidence, ref)]
+      wanted ref = T.CWantedScope "D" (candidates ref)
+      application ref = T.CApplyScopedDictionaries first [("D", candidates ref)]
+  check "no inferred declarations form no batches" [] (sizes [])
+  check "one inferred declaration preserves the singleton cutoff" [1] (sizes [member first literal])
+  check "two independent inferred declarations can share a solve" [2]
+    (sizes [member first literal, member second literal])
+  check "a dependency on a later declaration ends a batch" [1, 1]
+    (sizes [member first (variable second), member second literal])
+  check "a dependency on an earlier declaration ends a batch" [1, 1]
+    (sizes [member first literal, member second (variable first)])
+  check "a dependency in a wanted scope ends a batch" [1, 1]
+    (sizes [member first (wanted second), member second literal])
+  check "a dependency in a scoped dictionary operand ends a batch" [1, 1]
+    (sizes [member first (application second), member second literal])
+  check "independent closed Poly permits batching" True (admits closed (variable imported))
+  check "open Poly preserves sequential inference" False (admits open (variable imported))
+  check "unsolved Mono preserves sequential inference" False
+    (admits (C.bindTerm emptyScope imported (T.Mono term 1)) (variable imported))
+  check "missing declaration preserves sequential inference" False (admits emptyScope (variable imported))
+  check "unshadowed primitive permits batching" True (admits emptyScope (T.CVar "addInt"))
+  check "lexically shadowed primitive preserves sequential inference" False
+    (admits (C.bindTerm emptyScope (T.LexicalRef "addInt") (T.Mono term 1)) (T.CVar "addInt"))
+  check "a local recursive member preserves sequential inference" False
+    (C.closedRecursiveBatch graph emptyScope [member local literal, member second literal])
+  check "a captured lexical reference preserves sequential inference" False (admits captured (variable given))
+  check "a scope introducing a lexical given preserves sequential inference" False
+    (admits captured (T.CGivenScope ["compilerGiven0"] literal))
+  check "a scoped wanted with a lexical given preserves sequential inference" False
+    (admits captured (wanted given))
+  check "a scoped application with a lexical given preserves sequential inference" False
+    (admits captured (application given))
+
+recursiveExportBatchChecks :: IO ()
+recursiveExportBatchChecks = do
+  let input = Graph.mkGraph (IntMap.fromList
+        [(0,T.Node (T.GGen 1) T.Nothing T.Flexible),
+         (1,T.Node (T.GCon "Int" []) (T.Just 0) T.Rigid),
+         (2,T.Node (T.GGen 3) (T.Just 0) T.Flexible),
+         (3,T.Node (T.GArr 4 5) (T.Just 2) T.Flexible),
+         (4,T.Node (T.GArr 6 7) (T.Just 2) T.Flexible),
+         (5,T.Node (T.GArr 7 6) (T.Just 2) T.Flexible),
+         (6,T.Node T.GBot (T.Just 2) T.Flexible),
+         (7,T.Node (T.GCon "Int" []) (T.Just 2) T.Rigid)])
+        (IntMap.fromList [(11,4)]) 13
+      sequential graph members = case members of
+        [] -> T.Right ([],graph)
+        (source,destination):rest -> case Graph.materializeCheckedExport 2 source destination 0 graph of
+          T.Left why -> T.Left why
+          T.Right (export,next) -> case sequential next rest of
+            T.Left why -> T.Left why
+            T.Right (exports,result) -> T.Right (export:exports,result)
+      sameExport (x,m) (y,n) = x == y && IntMap.eqIntMap (==) m n
+      same left right = case (left,right) of
+        (T.Left why,T.Left message) -> Prim.eqString why message
+        (T.Right (xs,g),T.Right (ys,h)) -> length xs == length ys && and (zipWith sameExport xs ys) &&
+          Graph.nextId g == Graph.nextId h && IntMap.eqIntMap Graph.equalNode (Graph.nodes g) (Graph.nodes h) &&
+          IntMap.eqIntMap (==) (Graph.links g) (Graph.links h)
+        _ -> False
+      cases = [[(4,8),(5,9)],[(5,9),(11,8),(4,10)],[(4,8),(4,8)],
+               [(32,8),(5,4)],[(2,8),(32,9)],[(4,8),(32,9)],[(4,8),(13,9)]]
+  case Graph.validateGraph input of
+    T.Left message -> fail (H.unpack message)
+    T.Right () -> pure ()
+  forM_ cases $ \members ->
+    check ("batched recursive exports preserve copies and first diagnostic " ++ show members) True
+      (same (sequential input members) (Graph.materializeCheckedExports 2 members 0 input))
+  case Graph.materializeCheckedExports 2 [(4,8),(5,9)] 0 input of
+    T.Right ([_,_],_) -> pure ()
+    _ -> fail "expected two checked recursive exports"
+
+localExpansionChecks :: IO ()
+localExpansionChecks = do
+  let right label answer = case answer of
+        T.Left why -> fail (label ++ ": " ++ H.unpack why)
+        T.Right value -> pure value
+      outcome actual = case actual of
+        T.Left why -> Left (H.unpack why)
+        T.Right _ -> Right ()
+      same a b = IntMap.eqIntMap Graph.equalNode (Graph.nodes a) (Graph.nodes b) &&
+        IntMap.eqIntMap (==) (Graph.links a) (Graph.links b) && Graph.nextId a == Graph.nextId b
+  forM_ [(0,1),(-101,8192)] $ \(offset,stride) -> do
+    let at n = offset + stride*n
+        node tag parent flag = T.Node (Graph.mapTag at tag) (maybe T.Nothing (T.Just . at) parent) flag
+        gen n parent = node (T.GGen n) parent T.Flexible
+        original flag tag = Graph.mkGraph (IntMap.fromList [(at n,v) | (n,v) <-
+          [(0,gen 1 Nothing), (1,node T.GBot (Just 0) T.Flexible),
+           (2,gen 3 (Just 0)), (3,node (T.GArr 4 4) (Just 2) T.Flexible),
+           (4,node T.GBot (Just 3) T.Flexible), (5,gen 6 (Just 0)),
+           (6,node (T.GArr 8 11) (Just 5) T.Flexible), (8,node T.GBot (Just 0) flag),
+           (11,node tag (Just 5) T.Flexible), (12,node (T.GCon "Int" []) (Just 5) T.Rigid),
+           (13,gen 14 (Just 5)), (14,node (T.GArr 11 11) (Just 13) T.Flexible)]])
+          (IntMap.fromList [(at 16,at 6),(at 17,at 16)]) (at 18)
+        source = at 2
+        destination = at 17
+    initial <- right "prepare local expansion" (Solver.prepare (original T.Flexible (T.GArr 12 12)))
+    (root,_,frontier,expanded) <- right "expand shared variable" (Solver.expandedGraphPrepared source destination initial)
+    let first = Graph.nextId (Solver.graph initial)
+        fresh = Solver.allocatedNodes first (Graph.nextId expanded) (Graph.nodes expanded)
+        equations = frontier ++ [(root,destination)]
+    expected <- right "raw graph unification" (Graph.unify equations expanded)
+    local <- right "unify local expansion" (Solver.unifyExpandedLocally equations initial expanded (at 5) fresh root)
+    actual <- right "finish local expansion" (Solver.finish local)
+    check "local expansion preserves the full graph and alias chain" True (same expected actual)
+    prepared <- right "unify prepared expansion" (Solver.instantiateExpandedPrepared source destination initial)
+    integrated <- right "finish prepared expansion" (Solver.finish prepared)
+    check "prepared expansion publishes exact tags, binders and flags" True (same expected integrated)
+    batch <- right "solve the same edge with a batch-owned scope index"
+      (Solver.solveGenerated (original T.Flexible (T.GArr 12 12)) [] [T.Instantiate (T.Edge source destination)])
+    batchGraph <- right "audit the batch-owned scope index" (Solver.finish batch)
+    check "scope ancestry preserves the raw graph and alias chain" True (same expected batchGraph)
+    fileBatch <- right "solve the file-generated graph"
+      (Solver.solveFileGraph (original T.Flexible (T.GArr 12 12)) [] [T.Instantiate (T.Edge source destination)])
+    fileGraph <- right "finish the file-generated graph" (Solver.finish fileBatch)
+    check "file-generated expansion preserves nodes, links and identities" True (same expected fileGraph)
+    let T.Solver raw parents descendants (T.ScopeIndex intervals jumps) = initial
+        falseInterval = IntMap.get (at 5) intervals
+        forged = T.Solver raw parents descendants (T.ScopeIndex (IntMap.insert (at 2) falseInterval intervals) jumps)
+    check "forged scope intervals claim two unrelated scopes coincide" True
+      (Solver.scopeContains (Solver.scopeIndex forged) (at 2) (at 5))
+    check "manual binder lift follows the actual graph for sibling scopes"
+      (Left "a node's binder cannot be lowered")
+      (outcome (Solver.liftAncestors (Solver.graph forged) raw (at 2) I.empty (T.Just (at 5))))
+    check "a fabricated interval still fails the public solver audit"
+      (Left "incremental graph index disagrees with the graph") (outcome (Solver.finish forged))
+    let before = Graph.mkGraph (Graph.nodes expanded) IntMap.empty (Graph.nextId expanded)
+        canonical = [(Graph.resolve expanded a, Graph.resolve expanded b) | (a,b) <- equations]
+    kinds <- right "compute original equation kinds" (Graph.kindsAt before (concatMap Graph.equationNodes canonical))
+    quotient <- right "compute first-order classes once" (Graph.foldE (Graph.firstOrder kinds) before canonical)
+    (continued,_) <- right "complete the component from its existing classes"
+      (Solver.unifyPreparedFromQuotient Solver.Uncached equations initial expanded first fresh quotient)
+    continuedGraph <- right "finish the widened component" (Solver.finish continued)
+    check "reusing the equation classes preserves external aliases and binders" True (same expected continuedGraph)
+    let typeBinderExpected = outcome (Solver.instantiateWithFreshBottom source (at 4) initial)
+    check "the reference rejects a copy into an ordinary type binder before solving equations"
+      (Left "a type binder must structurally contain its node") typeBinderExpected
+    check "prepared type-binder admission returns the same structural diagnostic" typeBinderExpected
+      (outcome (Solver.instantiateExpandedPrepared source (at 4) initial))
+    let scopeTarget = at 5
+        scopeError = outcome (Solver.instantiateWithFreshBottom source scopeTarget initial)
+    check "the component rejects a generalization as an instance target"
+      (Left "cannot unify generalization nodes") scopeError
+    check "a generalization target goes straight to the component plan" scopeError
+      (outcome (Solver.instantiateExpandedPrepared source scopeTarget initial))
+    forM_ [(T.Rigid,T.GArr 12 12),(T.Flexible,T.GArr 8 8)] $ \(flag,tag) -> do
+      invalid <- right "prepare rejected expansion" (Solver.prepare (original flag tag))
+      let expectedError = outcome (Solver.instantiateWithFreshBottom source destination invalid)
+      case expectedError of
+        Left _ -> check "prepared expansion retains the original diagnostic" expectedError
+          (outcome (Solver.instantiateExpandedPrepared source destination invalid))
+        Right () -> fail "expected the reference expansion to reject the input"
+    let boxed target = Graph.mkGraph (IntMap.fromList [(at n,v) | (n,v) <-
+          [(0,gen 1 Nothing), (1,node T.GBot (Just 0) T.Flexible),
+           (2,gen 3 (Just 0)), (3,node (T.GCon "Box" [1]) (Just 2) T.Flexible),
+           (5,gen 6 (Just 0)), (6,node (T.GCon target [8]) (Just 5) T.Flexible),
+           (8,node (T.GCon "Int" []) (Just 6) T.Flexible)]]) IntMap.empty (at 10)
+        boxedTarget = at 6
+    boxedSolver <- right "prepare expansion with an external type variable" (Solver.prepare (boxed "Box"))
+    (boxedRoot,_,boxedFrontier,boxedExpanded) <- right "copy boxed type"
+      (Solver.expandedGraphPrepared source boxedTarget boxedSolver)
+    check "boxed expansion has one external equation" 1 (length boxedFrontier)
+    boxedExpected <- right "unify boxed type with the full graph"
+      (Graph.unify (boxedFrontier ++ [(boxedRoot,boxedTarget)]) boxedExpanded)
+    boxedPrepared <- right "unify boxed type with the prepared solver"
+      (Solver.instantiateExpandedPrepared source boxedTarget boxedSolver)
+    boxedActual <- right "finish boxed expansion" (Solver.finish boxedPrepared)
+    check "local boxed expansion preserves the full graph and alias chain" True (same boxedExpected boxedActual)
+    mismatch <- right "prepare a different constructor" (Solver.prepare (boxed "Other"))
+    let rejected = outcome (Solver.instantiateWithFreshBottom source boxedTarget mismatch)
+    case rejected of
+      Left _ -> do
+        check "local attempt preserves the constructor mismatch diagnostic" rejected
+          (outcome (Solver.instantiateExpandedPrepared source boxedTarget mismatch))
+        (wrongRoot,_,wrongFrontier,wrongExpanded) <- right "expand mismatched constructors"
+          (Solver.expandedGraphPrepared source boxedTarget mismatch)
+        let firstWrong = Graph.nextId (Solver.graph mismatch)
+            wrongFresh = Solver.allocatedNodes firstWrong (Graph.nextId wrongExpanded) (Graph.nodes wrongExpanded)
+            mismatchPlan = Solver.solveLocalExpansion True
+              (wrongFrontier ++ [(wrongRoot,boxedTarget)]) mismatch wrongExpanded wrongFresh
+        check "constructor mismatch is admitted to the local solve" True
+          (Solver.localExpansionAdmissible (Solver.preparedFragmentCheck firstWrong)
+            wrongExpanded (at 5) wrongFresh wrongRoot)
+        case mismatchPlan of
+          T.Right (Solver.LocalRejected message) ->
+            check "first-order rejection uses the original projected diagnostic directly" rejected (Left (H.unpack message))
+          _ -> fail "expected a local constructor mismatch"
+      Right () -> fail "expected mismatched constructors to be rejected"
+    let liftInput = Graph.mkGraph (IntMap.fromList [(at n,v) | (n,v) <-
+          [(0,gen 1 Nothing), (1,node T.GBot (Just 0) T.Flexible),
+           (5,gen 6 (Just 0)), (6,node (T.GArr 7 9) (Just 5) T.Flexible),
+           (7,node (T.GArr 8 8) (Just 6) T.Flexible),
+           (8,node (T.GArr 10 11) (Just 6) T.Flexible),
+           (9,node T.GBot (Just 6) T.Flexible),
+           (10,node (T.GCon "Int" []) (Just 6) T.Flexible),
+           (11,node (T.GCon "Bool" []) (Just 6) T.Flexible)]])
+          IntMap.empty (at 12)
+        liftRoot = at 12
+        liftFresh = node T.GBot (Just 5) T.Flexible
+        addLiftFresh input = Graph.mkGraph (Graph.insertNodeMap liftRoot liftFresh (Graph.nodes input))
+          IntMap.empty (at 13)
+        liftExpanded = addLiftFresh liftInput
+        liftEquations = [(liftRoot,at 7)]
+    liftSolver <- right "prepare local graft with nested structural parents" (Solver.prepare liftInput)
+    liftExpected <- right "retain all graft binder dependencies" (Graph.unify liftEquations liftExpanded)
+    liftPlan <- right "place all affected binders before publishing"
+      (Solver.unifyExpandedLocally liftEquations liftSolver liftExpanded (at 5) [(liftRoot,liftFresh)] liftRoot)
+    liftActual <- right "finish local graft" (Solver.finish liftPlan)
+    check "local graft widens the binder through two structural edges" True
+      (all (Graph.equalMaybeInt (T.Just (at 5)) . Graph.binder . Graph.nodeAt liftActual . at) [7,8,10,11])
+    check "local graft preserves unrelated binders and exact graph identity" True (same liftExpected liftActual)
+    let inertUnderRigid = Graph.setNode (at 6) (node (T.GArr 7 9) (Just 5) T.Rigid) liftInput
+        solveLiftLocally input = do
+          solver <- right "prepare protected-variable scope" (Solver.prepare input)
+          pure (Solver.unifyExpandedLocally liftEquations solver (addLiftFresh input)
+            (at 5) [(liftRoot,liftFresh)] liftRoot)
+        redUnderRigid =
+          Graph.setNode (at 9) (node T.GBot (Just 7) T.Flexible)
+            (Graph.setNode (at 7) (node (T.GArr 8 9) (Just 6) T.Flexible)
+              (Graph.setNode (at 6) (node (T.GArr 7 7) (Just 5) T.Rigid) liftInput))
+    inertExpected <- right "general unifier allows inert nodes to rise"
+      (Graph.unify liftEquations (addLiftFresh inertUnderRigid))
+    inertLocal <- solveLiftLocally inertUnderRigid >>= right "local permissions allow inert nodes to rise"
+    inertActual <- right "finish locally checked inert graft" (Solver.finish inertLocal)
+    check "exact local permissions preserve the raised graph" True (same inertExpected inertActual)
+    let redExpected = outcome (Graph.unify liftEquations (addLiftFresh redUnderRigid))
+    check "general unifier protects a flexible type above a bottom" (Left "cannot raise a protected type variable") redExpected
+    redLocal <- solveLiftLocally redUnderRigid
+    check "local permissions preserve rejection of a protected lift" redExpected (outcome redLocal)
+    redSolver <- right "prepare protected lift with competing errors" (Solver.prepare redUnderRigid)
+    let concrete = node (T.GCon "Int" []) (Just 5) T.Flexible
+        competing = Graph.mkGraph
+          (Graph.insertNodeMap (at 13) concrete (Graph.nodes (addLiftFresh redUnderRigid)))
+          IntMap.empty (at 14)
+        bothEquations = liftEquations ++ [(at 9,at 13)]
+        originalError = outcome (Graph.unify bothEquations competing)
+        permissionResult = Solver.unifyExpandedLocallyWith Solver.validFreshFragment
+          bothEquations redSolver competing (at 5) [(liftRoot,liftFresh),(at 13,concrete)] liftRoot
+    check "a competing protected instantiation retains the first diagnostic" redExpected originalError
+    case permissionResult of
+      T.Right (Solver.LocalRejected message) ->
+        check "complete local plan returns the exact rejection directly" originalError (Left (H.unpack message))
+      _ -> fail "expected a definitive local permission rejection"
+    case Solver.unifyExpandedLocallyWith (\_ _ _ _ -> False) liftEquations
+        redSolver (addLiftFresh redUnderRigid) (at 5) [(liftRoot,liftFresh)] liftRoot of
+      T.Left _ -> pure ()
+      T.Right _ -> fail "an unchecked fragment cannot issue a definitive permission rejection"
+    let cyclicEquations = liftEquations ++ [(at 9,at 6)]
+        liftFragment = [(liftRoot,liftFresh)]
+        cycleExpected = outcome (Solver.unifyPreparedFallback cyclicEquations liftSolver liftExpanded
+          liftRoot liftFragment)
+    case Solver.unifyExpandedLocallyWith Solver.validFreshFragment
+        cyclicEquations liftSolver liftExpanded (at 5) liftFragment liftRoot of
+      T.Right (Solver.LocalNeedsComponent _ partial) ->
+        case cycleExpected of
+          Left _ -> check "the widened plan preserves the cycle diagnostic"
+            cycleExpected (outcome (Solver.unifyPreparedFromQuotient Solver.Uncached cyclicEquations
+              liftSolver liftExpanded liftRoot liftFragment partial))
+          Right () -> fail "expected the reference component to reject an occurs check"
+      _ -> fail "expected the first-order result to survive the local occurs check"
+    let scopedArrow = Graph.mkGraph (IntMap.fromList [(at n,v) | (n,v) <-
+          [(0,gen 1 Nothing), (1,node T.GBot (Just 0) T.Flexible),
+           (2,gen 3 (Just 0)), (3,node (T.GArr 4 5) (Just 2) T.Flexible),
+           (4,node (T.GCon "Int" []) (Just 3) T.Rigid),
+           (5,node (T.GArr 6 7) (Just 3) T.Rigid),
+           (6,node (T.GCon "Int" []) (Just 5) T.Rigid),
+           (7,node (T.GCon "Int" []) (Just 5) T.Rigid),
+           (10,gen 11 (Just 0)), (11,node T.GBot (Just 10) T.Flexible),
+           (12,node (T.GArr 13 14) (Just 10) T.Flexible),
+           (13,node T.GBot (Just 10) T.Flexible), (14,node T.GBot (Just 10) T.Flexible),
+           (20,gen 21 (Just 10)), (21,node (T.GArr 13 14) (Just 20) T.Flexible)]])
+          IntMap.empty (at 22)
+        ancestorBound = Graph.setNode (at 6) (node (T.GCon "Int" []) (Just 3) T.Rigid) scopedArrow
+    forM_ [(True, scopedArrow), (False, ancestorBound)] $ \(tree,initialArrow) -> do
+      arrowSolver <- right "prepare scoped arrow" (Solver.prepare initialArrow)
+      (copy,_,outside,expandedArrow) <- right "expand closed arrow"
+        (Solver.expandedGraphPrepared source (at 12) arrowSolver)
+      component <- case Solver.closedArrowComponent expandedArrow (at 22) (at 10) copy (at 12) of
+        T.Just nodes -> pure nodes
+        T.Nothing -> fail "closed arrow projection rejected an endpoint with external parents"
+      let arrowFresh = Solver.allocatedNodes (at 22) (Graph.nextId expandedArrow) (Graph.nodes expandedArrow)
+      rawArrow <- right "raw closed-arrow unification" (Graph.unify (outside ++ [(copy,at 12)]) expandedArrow)
+      case Solver.graftClosedArrowTree arrowSolver expandedArrow arrowFresh (at 10) copy (at 12) component of
+        T.Nothing -> check "direct graft requires immediate binders" False tree
+        T.Just grafted -> do
+          check "direct graft requires immediate binders" True tree
+          checked <- right "finish direct closed-arrow graft" (Solver.finish grafted)
+          check "direct graft preserves the complete raw graph" True (same rawArrow checked)
+      (_,cache) <- right "solve closed-arrow unification"
+        (Solver.instantiateExpandedWith Solver.emptyUnificationCache source (at 12) arrowSolver)
+      (cached,_) <- right "repeat closed-arrow unification" (Solver.instantiateExpandedWith cache source (at 12) arrowSolver)
+      restored <- right "finish closed-arrow unification" (Solver.finish cached)
+      check "closed-arrow unification preserves external parents and hidden scope roots" True
+        (same rawArrow restored)
+    forM_ [(side,tag,flag) | side <- [False,True], tag <- [T.GBot,T.GBotK T.Star],
+            flag <- [T.Flexible,T.Rigid]] $ \(swap,tag,flag) -> do
+      let shape = if swap then T.GArr 5 4 else T.GArr 4 5
+          arrow = Graph.setNode (at 3) (node shape (Just 2) T.Flexible)
+            (Graph.setNode (at 4) (node tag (Just 3) flag) scopedArrow)
+          target = at 12
+          endpoint = if swap then at 14 else at 13
+      initial <- right "prepare arrow with a direct bottom" (Solver.prepare arrow)
+      (copy,_,frontier,expanded) <- right "expand direct bottom" (Solver.expandedGraphPrepared source target initial)
+      expected <- right "unify direct bottom" (Graph.unify (frontier ++ [(copy,target)]) expanded)
+      solved <- right "solve generated arrow with a direct bottom"
+        (Solver.solveGenerated arrow [] [T.Instantiate (T.Edge source target)])
+      actual <- right "validate the direct bottom quotient" (Solver.finish solved)
+      let retained = Graph.nodeAt actual endpoint
+      check "direct bottom keeps the older GBot tag and merged flag" True
+        (Graph.equalTag T.GBot (Graph.tag retained) && Graph.equalFlag flag (Graph.flag retained))
+      check "direct bottom preserves the complete reference quotient" True (same expected actual)
+  forM_ [0,-55] $ \base -> do
+    let root = base + 82
+        entries = [(base, T.Node (T.GGen root) T.Nothing T.Flexible),
+                   (base+1, T.Node (T.GCon "Wide" [base+2..base+81]) (T.Just base) T.Flexible)] ++
+          [(n,T.Node T.GBot (T.Just base) T.Flexible) | n <- [base+2..root]]
+        initialGraph = Graph.mkGraph (IntMap.fromList entries)
+          (IntMap.fromList [(base+90,base+2)]) (base+91)
+        equations = [(base+90,base+81),(base+79,base+3)]
+    initial <- right "prepare dense component" (Solver.prepare initialGraph)
+    raw <- right "raw dense-component unification" (Graph.unify equations initialGraph)
+    solved <- right "solve dense component with a hidden scope root" (Solver.unify equations initial)
+    restored <- right "finish dense component" (Solver.finish solved)
+    check "the dense projection preserves signed identities and an outside scope root" True
+      (same raw restored)
+
+integerReductionChecks :: IO ()
+integerReductionChecks = do
+  let base = T.XName 1 "base"
+      callback = T.XName 2 "callback"
+      worker = T.XName 3 "worker"
+      supplied = T.XName 4 "supplied"
+      add a b = T.XEApp (T.XEApp (T.XEPrimitive T.PAddInt) a) b
+      leaf i n = let arg = T.XName i "arg" in
+        T.XELet arg (add (T.XEVar base) (T.XEInt n)) (T.XEApp (T.XEVar callback) (T.XEVar arg))
+      term values = T.XELet worker (T.XEAbs base (T.XEAbs callback (foldr1 add (zipWith leaf [10..] values))))
+        (T.XEAbs supplied (T.XEApp (T.XEApp (T.XEVar worker) (T.XEInt 91)) (T.XEVar supplied)))
+  forM_ [(True,[8,6..(-6)]), (False,[0..6]), (False,[0,1,2,3,4,5,6,9]),
+         (False,[4611686018427387897..4611686018427387904])] $ \(loop,values) ->
+    case Codegen.generate M.empty (term values) of
+      T.Left why -> fail (H.unpack why)
+      T.Right (_,chunks) -> do
+        let ir = unlines (map H.unpack chunks)
+        check "integer reductions require alpha-equivalent leaves and a compact progression" loop
+          ("br label %sum.loop." `isInfixOf` ir)
+        check "immediately entered application cells call the runtime force routine" True
+          ("call ptr @mlf_force(ptr %" `isInfixOf` ir)
+  let boxedLeaf i (tag,n) =
+        let field = T.XName i "field"
+        in T.XECase (T.XEVar base) [T.XErasedAlternative (T.XConstructorPattern tag [T.Just field])
+             (T.XEApp (T.XEVar callback) (add (T.XEVar field) (T.XEInt n)))]
+      boxedTerm tags = T.XELet worker
+        (T.XEAbs base (T.XEAbs callback (foldr1 add (zipWith boxedLeaf [10..] (zip tags [0..])))))
+        (T.XEAbs supplied (T.XEApp
+          (T.XEApp (T.XEVar worker) (T.XEApp (T.XEConstructor "Box") (T.XEInt 91)))
+          (T.XEVar supplied)))
+      constructors = M.fromList H.v_compareString [("Box",(0,1)),("Other",(1,1))]
+  forM_ [(True,replicate 8 "Box"),(False,"Other":replicate 7 "Box")] $ \(loop,tags) ->
+    case Codegen.generate constructors (boxedTerm tags) of
+      T.Left why -> fail (H.unpack why)
+      T.Right (_,chunks) ->
+        check "integer reductions share cases only when their patterns agree" loop
+          ("br label %sum.loop." `isInfixOf` unlines (map H.unpack chunks))
 
 rebindingAncestors = do
   let bot parent = T.Node T.GBot parent T.Flexible
@@ -257,6 +900,11 @@ candidateSkeletonChecks = do
         T.FBinding _ a b _ -> wanted active a ++ wanted active b
         T.FLambda _ _ b _ -> wanted active b
         T.FApply a b _ _ -> wanted active a ++ wanted active b
+        T.FApplyPrimitive _ _ arguments -> concatMap (\operand -> case operand of
+          T.PrimitiveUse argument _ -> wanted active argument
+          T.ClosedPrimitiveForm nested -> walk active nested) arguments
+        T.FPrimitiveStringConversion _ _ _ argument _ _ -> wanted active argument
+        T.FApplyVariable _ _ argument _ -> wanted active argument
         _ -> []
       file = C.SharedEnvironments IntMap.empty
       rep = replicate 64 request
@@ -524,30 +1172,16 @@ queryChecks = do
       other = H.literal (replicate 64 '2')
       node k reads = Q.QueryNode k sha reads T.Nothing
       table ns = M.fromList H.v_compareString [(Q.nodeKey n,n) | n <- ns]
-      admitted ns = case W.planGraph W.defaultLimits [W.VNode 411
-        [W.VText "MLF-CRATE-QUERY-GRAPH-1",W.VText "cfg",W.VNode 1 (map Q.encodeNode ns)]] of
-        T.Left err -> error (H.unpack err)
-        T.Right graph -> Q.admitIndex "cfg" graph
       result (T.Left err) = Left (H.unpack err)
       result (T.Right _) = Right ()
-      order ns = case admitted ns of
-        T.Left err -> error (H.unpack err)
-        T.Right (_,canonical) -> canonical
       a = node "a" []
       shared = [("a",sha),("a",sha)]
       b = node "b" shared
       c = node "c" shared
-  check "ordered v1 input needs a v2 publication" False (order [a,b,c])
-  check "unordered index still admitted" False (order [c,a,b])
   check "read multiplicity" False (Q.sameNode b (node "b" [("a",sha)]))
   check "read order" False (Q.sameNode (node "c" [("a",sha),("b",sha)])
                                        (node "c" [("b",sha),("a",sha)]))
   check "payload location" False (Q.sameNode a (Q.QueryNode "a" sha [] (T.Just sha)))
-  forM_ [([a,node "b" [("a",other)]], "query publication has stale dependency version"),
-         ([a,node "b" [("missing",sha)]], "unpublished query dependency"),
-         ([node "a" [("b",sha)],node "b" [("a",sha)]], "cyclic query graph"),
-         ([a,node "b" [("a","bad")]], "invalid query graph digest")] $ \(ns,err) ->
-    check err (Left err) (result (admitted ns))
   let stable (Q.QueryNode k h edges location) = Q.QueryNode (Q.key "Binding" k) h
         [(Q.key "Binding" target, digest) | (target,digest) <- edges] location
       generation previous ns = do
@@ -557,21 +1191,22 @@ queryChecks = do
           T.Right T.Nothing -> Right False
           T.Right (T.Just _) -> Right True
   check "matching admitted generation" (Right False) =<< generation sha [a,b,c]
-  check "normalize unordered input on publish" (Right True) =<< generation "" [a,b,c]
+  check "publish a fresh generation" (Right True) =<< generation "" [a,b,c]
   check "changed reads, same value hash" (Right True) =<< generation sha [a,node "b" [],c]
   check "reject stale reads in edited generation" (Left "query publication has stale dependency version")
     =<< generation sha [a,node "b" [("a",other)],c]
   -- Both generations describe A.f, although its declaration slot changes
   -- when A.a is added. Edges refer to the producer generation's digest.
   let l = W.VNode 1
-      absent = W.VNode 4 []
-      row desc h reads = W.VNode 413 [desc,W.VText h,l reads,absent]
+      row desc h reads = (desc,W.VText h,reads)
       binding = W.VInt
       query tag i = W.VNode tag [W.VInt i]
       group = l . map binding
       snapshot names groups requests types rows = W.VNode 412
-        [W.VText "MLF-CRATE-QUERY-GRAPH-2",W.VText "cfg",l (map W.VText names),l groups,
-         l requests,l (map W.VText types),l rows]
+        [W.VText "MLF-CRATE-QUERY-GRAPH-3",W.VText "cfg",l (map W.VText names),l groups,
+         l requests,l (map W.VText types),l [k | (k,_,_) <- rows],l [h | (_,h,_) <- rows],
+         l [W.VInt (fromIntegral (length edges)) | (_,_,edges) <- rows],
+         l (concat [edges | (_,_,edges) <- rows]),l []]
       admit value = case W.planGraph W.defaultLimits [value] of
         T.Left err -> error (H.unpack err)
         T.Right graph -> Q.admitIndex "cfg" graph
@@ -632,7 +1267,7 @@ queryChecks = do
       input = Q.inputKey "root"
       links i = if i == size-1 then [(input,sha)] else [(query (i+1),sha), (query (i+1),sha)]
       queries = [node (query i) (links i) | i <- [0..size-1]]
-      session old active = Q.Session "" "" "" (table old) (table active) M.empty
+      session old active = Q.Session Q.MemoryStore "" "" (table old) (table active) M.empty
       validate old active = Q.validate (query 0) (session old active)
       reused (answer,stable) = (case answer of { T.Just _ -> True; T.Nothing -> False },
                                 M.size (Q.currentNodes stable))
@@ -1003,7 +1638,7 @@ resolverChecks = do
           ("Inst","module Inst () where\nimport Inspect\ninstance Inspect Int where { inspect = \\x -> true }\n"),
           ("A","module A (f) where\nimport Inspect\n" ++ imports ++ "f :: Bool\nf = inspect (1 :: Int)\n"),
           ("Main","module Main where\nimport A\nimport Inst ()\nmain = f\n")]
-        pure (Compiler.compileLinked T.NoImplicitPrelude (primitive:modules))
+        Compiler.compileLinked T.NoImplicitPrelude (primitive:modules)
   visible <- runScoped "import Inst ()\n"
   case visible of
     T.Right _ -> pure (); T.Left e -> error ("defining module lost its instance: " ++ H.unpack (Compiler.prettyError e))
@@ -1541,6 +2176,20 @@ signedConstructorChecks = do
     (T.Left a, T.Left b) -> check "constructor operand diagnostic" (H.unpack b) (H.unpack a)
     _ -> fail "invalid signed constructor operand admitted"
 
+liveDeclarationSpineChecks = do
+  let dependency = T.XName 1 "dependency"
+      first = T.XName 2 "first"
+      second = T.XName 3 "second"
+      definitions = [(first, T.XEVar second), (second, T.XEVar dependency)]
+      linked entry = T.XELet dependency (T.XEInt 42) (T.XELetRec definitions entry)
+      trim = fst . Optimize.liveDeclarationSpine
+      unit = T.XEConstructor "()"
+      entry = linked (T.XEVar first)
+  check "dead recursive groups release their outer dependencies" True
+    (X.equalErased unit (trim (linked unit)))
+  check "a reachable recursive group retains its outer dependencies" True
+    (X.equalErased entry (trim entry))
+
 -- Passing a function as a value prevents all calls to that binder from
 -- being saturated calls on the same outer arguments. A pipeline of such
 -- callbacks should queue each substitution and materialize the spine once.
@@ -1688,6 +2337,116 @@ lambdaCaptureChecks = do
   check "all deep callback bodies retain a lexical summary" depth (M.size table)
   check "deep lambda captures only the external name" [99999]
     (case chain of T.XEAbs n b -> ids (Analysis.lambdaNeeded M.empty table n b); _ -> [])
+
+letEntryChecks = do
+  let name i = T.XName i "same"
+      var = T.XEVar . name
+      prim p args = foldl T.XEApp (T.XEPrimitive p) args
+      bind i = T.XELet (name i)
+      pair a b = prim T.PAddInt [a,b]
+      divide a b = prim T.PQuotInt [a,b]
+      worker = Analysis.WorkerFunction [name 7] (var 7) [name 2] S.empty
+        (Analysis.EntryDemand [name 2,name 7] False)
+      workers = M.singleton (name 99) worker
+      rhs = [var 1,var 2,pair (var 4) (var 1),divide (var 1) (var 3),
+             T.XEApp (var 99) (var 1),T.XEAbs (name 1) (var 1)]
+      ends = [pair (var 1) (pair (var 2) (var 4)),pair (var 2) (var 1),
+              T.XEApp (var 99) (var 1),T.XEApp (var 11) (var 2),
+              T.XECase (var 1) [T.XErasedAlternative (T.XDefaultPattern (T.Just (name 2))) (var 2)],
+              T.XECase (var 2) [],T.XELetRec [(name 1,var 1)] (var 1)]
+      prefix d = (map Optimize.nameId (Analysis.demandNames d), Analysis.demandComplete d)
+      verify term (Analysis.LetDemands entry rest) = do
+        check "lexical let summary preserves first-force order and barriers"
+          (prefix (Analysis.entryDemand workers M.empty term)) (prefix entry)
+        case (term,rest) of
+          (T.XELet _ _ body,T.Just next) -> verify body next
+          (T.XELet _ _ _,_) -> fail "missing lexical let suffix"
+          (_,T.Nothing) -> pure ()
+          _ -> fail "unexpected lexical let suffix"
+  forM_ [bind 1 a (bind inner b end) | a <- rhs, b <- rhs, inner <- [1,2,99], end <- ends] $
+    \term -> verify term (Analysis.letBodyDemands workers term)
+
+recursiveArgumentChecks = do
+  env <- case Data.validateDeclarations [] of
+    T.Right ok -> pure ok
+    T.Left why -> fail (H.unpack why)
+  let name i = T.XName i "same"
+      var = T.XEVar . name
+      call = foldl T.XEApp
+      choose a b = call (T.XEPrimitive T.PIfThenElse) [T.XEBool True,a,b]
+      first = [10..25]
+      second = [30..45]
+      binding f args body = (name f,foldr (T.XEAbs . name) body args)
+      group passed enter =
+        T.XELetRec [binding 1 first (call (var 2) passed),
+                    binding 2 second (choose (call (T.XEPrimitive T.PSubInt) [var 45,var 30])
+                                             (call (var 1) (map var second)))] enter
+      external = call (var 1) (replicate 16 (var 3))
+      run t = Runtime.integer (Runtime.evaluate env (Runtime.REnv M.empty)
+                    (T.XELet (name 3) (T.XEInt 7) (T.XELet (name 4) (T.XEInt 11) t)))
+      widths (T.XELetRec bindings _) = map (length . fst . Optimize.lambdas . snd) bindings
+      widths _ = []
+  forM_ [(map var first,external,1,0),
+         (map var (init first) ++ [var 4],external,2,4),
+         (map var first,choose external (call (var 2) (replicate 15 (var 3) ++ [var 4])),2,0),
+         (map var first,T.XELet (name 5) (var 2) external,16,0),
+         (map var first,T.XELet (name 5) (call (var 2) [var 3]) external,16,0)] $
+    \(passed,entry,width,expected) -> do
+      let original = group passed entry
+          optimized = Optimize.compactRecursiveArguments original
+      check "recursive arguments respect partial uses and every incoming edge" [width,width] (widths optimized)
+      forM_ [original,optimized] $ \term -> case run term of
+        T.Right value -> check "recursive argument forwarding preserves both values" expected value
+        T.Left why -> fail (H.unpack why)
+
+  -- Each reachable entry passes sixteen distinct variables. Every peer
+  -- retains all its arguments, regardless of the number of unrelated groups.
+  let many = foldr independent (T.XEInt 0) [1..512]
+      independent i rest =
+        let base = 100*i
+            worker f peer args = binding f args (call (var peer) (map var args))
+        in T.XELetRec [worker base (base+1) [base+10..base+25],
+                       worker (base+1) base [base+30..base+45]]
+           (T.XELet (name (base+2)) (call (var base) (map var [-16..(-1)])) rest)
+  check "independent uncompressible groups retain all uses" True
+    (X.equalErased many (Optimize.compactRecursiveArguments many))
+  -- Compacting the nested group makes its call into the outer group uniform.
+  let inner = T.XELetRec [binding 60 [70..85] (call (var 1) (map var [70..85])),
+                          binding 61 [90..105] (call (var 60) (map var [90..105]))]
+                         (call (var 61) (replicate 16 (var 3)))
+      nested = Optimize.compactRecursiveArguments (group (map var first) inner)
+  case nested of
+    T.XELetRec _ (T.XELetRec ((_,rhs):_) _) -> do
+      check "outer argument analysis sees rewritten inner formals" [1,1] (widths nested)
+      check "a nested call applies the outer mask exactly once" 1
+        (length (snd (Optimize.applications (snd (Optimize.lambdas rhs)))))
+    _ -> fail "expected two nested recursive groups"
+
+conditionalConstructorChecks = do
+  let name = T.XName 17 "flag"
+      cond = T.XEVar name
+      choose a b = foldl T.XEApp (T.XEPrimitive T.PIfThenElse) [cond,a,b]
+      tree = Optimize.indexUses (choose (T.XEConstructor "A") (T.XEConstructor "B"))
+      branches = [(T.XConstructorPattern n [],Optimize.indexUses (T.XEInt i)) | (n,i) <- [("A",1),("B",2)]]
+  case Optimize.selectConditionalConstructors tree branches of
+    T.Just folded -> check "indexed constructor arms preserve the runtime condition" True
+      (X.equalErased (Optimize.useTerm folded) (choose (T.XEInt 1) (T.XEInt 2)))
+    _ -> fail "conditional constructor fold missed production use indexing"
+
+longDemandChainChecks = do
+  let n = 4000
+      frames = [Demand.Frame 0 T.Nothing 3,Demand.Frame 1 (T.Just 0) 2,Demand.Frame 2 (T.Just 1) 1]
+      uses = [Demand.Use 100 2 1,Demand.Use 101 2 1]
+      right (T.Right value) = pure value
+      right (T.Left message) = fail (H.unpack message)
+  forM_ [id,(n-)] $ \key -> do
+    let nodes = IntMap.fromList $ (key 0,Demand.SeedNode 10):
+          [(key i,Demand.RefNode (key (i-1))) | i <- [1..n]] ++
+          [(n+1,Demand.InstantiateNode 100 (key n)),(n+2,Demand.InstantiateNode 101 (key n))]
+    plan <- right (Demand.solve frames [Demand.Seed 10 "Inspect" 2] uses nodes)
+    check "two real copies survive dense alias discovery" 3 (Demand.universeSize plan)
+    forM_ [0..n] $ \i -> right (Demand.slotsAt plan (key i)) >>= check "forwarded seed" [0]
+    forM_ [1,2] $ \i -> right (Demand.slotsAt plan (n+i)) >>= check "distinct copy slot" [i]
 
 -- Both arms call the previous layer with their own lambda parameters.
 -- Duplicating that captured function at each use unfolds a linear graph into
@@ -2023,9 +2782,40 @@ factoredCallChecks = do
     T.Nothing -> pure ()
     _ -> fail "different counts were factored"
 
+checkedOpenProofGeometryChecks :: IO ()
+checkedOpenProofGeometryChecks = do
+  let checked (T.Left message) = fail (H.unpack message)
+      checked (T.Right value) = pure value
+      x = T.XTyVar 0
+      y = T.XTyVar 1
+      outer = T.XTyVar 2
+      seed = T.XName 5 "seed"
+      int = T.XCon "Int" []
+      scheme = T.XForall x T.XBot (T.XForall y T.XBot (T.XArrow (T.XVar x) (T.XVar y)))
+      arg ty = T.XThen (T.XInner (T.XBottom ty)) T.XElim
+      proof = T.XThen (arg int) (arg (T.XVar outer))
+      body = T.XTypeApp (T.XVarTerm seed) proof
+      term count = T.XLet (T.XName 6 "owner") (T.XTypeAbs outer T.XBot
+        (foldr (\i rhs -> T.XAbs (T.XName (10+i) "ignored") int rhs) body [1..count]))
+        (T.XConstructor "()" [])
+      bytes fragment = W.encode W.defaultLimits 8 [Open.bodyValue fragment] >>= checked >>= Prim.byteArrayDigest
+  env <- checked (Open.environment [])
+  forM_ [0,260] $ \count -> do
+    fragment <- checked (Open.check env [(seed,scheme)] (term count))
+    check "mixed-height proof crosses only the local traversal depth boundary" (if count == 0 then [True] else [])
+      (case Source.finalCheckedTreeGeometry 256 (Open.body fragment) of T.Just v -> [v]; T.Nothing -> [])
+    expected <- checked (Source.canonicalOpenPlanned fragment)
+    actual <- checked (Source.canonicalCheckedOpen fragment)
+    expectedBytes <- bytes expected
+    actualBytes <- bytes actual
+    check "checked open proof keeps canonical bytes" (H.unpack expectedBytes) (H.unpack actualBytes)
+    check "checked open proof keeps its logical fingerprint"
+      (H.unpack (Open.fingerprint expected)) (H.unpack (Open.fingerprint actual))
+
 -- A checked open fragment with no composable proofs can retain its
 -- original body up to the absolute wire depth and work limits.
 openGeometryChecks = do
+  checkedOpenProofGeometryChecks
   let depth = W.maxDepth W.defaultLimits
       wrap count t = foldr (\_ child -> W.VNode 8 [child]) t [1..count]
       normal = W.VInt 0
@@ -2254,6 +3044,15 @@ loweringChecks = do
     check "surface-core admission" eligible (Surface.surfaceCore e)
     check "surface lowering agrees with the fresh-name traversal" (result (ordinary e))
       (result (Surface.lowerExpressionWithData env e))
+
+  let patterns = [T.SAsPattern "first" (T.SIntPattern 7), T.SLazyPattern bind]
+      row = Surface.MatchRow patterns (T.SVar "result") 3
+  case Fresh.runFresh [] (Surface.normalizeRow env [T.SVar "left",T.SVar "right"] row) of
+    T.Right (Surface.MatchRow [T.SIntPattern 7,T.SDefaultPattern T.Nothing] body 3) ->
+      check "row binders keep their column values and left-to-right wrapping order"
+        (result (T.Right (T.SLet "x" (T.SVar "right")
+          (T.SLet "first" (T.SVar "left") (T.SVar "result"))))) (result (T.Right body))
+    _ -> fail "row normalization changed the pattern columns"
 
 lexicalRunChecks = do
   let cursor (Lexer.Cursor i l c) = (i,l,c)
@@ -2708,6 +3507,39 @@ applicationPatternChecks = do
   tooSmall <- encoded (W.encodeRootsWithAtoms Structure.termAtomShapes W.defaultLimits 29 8 testRoots)
   check "repeated atoms and root references consume exact expanded work"
     (Left "binary expanded-work limit exceeded") tooSmall
+  let indexedLimits = W.IndexedText (W.Limits 1024 8 32 64 12 12 8 5)
+      shortIndexedLimits = W.IndexedText (W.Limits 1024 8 32 64 12 12 8 4)
+      smallSymbolLimits = W.IndexedText (W.Limits 1024 8 5 64 12 12 8 5)
+      indexedLeaf = W.VNode 1 [W.VText "shared name"]
+      indexedRoot = W.VNode 2 [indexedLeaf, indexedLeaf]
+  indexed <- W.encode indexedLimits 8 [indexedRoot]
+  case indexed of
+    T.Left why -> fail (H.unpack why)
+    T.Right bytes -> do
+      ordinary <- encoded (W.encode W.defaultLimits 8 [indexedRoot])
+      actual <- encoded (pure (T.Right bytes))
+      check "indexed text preserves the canonical wire bytes" ordinary actual
+      graph <- W.decodeGraph indexedLimits 8 bytes
+      opened <- case graph of
+        T.Left why -> fail (H.unpack why)
+        T.Right value -> pure value
+      case W.graphRoots opened of
+        [root] -> case W.lookupGraphNode opened root of
+          T.Right (W.GNode 2 [a, b]) -> check "indexed text retains one child index" a b
+          _ -> fail "invalid indexed text test node"
+        _ -> fail "invalid indexed text test roots"
+      let work answer = case answer of
+            T.Left why -> Left (H.unpack why)
+            T.Right value -> Right value
+      check "indexed text admits by node visits" (Right 5) (work (W.graphAdmittedWork opened))
+      check "expanded statistics still cover repeated text" (Right 27) (work (W.graphExpandedWork opened))
+      expanded <- W.decode indexedLimits 8 bytes
+      check "generic expansion charges text per occurrence" (Left "binary expanded-work limit exceeded")
+        (case expanded of T.Left why -> Left (H.unpack why); T.Right _ -> Right ())
+  rejectedNodes <- encoded (W.encode shortIndexedLimits 8 [indexedRoot])
+  check "indexed text still bounds expanded node visits" (Left "binary expanded-work limit exceeded") rejectedNodes
+  rejectedText <- encoded (W.encode smallSymbolLimits 8 [indexedRoot])
+  check "indexed text still bounds physical symbol bytes" (Left "binary symbol byte limit exceeded") rejectedText
   let underDepth = W.Limits 1024 8 32 64 12 12 1 8
       underWork = W.Limits 1024 8 32 64 12 12 8 3
       defer = error "forced a field after its limiting failure"
@@ -2956,6 +3788,15 @@ applicationPatternChecks = do
   (oldTag,oldBody) <- payload plainQuery
   (newTag,newBody) <- payload compactQuery
   check "versioned private query body" (400,442) (oldTag,newTag)
+  let digest encode = W.encode W.indexedTextLimits 6 [wireRaw encode] >>= right >>= Prim.byteArrayDigest
+      verify saved = CrateGraph.finishContentHash True "checked" Source.KeepRawBody checkedSpine
+        (Q.QueryNode "raw" saved [] (T.Just saved)) [] []
+  current <- digest Open.encodeCheckedRaw
+  previous <- digest Open.encodeRaw
+  actual <- verify current >>= right
+  check "ICH reproduces the current checked query payload" (H.unpack current) (H.unpack actual)
+  stale <- verify previous
+  unless (rejected stale) (fail "ICH accepted a pre-spine hash for a current checked query")
   oldTerm <- right (Structure.fromGraphXTerm plainQuery oldBody)
   newTerm <- right (Structure.storedTermWith True True compactQuery newBody)
   oldBytes <- encoded (W.encode W.defaultLimits 6 [Structure.toXTerm oldTerm])
@@ -3133,6 +3974,36 @@ evidenceScopeChecks = do
           check "lexical overlay agrees with complete ordered proof environment"
             (observe (Evidence.resolveDictionaryDetailed ds gamma (locals ++ globals) goal))
             (observe (resolve locals goal))
+  let decl i = T.DeclRef (V.fromInt i) "printed hint"
+      row r i = (r, decl i)
+      declared = [row T.InstanceEvidence 11, row T.InstanceEvidence 12]
+      root = M.fromList Std.compareInt
+        [(11, Inference.GroundImport (visible 1) (score int)),
+         (12, Inference.GroundImport (visible 2) (score bool)),
+         (13, Inference.GroundLocal (visible 3) (Inference.GroundVar 0))]
+      prepared rows =
+        case Inference.groundModuleContext ds root (T.SWantedScope "Score" (T.CandidateEnvironment 7 rows)) of
+          Inference.GroundModuleContext _ _ _ select -> select
+          _ -> error "expected a prepared ground context"
+      local = [(T.GivenEvidence, visible 10, score int)]
+      bindings = [instanceOf 1 (score int), instanceOf 2 (score bool)]
+  case prepared declared [(r,T.DeclRef i "different spelling") | (r,T.DeclRef i _) <- declared] of
+    T.Just resolve ->
+      forM_ [[],local] $ \givens -> forM_ [M.empty,M.singleton variable a] $ \gamma ->
+        forM_ [score int,score bool,base bool] $ \goal ->
+          check "ground imports preserve checked proofs and diagnostics"
+            (observe (Evidence.scopedResolver ds bindings gamma givens goal))
+            (observe (resolve gamma givens goal))
+    T.Nothing -> fail "the ordered declaration identities were not recognized"
+  forM_ [(declared,reverse declared),(declared,take 1 declared),(declared,declared++take 1 declared),
+         (declared,row T.GivenEvidence 11:tail declared)] $ \(original,other) ->
+    case prepared original other of
+      T.Nothing -> pure ()
+      _ -> fail "the resolver accepted a different candidate sequence"
+  forM_ [[row T.InstanceEvidence 13],[row T.InstanceEvidence 99],[(T.InstanceEvidence,T.LexicalRef "local")]] $ \rows ->
+    case prepared rows rows of
+      T.Nothing -> pure ()
+      _ -> fail "a local or absent declaration acquired a static ground resolver"
   let param i = T.EvidenceBinding T.GivenEvidence (visible i) i False
       moduleEnv = T.ResolvedCandidateEnvironment 47 []
       request g = T.Typed g (T.FScopedEvidence moduleEnv)
@@ -3178,7 +4049,220 @@ evidenceScopeChecks = do
          T.DeclaredEvidenceBinding T.InstanceEvidence (T.XName 4 "first") (score int)] $ \other ->
     check "different graph authorities keep separate resolvers" False (Elaborate.sameGraphCandidate source other)
 
+fileImportPrefixChecks = do
+  let a = T.XTyVar 83
+      identity = T.XForall a T.XBot (T.XArrow (T.XVar a) (T.XVar a))
+      slot = V.fromInt
+      imports = [(slot 9,"aa",identity), (slot 4,"bb",T.XCon "Bool" [])]
+      members = [(slot 30,("entry",T.Nothing,
+                  T.SLam "x" T.Nothing (T.SApp (T.SGlobal (slot 9) "aa") (T.SVar "x"))))]
+      checked (T.Left message) = fail (H.unpack message)
+      checked (T.Right value) = pure value
+      rejected (T.Left _) = True
+      rejected _ = False
+  (_,lowered) <- checked (Inference.prepareIndexedGroup imports [] members)
+  (declarations,slots,definitions,body,names) <- case lowered of
+    (T.SProgram ds (T.SDeclScope ss (T.SLetRec rows inner)), resolved) ->
+      pure (ds,ss,rows,inner,resolved)
+    _ -> fail "expected a lowered declaration import prefix"
+  let rebuild ids rows = (T.SProgram declarations (T.SDeclScope ids (T.SLetRec rows body)),names)
+      alter change = case definitions of
+        (key,mode,rhs):rest -> (key,mode,change rhs):rest
+        [] -> error "missing imported declaration"
+      wrongMarker (T.SChecked ty _) =
+        T.SChecked ty (T.SApp (T.SPrimitive T.PPanic) (T.SStringLit "user panic"))
+      wrongMarker _ = error "missing generated annotation"
+  selected <- checked (ImportedRoot.fileImports imports lowered)
+  (_,parameters,actual) <- checked (ImportedRoot.finishFileImports selected lowered)
+  check "direct file import retains exactly the supplied parameters" (length imports) (length parameters)
+  check "direct file import preserves an unused parameter in its original slot"
+    [("aa",True),("bb",True)] [(H.unpack (X.nameHint n),XT.alphaEq ty expected) |
+      ((n,ty),(_,_,expected)) <- zip parameters imports]
+  env <- checked (Open.environment [])
+  fragment <- checked (Open.check env parameters actual)
+  _ <- checked (Independent.checkClosed (Open.closedTerm fragment))
+  forM_ [("swapped slots",rebuild (reverse slots) definitions),
+         ("swapped names",rebuild slots (reverse definitions)),
+         ("arbitrary right-hand side",rebuild slots (alter (const (T.SIntLit 0)))),
+         ("different panic",rebuild slots (alter wrongMarker))] $ \(label,source) ->
+    check ("file import rejects "++label) True (rejected (ImportedRoot.fileImports imports source))
+  forged <- checked (ImportedRoot.fileImports [(slot 9,"aa",T.XCon "Int" []),last imports] lowered)
+  case ImportedRoot.finishFileImports forged lowered of
+    T.Left why -> check "file import checks each solved declared type"
+      "Verification: direct import declaration changed its contract: aa" (H.unpack why)
+    T.Right _ -> fail "file import accepted a mismatched checked target contract"
+
+declarationStampInventory = do
+  let right e = case e of {T.Left message -> fail (H.unpack message); T.Right result -> pure result}
+      decl = T.DataDeclK "IndexedΔ" [("originalλ",T.Star)] [T.ConstructorDecl "Wrapλ" [T.Parameter "originalλ"]]
+      canonical = T.DataDeclK "IndexedΔ" [("type:0",T.Star)] [T.ConstructorDecl "Wrapλ" [T.Parameter "type:0"]]
+      other = T.DataDeclK "Solo" [] [T.ConstructorDecl "One" []]
+      rows = [([decl,other],[canonical,other]),([decl,other],[canonical,other]),
+              ([other,decl],[other,canonical]),([other],[other]),([],[]),([decl,other],[canonical,other])]
+      mk (k,(original,expected)) = do
+        env <- right (Open.environment original)
+        let hint = H.literal ("binderΔ😀_"++show k)
+            name = T.XName (10+k) hint
+            rhs = T.XLet name (T.XIntTerm (3+k)) (T.XConstructor "()" [])
+            frame = Separate.pack [Separate.pack (map Data.prettyDeclaration expected),
+              Separate.pack [], Pretty.prettyTerm rhs, Separate.pack [Separate.pack [hint,"Int"]]]
+        f <- right (Open.check env [] rhs)
+        let target = H.unpack (Separate.fingerprint frame)
+        check "producer stamp matches independent complete framed bytes" target (H.unpack (Open.fingerprint f))
+        pure ((H.literal ("group"++show k),f),target)
+  settled <- mapM mk (zip [0..] rows)
+  let fragments = map fst settled
+      available = M.fromList H.v_compareString [(X.nameHint name,ty) | (_,frag) <- fragments, (name,ty) <- Open.bindings frag]
+      decls = M.fromList H.v_compareString [(Data.datatypeName v,v) | v <- [decl,other]]
+  package <- Open.makePackage "checksum-probe" "declarations" fragments >>= right
+  checked <- Open.readPackage (Open.packageBytes package) (Open.packageHash package)
+    "checksum-probe" "declarations" available decls >>= right
+  check "restored stamps preserve varied declaration order and individual owned fields" (map snd settled)
+    (map (H.unpack . Open.fingerprint . snd) (Open.packageFragments checked))
+
+checkedProjectionSpines = do
+  let first = T.XName 0 "first"
+      chosen = T.XName 1 "chosen"
+      lastArg = T.XName 2 "last"
+      callee = T.XName 3 "choose"
+      rows = [(first,T.XTyVar 0,T.Just (T.XTyVar 3)),
+              (chosen,T.XTyVar 1,T.Just (T.XTyVar 4)),
+              (lastArg,T.XTyVar 2,T.Nothing)]
+      operands = [("Int",True,T.XIntTerm 7),
+                  ("Bool",True,T.XBoolTerm True),
+                  ("Int",False,T.XIntTerm 12)]
+      projection = T.XProjection rows chosen
+      invoke = T.XInstantiationSpine callee operands
+      packed = T.XLet callee projection invoke
+      expanded = T.XLet callee (X.expandProjection rows chosen)
+                   (X.expandInstantiationSpine callee operands)
+      result checkTerm = case checkTerm of
+        T.Right ty -> Right (H.unpack (Pretty.prettyType ty))
+        T.Left message -> Left (H.unpack message)
+      require value = case value of
+        T.Right actual -> pure actual
+        T.Left message -> fail (H.unpack message)
+  check "packed projection call checks as Bool"
+    (Right "Bool") (result (XCheck.checkClosed packed))
+  check "expanded reference checker agrees with packed projection"
+    (result (Independent.infer Independent.emptyEnv expanded)) (result (XCheck.checkClosed packed))
+  check "packed call prints canonical type computations" (H.unpack (Pretty.prettyTerm expanded))
+    (H.unpack (Prim.concatStringList (Pretty.termChunks 0 packed [])))
+  env <- require (Open.environment [])
+  let terminal = T.XConstructor "()" []
+      owner = T.XName 4 "owner"
+  a <- require (Open.check env [] (T.XLet owner packed terminal))
+  b <- require (Open.check env [] (T.XLet owner expanded terminal))
+  check "expanded and packed projections have the same fingerprint"
+    (H.unpack (Open.fingerprint b)) (H.unpack (Open.fingerprint a))
+  decoded <- require (Structure.fromXTerm (Structure.toXTerm packed))
+  check "decoded projection retains its type" (Right "Bool") (result (XCheck.checkClosed decoded))
+  ty <- require (XCheck.checkClosed projection)
+  normal <- require (Fresh.runFresh [] (Separate.normalTypeIn M.empty ty))
+  check "projection normalization retains the canonical binder order" True
+    (Structure.sameEncodedXType normal (Separate.normalType ty))
+  decodedType <- require (Structure.fromXType (Structure.toStoredXType ty))
+  check "packed bounded type retains exact binder identities" True
+    (Structure.sameEncodedXType ty decodedType)
+  let invalid = T.XLet callee projection (T.XInstantiationSpine callee
+        (take 2 operands ++ [("Int",False,T.XBoolTerm False)]))
+  check "discarded operands still require type checking" (Left "application type mismatch")
+    (result (XCheck.checkClosed invalid))
+
+preparedPrefixControls = do
+  let span = T.SourceSpan "source" "Projection" "Projection.hs" 2 1 2 20
+      scope = CrateGraph.SourceOrigin id M.empty 0 M.empty 0
+      encode expression = case CrateGraph.simplePackedOrigin scope span 0 4096 expression "header" of
+        T.Just bytes -> H.unpack bytes
+        T.Nothing -> error "expected a simple prepared source"
+      selector a b chosen = T.SLam a T.Nothing (T.SLam b T.Nothing (T.SVar chosen))
+      left = T.SApp (T.SApp (T.SVar "pick") (T.SIntLit 2)) (T.SIntLit 3)
+      right = T.SApp (T.SVar "pick") (T.SApp (T.SIntLit 2) (T.SIntLit 3))
+  check "prepared projection uses lexical binder positions"
+    (encode (selector "first" "second" "first")) (encode (selector "x" "y" "x"))
+  check "prepared projection retains selected binder" False
+    (encode (selector "x" "y" "x") == encode (selector "x" "y" "y"))
+  check "prepared source retains application association" False (encode left == encode right)
+  check "prepared locations retain start and end coordinates" False
+    (encode (T.SCallSite "arg" span left) ==
+     encode (T.SCallSite "arg" (T.SourceSpan "source" "Projection" "Projection.hs" 2 1 2 21) left))
+
+reviewBoundaryChecks :: IO ()
+reviewBoundaryChecks = do
+  let entry i label action = Case.test i label ["group"] action
+      a = entry "first" "First" (Assert.succeed ())
+      b = entry "second" "Second" (Assert.succeed ())
+      bad label selected message = case Selection.project [a,b] selected of
+        T.Right _ -> fail label
+        T.Left errorText -> check label message (H.unpack errorText)
+  bad "duplicate selection" [a,a] "duplicate test ID"
+  bad "empty selection" [] "empty required test selection"
+  bad "unknown selection" [entry "unknown" "Unknown" (Assert.succeed ())] "unknown test ID"
+  bad "stale descriptor" [entry "second" "Changed" (Assert.succeed ())] "selected test descriptor changed"
+  case Selection.rebind [a,b] [entry "second" "Second" (Assert.fail "placeholder"),a] of
+    T.Left message -> fail (H.unpack message)
+    T.Right plan -> do
+      check "selection order" ["second","first"] (map (H.unpack . Case.id) (Selection.cases plan))
+      forM_ (Selection.cases plan) $ \c -> do
+        r <- Assert.run (Case.action c)
+        case r of { T.Right () -> pure (); T.Left _ -> fail "placeholder action escaped planning" }
+  let v = T.XName 7 "bound"
+      f = T.XName 9 "free"
+      body = T.XInstantiationSpine f [("Int",False,T.XVarTerm v)]
+      pattern = T.XDefaultPattern (T.Just v)
+      tree = T.XLet v (T.XVarTerm v) (T.XCase body T.XBot [T.XAlternative pattern body])
+  check "free spine head and shadowed operands" [7,9,9] (map X.nameId (Traversal.freeNames tree))
+  check "binder and operand occurrence order" [7,7,9,7,7,9,7] (map X.nameId (Traversal.names tree))
+  let name = "@mlf.worker.7"
+      policy = H.unpack . Policy.attributes False False False name
+      small = Policy.empty name
+      tailCall = Policy.markTail (iterate (Policy.pointerCall "@mlf_closure") small !! 3)
+  check "worker threshold below 64" "" (policy (iterate Policy.instruction small !! 63))
+  check "worker threshold at 64" " noinline optnone" (policy (iterate Policy.instruction small !! 64))
+  check "allocating musttail" " noinline optnone" (policy tailCall)
+  check "explicit loop" "" (policy (Policy.markLoop tailCall))
+  let largePolicy = H.unpack . Policy.attributes True False False name
+  check "ordinary boxed helpers in large modules retain their bodies" " noinline optnone" (largePolicy small)
+  check "a recursive worker in the same module stays optimizable" "" (largePolicy (Policy.markTail small))
+  check "boxed worker calls keep the closure out of the optimizer" " noinline optnone"
+    (H.unpack (Policy.attributes False False False "@mlf.code.x" (Policy.pointerCall name small)))
+
+-- The copied arrow shares a surviving grandchild. Its name is demanded by
+-- expansion, while a disconnected generalization can carry an unevaluated name.
+manualSurvivorDemand = do
+  let node tag parent = T.Node tag (T.Just parent) T.Flexible
+      base = [(0,T.Node (T.GGen 1) T.Nothing T.Flexible), (1,node (T.GCon "Int" []) 0),
+              (2,node (T.GGen 3) 0), (3,node (T.GArr 4 5) 2), (4,node (T.GArr 6 6) 3),
+              (5,node T.GBot 3), (7,node (T.GGen 8) 0), (8,node (T.GArr 9 10) 7),
+              (9,node T.GBot 8), (10,node T.GBot 8)]
+      name = errorWithoutStackTrace "surviving name demanded"
+      live = [(6,node (T.GArr 11 11) 4), (11,node (T.GCon name []) 6)]
+      unused = [(6,node T.GBot 4), (20,node (T.GGen 21) 0), (21,node (T.GCon name []) 20)]
+      observe memo extra = do
+        let graph = Graph.mkGraph (IntMap.fromList (base ++ extra)) IntMap.empty (1 + maximum (map fst extra))
+            state = C.Generation graph [] [T.Instantiate (T.Edge 2 8)]
+        result <- try (evaluate (case C.runGeneration memo C.flushGeneration state of
+          T.Left why -> error (H.unpack why)
+          T.Right (_, C.Generation solved _ _) -> Graph.nextId solved > 0)) :: IO (Either ErrorCall Bool)
+        pure (either (Left . displayException) Right result)
+  forM_ [C.SharedEnvironments IntMap.empty, C.BatchedEnvironments IntMap.empty] $ \memo -> do
+    check "manual graph checks the surviving name" (Left "surviving name demanded") =<< observe memo live
+    check "manual graph leaves disconnected names lazy" (Right True) =<< observe memo unused
+
 main = do
+  manualSurvivorDemand
+  reviewBoundaryChecks
+  permissionMemoPages
+  recursiveArgumentChecks
+  conditionalConstructorChecks
+  longDemandChainChecks
+  preparedPrefixControls
+  checkedProjectionSpines
+  fileImportPrefixChecks
+  declarationStampInventory
+  liveDeclarationSpineChecks
+  recursiveExportBatchChecks
+  recursiveBatchAdmissionChecks
   rebindingAncestors
   preparedScopeFingerprintChecks
   methodOwnerChecks
@@ -3250,6 +4334,16 @@ main = do
   candidateSkeletonChecks
   wantedBindingRoots
   denseRaisedAncestors
+  denseTypeBinderAncestorChecks
+  denseBindingValidationOrderChecks
+  solvedTypeBoundsChecks
+  scopeProjectionChecks
+  localExpansionChecks
+  capturedGivenChecks
+  inferredDictionaryPrefixChecks
+  dictionaryApplicationChecks
+  variableApplicationChecks
+  integerReductionChecks
   groupedMergePermissions
   queryChecks
   datatypeChecks
@@ -3283,6 +4377,7 @@ main = do
   continuationPipelineChecks
   singleActionChecks
   lambdaCaptureChecks
+  letEntryChecks
   constructorSubstitutionChecks
   openGeometryChecks
   factoredCallChecks

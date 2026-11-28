@@ -14,8 +14,30 @@ module Bootstrap.X.Type where {
   compareTyVar a b =
     if (tyVarId a < tyVarId b) then (0 - 1) else if (tyVarId a == tyVarId b) then 0 else 1;
   equalTyVar a b = (tyVarId a == tyVarId b);
+  -- A closed projection's only nonlocal reference in the arrow spine is
+  -- the final result. Resolve it on the way back through the argument
+  -- binders, so its position respects the closest lexical binding.
+  projectionTypeLayout :: XType -> Maybe ((,) Int Int);
+  projectionTypeLayout ty = let {
+    walk index source = case source of {
+      XForall a XBot (XForall r bound (XArrow (XVar input) (XVar output))) ->
+        if equalTyVar a input && equalTyVar r output && L.not (equalTyVar a r)
+        then case walk (index + 1) bound of {
+          Just ((,,) width target selected) -> Just ((,,) width target
+            (if selected < 0 && equalTyVar a target then index else selected));
+          Nothing -> Nothing
+        } else Nothing;
+      XForall a XBot (XArrow (XVar input) (XVar output)) ->
+        if equalTyVar a input then Just ((,,) (index + 1) output
+          (if equalTyVar a output then index else (-1))) else Nothing;
+      _ -> Nothing
+    }
+  } in case walk 0 ty of {
+    Just ((,,) width _ selected) -> if width >= 2 && selected >= 0 then Just ((,) width selected) else Nothing;
+    Nothing -> Nothing
+  };
   freeVars :: XType -> Set XTyVar;
-  freeVars = typeVariableSet (\variable bound body ->
+  freeVars = typeVariableSetUsing True (\variable bound body ->
     unionVariables bound (seq body (M.delete compareTyVar variable body)));
   allVars :: XType -> Set XTyVar;
   allVars = typeVariableSet (\variable bound body ->
@@ -26,7 +48,10 @@ module Bootstrap.X.Type where {
   -- Both inventories use the same ordered tree. Keep the binder operation
   -- explicit and wrap the finished tree once, at the public set boundary.
   typeVariableSet :: (XTyVar -> Map XTyVar () -> Map XTyVar () -> Map XTyVar ()) -> XType -> Set XTyVar;
-  typeVariableSet quantify ty = let {
+  typeVariableSet = typeVariableSetUsing False;
+  -- In forall a. forall (r >= t). a -> r the two arrow variables
+  -- are locally bound. Only t can contribute a free variable.
+  typeVariableSetUsing free quantify ty = let {
     variables term = case term of {
       XVar a -> M.singleton a ();
       XBot -> M.empty;
@@ -34,7 +59,15 @@ module Bootstrap.X.Type where {
       XArrow a b -> unionVariables (variables a) (variables b);
       XCon _ arguments -> L.foldr (\argument rest -> unionVariables (variables argument) rest) M.empty arguments;
       XApply f a -> unionVariables (variables f) (variables a);
-      XForall a bound body -> quantify a (variables bound) (variables body)
+      XForall a bound body -> let {
+        ordinary = quantify a (variables bound) (variables body)
+      } in if free then case (,) bound body of {
+        (,) XBot (XForall r tail (XArrow (XVar input) (XVar output))) ->
+          if equalTyVar a input && equalTyVar r output then
+            let { found = variables tail } in seq found (M.delete compareTyVar a found)
+          else ordinary;
+        _ -> ordinary
+      } else ordinary
     }
   } in S.wrap (variables ty);
   freshNegative :: Set XTyVar -> Int -> XTyVar;
@@ -67,6 +100,10 @@ module Bootstrap.X.Type where {
     };
   alphaEq :: XType -> XType -> Bool;
   alphaEq a b = alphaIn M.empty M.empty 0 a b;
+  checkExecutableType :: XType -> Either String ();
+  checkExecutableType ty =
+    L.ensure (alphaEq ty (XCon "IO" [XCon "()" []]))
+      "program must have type IO () to run";
   alphaIn :: Map XTyVar Int -> Map XTyVar Int -> Int -> XType -> XType -> Bool;
   alphaIn l r depth a b =
     case a of {
@@ -122,13 +159,22 @@ module Bootstrap.X.Type where {
             } in
             (alphaIn l r depth xb yb &&
              seq nextDepth
-               (alphaIn (M.insert compareTyVar x depth l) (M.insert compareTyVar y depth r)
-                  nextDepth
-                  xt
-                  yt));
+               (alphaForallBodies (M.insert compareTyVar x depth l) (M.insert compareTyVar y depth r)
+                  nextDepth x y xt yt));
           _ -> alphaApplications l r depth a b
         }
     };
+  alphaForallBodies l r depth a b left right = case (,) left right of {
+    (,) (XForall x xb xt) (XForall y yb yt) ->
+      alphaIn l r depth xb yb && case (,) xt yt of {
+        (,) (XArrow (XVar ix) (XVar rx)) (XArrow (XVar iy) (XVar ry)) ->
+          if equalTyVar ix a && equalTyVar iy b && equalTyVar rx x && equalTyVar ry y
+          then equalTyVar a x == equalTyVar b y
+          else alphaIn (M.insert compareTyVar x depth l) (M.insert compareTyVar y depth r) (depth + 1) xt yt;
+        _ -> alphaIn (M.insert compareTyVar x depth l) (M.insert compareTyVar y depth r) (depth + 1) xt yt
+      };
+    _ -> alphaIn l r depth left right
+  };
   alphaList :: Map XTyVar Int -> Map XTyVar Int -> Int -> [] XType -> [] XType -> Bool;
   alphaList l r depth [] [] = True;
   alphaList l r depth ((:) a as) ((:) b bs) =
@@ -164,7 +210,10 @@ module Bootstrap.X.Type where {
       XBot -> Right Star;
       XBotKind k -> Right k;
       XCon name [] -> Right (D.constructorKind ds name 0);
-      _ -> kindFromVariables ds bounds S.empty ty
+      _ -> case projectionTypeLayout ty of {
+        Just _ -> Right Star;
+        Nothing -> kindFromVariables ds bounds S.empty ty
+      }
     };
   -- The free-variable set already has distinct ordered keys. Resolve them
   -- in ascending order so competing environment errors keep their priority.
@@ -235,7 +284,22 @@ module Bootstrap.X.Type where {
       XForall a bound body ->
         do {
           k <- kindIn ds env bound;
-          kindIn ds (M.insert compareTyVar a k env) body
+          let { scope = M.insert compareTyVar a k env };
+          case body of {
+            XForall r tail inner -> do {
+              result <- kindIn ds scope tail;
+              let { ordinary = kindIn ds (M.insert compareTyVar r result scope) inner };
+              case inner of {
+                XArrow (XVar input) (XVar output) ->
+                  if equalTyVar a input && equalTyVar r output then
+                    if eqKind result Star && (equalTyVar a r || eqKind k Star)
+                    then Right Star else Left "function types require kind * arguments"
+                  else ordinary;
+                _ -> ordinary
+              }
+            };
+            _ -> kindIn ds scope body
+          }
         }
     };
   -- Check the spine's argument first, then apply constructors from the

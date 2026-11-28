@@ -182,6 +182,21 @@ module Package.Command where {
   expand :: [] ((,) String String) -> String -> String;
   expand replacements text =
     S.foldl (\acc entry -> O.replace (S.fst entry) (S.snd entry) acc) text replacements;
+  recordTestFailure :: B.Builder -> J.Json -> String -> String -> IO ();
+  recordTestFailure b row reason diagnostic =
+    B.record b "tests"
+      (J.set "passed" (J.Boolean False)
+         (J.set "reason" (J.str reason) (J.set "diagnostic" (J.str diagnostic) row)));
+  testFailure :: forall a. B.Builder -> J.Json -> String -> String -> IO a;
+  testFailure b row reason diagnostic = do {
+    recordTestFailure b row reason diagnostic;
+    O.fatal diagnostic
+  };
+  testCapture :: forall a. B.Builder -> J.Json -> String -> IO a -> IO a;
+  testCapture b row path action = catchIOError action (\error -> do {
+    recordTestFailure b row "capture" (path ++ (": " ++ textFromChars (ioeGetErrorString error)));
+    ioError error
+  });
   commandTest :: B.Builder ->
                  M.Package -> [] ((,) String String) -> String -> J.Json -> IO J.Json;
   commandTest b p built name target =
@@ -222,21 +237,28 @@ module Package.Command where {
       code <-
         O.exec (M.packageRoot p) argv "" log log
           (readInt (J.getText "timeout" "1800" (B.config b)));
-      hash <- fileDigest log;
+      let {
+        test = B.obj2 "name" (J.str name) "log" (J.str log);
+        observed = J.set "exit_code" (J.num code) test
+      };
+      hash <- testCapture b observed log (fileDigest log);
       B.record b "commands"
         (B.info
            ((:) ((,) "argv" (J.stringArray argv))
               ((:) ((,) "cwd" (J.str (M.packageRoot p)))
                  ((:) ((,) "exit_code" (J.num code))
                     ((:) ((,) "log" (J.str log)) ((:) ((,) "sha256" (J.str hash)) []))))));
-      O.require (code == 0)
-        ("test " ++ (name ++ (" failed (" ++ (showInt code ++ ("); see " ++ log)))));
-      text <- readFile log;
-      putStr (O.drop (S.max 0 (stringLength text - 3000)) text);
-      ioReturn
-        (B.info
-           ((:) ((,) "name" (J.str name))
-              ((:) ((,) "log" (J.str log)) ((:) ((,) "sha256" (J.str hash)) []))))
+      let {
+        row = B.info (S.snoc (J.items test) ((,) "sha256" (J.str hash)));
+        observation = J.set "exit_code" (J.num code) row
+      };
+      if code /= 0 then testFailure b observation "exit"
+        ("test " ++ (name ++ (" failed (" ++ (showInt code ++ ("); see " ++ log)))))
+      else do {
+        text <- testCapture b observation log (readFile log);
+        putStr (O.drop (S.max 0 (stringLength text - 3000)) text);
+        ioReturn row
+      }
     };
   nativeTest :: B.Builder ->
                 M.Package -> [] ((,) String String) -> String -> J.Json -> IO J.Json;
@@ -259,31 +281,42 @@ module Package.Command where {
       };
       O.mkdir testDir;
       writeFile (testDir ++ "/stdin") (J.getText "stdin" "" target);
-      S.mapM_
-        (\entry ->
-           do {
-             let {
-               backend = S.fst entry
-             };
-             code <-
-               O.exec artifact (S.snd entry) (testDir ++ "/stdin")
-                 (testDir ++ ("/" ++ (backend ++ ".stdout")))
-                 (testDir ++ ("/" ++ (backend ++ ".stderr")))
-                 (readInt (J.getText "timeout" "1800" (B.config b)));
-             out <- readFile (testDir ++ ("/" ++ (backend ++ ".stdout")));
-             err <- readFile (testDir ++ ("/" ++ (backend ++ ".stderr")));
-             O.require (code == 0)
-               ("test " ++ (name ++ (" (" ++ (backend ++ (") exited " ++ showInt code)))));
-             O.require (eqString out (J.getText "stdout" "" target))
-               ("test " ++
-                (name ++ (" (" ++ (backend ++ ("): unexpected stdout " ++ J.quote out)))));
-             O.require (eqString err "")
-               ("test " ++
-                (name ++ (" (" ++ (backend ++ ("): unexpected stderr " ++ J.quote err)))))
-           })
-        ((:) ((,) "interpreter" command)
-           ((:) ((,) "llvm" ((:) binary (J.getStrings "arguments" target))) []));
-      hash <- fileDigest (testDir ++ "/llvm.stdout");
+      let {
+        expected = J.getText "stdout" "" target;
+        check earlier backend argv = do {
+          let {
+            stdout = testDir ++ ("/" ++ (backend ++ ".stdout"));
+            stderr = testDir ++ ("/" ++ (backend ++ ".stderr"));
+            description = "test " ++ (name ++ (" (" ++ backend))
+          };
+          code <- O.exec artifact argv (testDir ++ "/stdin") stdout stderr
+            (readInt (J.getText "timeout" "1800" (B.config b)));
+          let {
+            observation = B.info
+              [ (,) "name" (J.str name)
+              , (,) "backend" (J.str backend)
+              , (,) "backends" (J.stringArray (S.snoc earlier backend))
+              , (,) "exit_code" (J.num code)
+              , (,) "stdout" (J.str stdout)
+              , (,) "stderr" (J.str stderr)
+              ]
+          };
+          out <- testCapture b observation stdout (readFile stdout);
+          err <- testCapture b observation stderr (readFile stderr);
+          if code /= 0 then testFailure b observation "exit"
+            (description ++ (") exited " ++ showInt code))
+          else if S.not (eqString out expected) then
+            testFailure b (J.set "expected_stdout" (J.str expected) observation) "stdout"
+              (description ++ ("): unexpected stdout " ++ J.quote out))
+          else if S.not (eqString err "") then testFailure b observation "stderr"
+            (description ++ ("): unexpected stderr " ++ J.quote err))
+          else ioReturn observation
+        }
+      };
+      check [] "interpreter" command;
+      llvm <- check ((:) "interpreter" []) "llvm" ((:) binary (J.getStrings "arguments" target));
+      let { output = testDir ++ "/llvm.stdout" };
+      hash <- testCapture b llvm output (fileDigest output);
       ioReturn
         (B.info
            ((:) ((,) "name" (J.str name))

@@ -112,27 +112,6 @@ class ComparatorControls(unittest.TestCase):
         allowed = C.tree_document([N(81, N(32, I(131)), L([]))], 6)
         C.decoded(allowed, 6, 'XTerm')
 
-    def test_dependency_only_primitive_extension_is_exact(self):
-        def dependency(code, owner='Prelude', spelling='freezeSTArray'):
-            fs = list(C.fields(iface('metadata'), 242, 13))
-            entity = N(189, S(owner), S(spelling), N(186, N(32, I(code))))
-            fs[3] = L([N(2, S('MLF.Primitive'), L([entity]))])
-            return C.tree_document([N(242, *fs)], 3)
-        for code, spelling in ((132, 'freezeSTArray'), (133, 'stToIO')):
-            raw = dependency(code, spelling=spelling)
-            C.dependency_decoded(raw)
-            with self.assertRaisesRegex(C.Invalid, 'closed primitive ABI'):
-                C.decoded(raw, 3, 'CrateInterfaceFields')
-            for wrong in (dependency(code, spelling='other'),
-                          dependency(code, owner='Other', spelling=spelling)):
-                with self.assertRaisesRegex(C.ComparisonError, 'added dependency primitive identity'):
-                    C.dependency_decoded(wrong)
-        for code in (-1, 134, 2147483647):
-            with self.assertRaisesRegex(C.Invalid, 'closed primitive ABI'):
-                C.dependency_decoded(dependency(code))
-        original = (C.ORACLE_DIRECTORY / 'artifact_binary_typed.py').read_bytes()
-        adapted = C.DEPENDENCY_ORACLE_PATH.read_bytes()
-        self.assertEqual(adapted.replace(b'0 <= node.data <= 133', b'0 <= node.data <= 131'), original)
 
     def test_oracle_mutation_rejected_before_execution(self):
         import frozen_file_oracles as F
@@ -152,18 +131,21 @@ class ComparatorControls(unittest.TestCase):
         with mock.patch.dict(sys.modules, impostors):
             directory, reference, typed = F.load_oracles(C.ORACLE_PINS)
             self.assertTrue(directory.is_dir())
-            self.assertIs(typed.read_document, reference.read_document)
+            self.assertIs(typed.require, reference.require)
             for name in names:
                 self.assertIs(sys.modules[name], impostors[name])
             self.assertIsNot(reference, impostors[names[0]])
             self.assertIsNot(typed, impostors[names[1]])
 
-    def test_oracle_predecessor_tree_drift_rejected(self):
+    def test_fixture_load_does_not_require_git(self):
         import frozen_file_oracles as F
         from unittest import mock
-        with mock.patch.object(F.subprocess, 'check_output', return_value='0' * 40):
-            with self.assertRaisesRegex(ValueError, 'predecessor tree'):
-                F.load_oracles(C.ORACLE_PINS)
+        import subprocess
+        with mock.patch.object(subprocess, 'check_output', side_effect=AssertionError('Git is unavailable')):
+            _, reference, typed = F.load_oracles(C.ORACLE_PINS)
+            raw = reference.tree_document([N(81, N(32, I(131)), L([]))], 6)
+            document = reference.read_document(raw, 6)
+            typed.validate_type(document, document.roots[0], 'XTerm')
 
     def test_positive_complete_private_body_and_linked_alpha(self):
         result = C.compare_open_file(**self.data)
@@ -544,14 +526,10 @@ class CurrentDependencyV12Controls(unittest.TestCase):
                          N(189, S('User'), S('Box'), N(183, S('Box')))]
         C.current_dependency_decoded(self.dependency([('User', same_spelling)]))
 
-    def test_historical_dependency_layer_and_own_domains_unchanged(self):
+    def test_dependency_extension_does_not_widen_own_domains(self):
         for code in self.expected:
             raw = self.dependency([('MLF.Primitive', [self.entity(code)])])
-            if code <= 133:
-                C.dependency_decoded(raw)
-            else:
-                with self.assertRaisesRegex(C.Invalid, 'closed primitive ABI'):
-                    C.dependency_decoded(raw)
+            C.current_dependency_decoded(raw)
             with self.assertRaisesRegex(C.Invalid, 'closed primitive ABI'):
                 C.decoded(raw, 3, 'CrateInterfaceFields')
             interface = C.decoded(raw, 3)
@@ -569,9 +547,8 @@ class CurrentDependencyV12Controls(unittest.TestCase):
 
     def test_137_is_rejected_by_every_layer(self):
         raw = self.dependency([('MLF.Primitive', [self.entity(137)])])
-        for decoder in (C.dependency_decoded, C.current_dependency_decoded):
-            with self.assertRaisesRegex(C.Invalid, 'closed primitive ABI'):
-                decoder(raw)
+        with self.assertRaisesRegex(C.Invalid, 'closed primitive ABI'):
+            C.current_dependency_decoded(raw)
         with self.assertRaisesRegex(C.Invalid, 'closed primitive ABI'):
             C.decoded(raw, 3, 'CrateInterfaceFields')
         root = C.decoded(raw, 3)
@@ -610,26 +587,12 @@ class CurrentDependencyV12Controls(unittest.TestCase):
                 with self.subTest(code=code, rows=rows), self.assertRaises(C.ComparisonError):
                     C.current_dependency_decoded(self.dependency(rows))
 
-    def test_frozen_triple_and_two_complete_source_inverses(self):
-        import frozen_file_oracles as F
-        for name, digest in C.ORACLE_PINS.items():
-            self.assertEqual(hashlib.sha256((C.ORACLE_DIRECTORY / name).read_bytes()).hexdigest(), digest)
-        original = (C.ORACLE_DIRECTORY / 'artifact_binary_typed.py').read_bytes()
-        legacy = C.DEPENDENCY_ORACLE_PATH.read_bytes()
-        current = C.CURRENT_DEPENDENCY_ORACLE_PATH.read_bytes()
-        sha = C.ORACLE_PINS['artifact_binary_typed.py']
-        self.assertEqual(F.dependency_v12_bytes(original, legacy, sha), current)
-        self.assertEqual(current.replace(b'0 <= node.data <= 136', b'0 <= node.data <= 133'), legacy)
-        self.assertEqual(legacy.replace(b'0 <= node.data <= 133', b'0 <= node.data <= 131'), original)
-        for changed in (legacy+b'\n', legacy.replace(b'<= 133', b'<= 134'),
-                        legacy.replace(b'closed primitive ABI', b'other diagnostic'),
-                        legacy + b"# if typ=='PrimitiveCode': require(0 <= node.data <= 133, 'closed primitive ABI')\n"):
-            with self.subTest(changed=changed[-120:]), self.assertRaises(ValueError):
-                F.dependency_v12_bytes(original, changed, sha)
-        with self.assertRaises(ValueError):
-            F.dependency_v12_bytes(original+b'\n', legacy, sha)
-        with self.assertRaises(ValueError):
-            F.dependency_v12_bytes(original, legacy, '0'*64)
+    def test_unreviewed_primitive_domain_rejected(self):
+        raw = self.dependency([('MLF.Primitive', [self.entity(136)])])
+        document = C.read_document(raw, 3)
+        for maximum in (133, 137, -1, 2147483647):
+            with self.subTest(maximum=maximum), self.assertRaisesRegex(C.Invalid, 'supported primitive declaration domain'):
+                C._typed.validate_type(document, document.roots[0], 'CrateInterfaceFields', primitive_max=maximum)
 
     def test_root_family_arity_and_trailing_bytes_stay_strict(self):
         raw = self.dependency([('MLF.Primitive', [self.entity(136)])])
@@ -647,9 +610,8 @@ class CurrentDependencyV12Controls(unittest.TestCase):
         data = fixture()
         data['dependency_interfaces'] = [self.dependency([('MLF.Primitive', [self.entity(136)])])]
         with mock.patch.object(C, 'current_dependency_decoded', side_effect=C.ComparisonError('current dependency route')) as current:
-            with mock.patch.object(C, 'dependency_decoded', side_effect=AssertionError('historical route called')):
-                with self.assertRaisesRegex(C.ComparisonError, 'current dependency route'):
-                    C.compare_open_file(**data)
+            with self.assertRaisesRegex(C.ComparisonError, 'current dependency route'):
+                C.compare_open_file(**data)
         current.assert_called_once_with(data['dependency_interfaces'][0])
 
     def test_complete_synthetic_136_dependency_closure_and_association(self):
@@ -665,8 +627,6 @@ class CurrentDependencyV12Controls(unittest.TestCase):
         dep = N(242, *dep_fields)
         dependency_bytes = C.tree_document([dep], 3)
         C.current_dependency_decoded(dependency_bytes)
-        with self.assertRaisesRegex(C.Invalid, 'closed primitive ABI'):
-            C.dependency_decoded(dependency_bytes)
         for schema in (7, 8):
             data = fixture(schema)
             root_fields = list(C.fields(C.decoded(data['closed_files']['.mlfci'], 3), 242, 13))

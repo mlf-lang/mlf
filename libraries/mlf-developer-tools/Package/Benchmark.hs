@@ -770,6 +770,87 @@ module Package.Benchmark where {
   validateLimits :: J.Json -> Bool;
   validateLimits targets =
     S.all (\entry -> S.maybe False V.positive (V.number (S.snd entry))) (J.items targets);
+  -- Parse the benchmark runner's two public modes before starting any tools.
+  runnerOptions :: [] String -> Either String ((,,) Bool J.Json ([] String));
+  runnerOptions options = do {
+    let { defaults = J.Object [(,) "compilation" (J.num 5), (,) "runtime" (J.num 2)] };
+    (,,) checkOnly limits selected <- case options of {
+      [] -> Right ((,,) False defaults []);
+      [option] -> if eqString option "--check-only"
+        then Right ((,,) True defaults [])
+        else Left "supply both compilation and runtime limits, or only --check-only";
+      (:) compilation ((:) runtime names) -> Right
+        ((,,) False (J.Object [(,) "compilation" (J.Number compilation),
+                              (,) "runtime" (J.Number runtime)]) names)
+    };
+    V.ensure (validateLimits limits) "limits must be finite positive numbers";
+    V.ensure (S.all (\name -> S.elem eqString name V.workloads) selected &&
+              S.length selected == S.length (S.nubBy eqString selected))
+      "invalid workload selection";
+    return ((,,) checkOnly limits selected)
+  };
+  -- Absent optional package maps are empty. Present malformed values are
+  -- errors; they must not silently discard a native dependency or its pin.
+  optionalPackageMap :: String -> J.Json -> Either String J.Json;
+  optionalPackageMap field work = case J.getObject field work of {
+    J.Object entries -> Right (J.Object entries);
+    _ -> Left ("expected benchmark package object: " ++ field)
+  };
+  packageString :: J.Json -> Bool;
+  packageString value = case value of { J.String _ -> True; _ -> False };
+  packageStrings :: J.Json -> Bool;
+  packageStrings value = case value of {
+    J.Array entries -> S.all packageString entries;
+    _ -> False
+  };
+  packageRequirements :: [] J.Json -> Either String ([] ((,,) String String ([] String)));
+  packageRequirements workloads = do {
+    entries <- S.mapM (\work -> do {
+      names <- optionalPackageMap "pkg_config" work;
+      versions <- optionalPackageMap "pkg_config_versions" work;
+      headers <- optionalPackageMap "pkg_config_headers" work;
+      V.ensure (S.all (\entry -> packageStrings (S.snd entry)) (J.items names))
+        "expected benchmark package name arrays";
+      V.ensure (S.all (\entry -> packageString (S.snd entry)) (J.items versions))
+        "expected benchmark package version strings";
+      V.ensure (S.all (\entry -> packageStrings (S.snd entry)) (J.items headers))
+        "expected benchmark package header arrays";
+      return ((,,) (S.concatMap (\language -> J.getStrings language names) ["c", "mlf"])
+                   versions headers)
+    }) workloads;
+    let { names = S.nubBy eqString (S.concatMap (\((,,) names _ _) -> names) entries) };
+    S.mapM (\name -> do {
+      let { versions = S.nubBy eqString (S.map
+              (\((,,) _ versions _) -> V.text name versions)
+              (S.filter (\((,,) names _ _) -> S.elem eqString name names) entries)) };
+      V.ensure (S.length versions == 1 && stringLength (S.head versions) > 0)
+        ("missing or conflicting benchmark library pin: " ++ name);
+      let { headers = S.nubBy eqString (S.concatMap
+              (\((,,) _ _ headers) -> J.getStrings name headers) entries) };
+      return ((,,) name (S.head versions) headers)
+    }) names
+  };
+  runWorkloadMode :: Bool -> IO J.Json -> IO ((,) J.Json ([] J.Json)) -> IO ((,) J.Json ([] J.Json));
+  runWorkloadMode checkOnly correctness measured =
+    if checkOnly then do { result <- correctness; return ((,) result []) }
+    else measured;
+  -- A correctness-only run cannot acquire a measured success label or timing
+  -- claims. Provenance fields are added by the runner after this mode decision.
+  runnerReport :: Bool -> Int -> [] J.Json -> [] J.Json -> Either String J.Json;
+  runnerReport checkOnly runs rows checks = do {
+    V.ensure (S.not checkOnly || S.null checks)
+      "correctness-only results contain performance measurements";
+    let { passed = S.all (J.getBool "passed" False) checks };
+    let { report = J.Object
+      [(,) "status" (J.str (if checkOnly then "correctness-passed" else if passed then "passed" else "failed")),
+       (,) "implementation" (J.str "MLF"),
+       (,) "runs" (J.num (if checkOnly then 0 else runs)),
+       (,) "benchmarks" (J.Array rows),
+       (,) "performance_checks" (J.Array checks)] };
+    return (if checkOnly
+      then J.set "mode" (J.str "check-only") (J.set "performance_checked" (J.Boolean False) report)
+      else report)
+  };
   measure :: String -> [] String -> String -> Int -> IO (Either String J.Json);
   measure directory argv input timeout =
     do {
@@ -1157,7 +1238,13 @@ module Package.Benchmark where {
                                String ->
                                [] String ->
                                [] String -> Double -> IO (Either String ((,) String J.Json));
-  buildParallelWithIncludes directory compiler clang source runtime flags includes timeout =
+  buildParallelWithIncludes directory compiler clang source runtime flags includes timeout = do {
+    splitting <- getEnv "MLF_BENCH_SPLIT_RUNTIME";
+    buildParallelWithRuntime splitting directory compiler clang source runtime flags includes timeout
+  };
+  buildParallelWithRuntime :: String -> String -> String -> String -> String -> String ->
+    [] String -> [] String -> Double -> IO (Either String ((,) String J.Json));
+  buildParallelWithRuntime splitting directory compiler clang source runtime flags includes timeout =
     do {
       present <- directoryExists directory;
       files <- if present then O.entries directory else return [];
@@ -1192,7 +1279,6 @@ module Package.Benchmark where {
              let {
                streamLink = eqString linking "1"
              };
-             splitting <- getEnv "MLF_BENCH_SPLIT_RUNTIME";
              O.require (eqString splitting "" || eqString splitting "1")
                "invalid split runtime setting";
              let {

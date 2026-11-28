@@ -21,6 +21,9 @@ Implement test-code changes, adapters, updated defaults, removal of duplicate ru
 
 During this phase use static inspection and diff review. Defer suite execution, probes, executable discovery, timing runs and CI to Phase 2. Keep Phase 1 commits local when pushing would automatically start tests. Each owner hands off its code, old-to-new coverage map, compatibility changes, expected saving, exact verification commands and any unverified assumptions. The lead waits for every subagent, integrates all contributions, checks references and records the candidate commit. **Phase 1 is complete when every subplan is implemented and handed off. Its status is unverified.**
 
+The [Phase 1 handoff](test-migration-phase-1/README.md) records the pinned baseline,
+coverage mapping and comparison commands.
+
 ## Phase 2 — Run, compare, fix and qualify
 
 1. **Establish the comparison.** Use the recorded parent and integrated candidate in separate build directories. Record host, compiler producer, tool versions, optimization, selection, parallelism and cache state. Run discovery on both revisions. Account for every case, generated family, alias, backend, platform and independent oracle using the agents' coverage maps.

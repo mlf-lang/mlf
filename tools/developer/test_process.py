@@ -1,5 +1,6 @@
 """Process-level checks for the developer build launcher."""
 import os
+import json
 from pathlib import Path
 import shutil
 import signal
@@ -59,6 +60,23 @@ def check_tools_fixture(root, script):
     tools = root / 'tools'
     suite = tools / 'developer'
     suite.mkdir(parents=True)
+    framework = tools / 'testing'
+    framework.mkdir()
+    for module in ('run.py', 'receipt_adapter.py'):
+        shutil.copyfile(SCRIPT.parents[1] / 'testing' / module, framework / module)
+    (root / 'tests').mkdir()
+    (root / 'tests/test-catalog.json').write_text(json.dumps({
+        'external_adapters': ['tools/developer/fixture-suites.json'],
+    }))
+    names = ('commands', 'process')
+    (suite / 'fixture-suites.json').write_text(json.dumps({
+        f'release-developer-{name}': {
+            'command': ['python3', '-B', f'tools/developer/test_{name}.py'],
+            'kind': 'exit',
+            'ids': [f'fixture/{name}'],
+        }
+        for name in names
+    }))
     shutil.copyfile(SCRIPT.parents[1] / 'dev.py', tools / 'dev.py')
     shutil.copyfile(process.__file__, suite / 'process.py')
     (suite / 'test_commands.py').write_text(script)
@@ -86,15 +104,75 @@ class BuildProcessTests(unittest.TestCase):
                 self.assertFalse((root / 'next').exists())
 
     @unittest.skipUnless(os.name == 'posix', 'POSIX process groups')
+    def test_dispatcher_cancels_owned_producer_and_discovery(self):
+        for phase, ignore in [('run', False), ('run', True), ('discovery', True), ('list', True)]:
+            with self.subTest(phase=phase, ignore=ignore), tempfile.TemporaryDirectory() as cwd:
+                root = Path(cwd)
+                script = ('import signal, sys\nfrom pathlib import Path\n'
+                          f'sys.path.insert(0, {str(SCRIPT.parent)!r})\n'
+                          'from test_process import fixture\n')
+                if ignore:
+                    script += 'signal.signal(signal.SIGTERM, signal.SIG_IGN)\n'
+                check_tools_fixture(root, script + 'fixture("leader", Path.cwd())\n')
+                if phase != 'run':
+                    (root / 'tools/developer/fixture-suites.json').write_text(json.dumps({
+                        'release-developer-commands': {
+                            'command': ['python3', 'tools/developer/test_commands.py'],
+                            'kind': 'receipt', 'prefix': 'fixture/', 'list_args': ['--list'],
+                            'receipt': {'output': '--output', 'cases': 'cases'},
+                        }}))
+                record = root / 'report.json'
+                cli = subprocess.Popen([sys.executable, root / 'tools/testing/run.py',
+                                        'release-developer-commands', '--report', record,
+                                        *(['--list'] if phase == 'list' else [])],
+                                       stdout=subprocess.PIPE, stderr=subprocess.PIPE, start_new_session=True)
+                try:
+                    wait_for(root / 'ready')
+                    cli.terminate()
+                    _, err = cli.communicate(timeout=5)
+                    self.assertEqual(cli.returncode, 143, err)
+                    if phase != 'list':
+                        self.assertEqual(json.loads(record.read_text())['status'], 'interrupted')
+                    # The stopped descendant inherited stderr in both phases.
+                    # communicate() returning proves that its descriptor closed.
+                finally:
+                    if not cli.stderr.closed:
+                        if (root / 'ready').exists():
+                            process.signal_group(int((root / 'ready').read_text()), signal.SIGKILL)
+                        process.signal_group(cli.pid, signal.SIGKILL)
+                        cli.communicate(timeout=5)
+
+    def test_receipt_path_follows_last_output_option(self):
+        for options in [('--output', 'a', '--output', 'b'), ('--output=a', '--output', 'b'),
+                        ('--output', 'a', '--output=b'), ('--output=a', '--output=b')]:
+            with self.subTest(options=options), tempfile.TemporaryDirectory() as cwd:
+                root = Path(cwd)
+                producer = ('import argparse\nfrom pathlib import Path\n'
+                            'p = argparse.ArgumentParser()\np.add_argument("--output")\n'
+                            'out = Path(p.parse_args().output)\nout.mkdir()\n'
+                            f'out.joinpath("receipt.json").write_text({json.dumps({"complete": True, "cases": ["one"]})!r})')
+                check_tools_fixture(root, producer)
+                (root / 'tools/developer/fixture-suites.json').write_text(json.dumps({
+                    'fixture': {'command': ['python3', 'tools/developer/test_commands.py'],
+                                'kind': 'receipt', 'prefix': 'sample/',
+                                'receipt': {'output': '--output', 'inventory': ['one'], 'cases': 'cases'}}}))
+                report = root / 'report.json'
+                result = subprocess.run([sys.executable, root / 'tools/testing/run.py', 'fixture',
+                                         '--report', report, '--', *options], capture_output=True, timeout=5)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(Path(json.loads(report.read_text())['adapter_receipt']['path']),
+                                 (root / 'b/receipt.json').resolve())
+
+    @unittest.skipUnless(os.name == 'posix', 'POSIX process groups')
     def test_signalling_check_tools_cleans_up_the_active_suite(self):
         for sig in (signal.SIGTERM, signal.SIGINT):
             with self.subTest(sig=sig), tempfile.TemporaryDirectory() as cwd:
                 root = Path(cwd)
                 script = ('import sys, os\nfrom pathlib import Path\n'
                           f'sys.path.insert(0, {str(SCRIPT.parent)!r})\n'
-                          'from test_process import fixture\n'
                           'Path("suite-pid").write_text(str(os.getpid()))\n'
-                          'fixture("driver", Path.cwd())\n')
+                          'from test_process import args, process\n'
+                          'process.run_build(args("leader", Path.cwd()), Path.cwd(), cancellation_grace=0.8)\n')
                 argv = check_tools_fixture(root, script)
                 with subprocess.Popen(argv, stdout=subprocess.PIPE, stderr=subprocess.PIPE) as cli:
                     try:

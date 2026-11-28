@@ -1,0 +1,1054 @@
+{
+  "bootstrap-macos-native": {
+    "kind": "events",
+    "command": [
+      "bash",
+      "tools/release/timed-bootstrap.sh"
+    ],
+    "ids": [
+      "bootstrap/macos/seed-toolchain",
+      "bootstrap/macos/native-bridge",
+      "bootstrap/macos/fresh-candidate",
+      "bootstrap/macos/native-helper",
+      "bootstrap/macos/resource-budget"
+    ]
+  },
+  "bootstrap-linux-llvm": {
+    "kind": "events",
+    "command": [
+      "bash",
+      "tools/release/bootstrap-linux.sh"
+    ],
+    "ids": [
+      "bootstrap/linux/portable-seed",
+      "bootstrap/linux/native-seed",
+      "bootstrap/linux/native-manager",
+      "bootstrap/linux/fresh-candidate"
+    ]
+  },
+  "bootstrap-windows-llvm": {
+    "kind": "events",
+    "command": [
+      "pwsh",
+      "-NoProfile",
+      "-File",
+      "tools/release/bootstrap-windows-release.ps1"
+    ],
+    "ids": [
+      "bootstrap/windows/portable-seed",
+      "bootstrap/windows/native-seed",
+      "bootstrap/windows/native-manager",
+      "bootstrap/windows/stage1",
+      "bootstrap/windows/stage2"
+    ]
+  },
+  "self-host-native": {
+    "kind": "events",
+    "command": [
+      "bash",
+      "tools/release/native-ci.sh",
+      "self-host"
+    ],
+    "ids": [
+      "self-host/posix/candidate-provenance",
+      "self-host/posix/native-toolchain",
+      "self-host/posix/fresh-rebuild",
+      "self-host/posix/producer-chain",
+      "self-host/posix/llvm-fixed-point",
+      "self-host/posix/binary-fixed-point"
+    ]
+  },
+  "windows-release-qualification": {
+    "kind": "events",
+    "command": [
+      "pwsh",
+      "-NoProfile",
+      "-File",
+      "tools/release/qualify-windows.ps1"
+    ],
+    "ids": [
+      "release/windows/build-runner-protocol",
+      "self-host/windows/stage1-provenance",
+      "self-host/windows/stage2-provenance",
+      "self-host/windows/emlf-llvm-fixed-point",
+      "self-host/windows/mlfpkg-llvm-fixed-point",
+      "self-host/windows/producer-chain",
+      "release/windows/emlf-version",
+      "release/windows/mlfpkg-version",
+      "release/windows/runtime-evidence",
+      "release/windows/package-evidence",
+      "release/windows/parity-evidence",
+      "release/windows/final-provenance"
+    ]
+  },
+  "sdk-smoke-posix": {
+    "kind": "events",
+    "command": [
+      "bash",
+      "tools/release/smoke.sh"
+    ],
+    "ids": [
+      "sdk/posix/relocated-install",
+      "sdk/posix/versions",
+      "sdk/posix/compiler-and-helper",
+      "sdk/posix/interpreter",
+      "sdk/posix/llvm",
+      "sdk/posix/package-test",
+      "sdk/posix/reinstall",
+      "sdk/posix/conflict"
+    ]
+  },
+  "sdk-smoke-windows": {
+    "kind": "events",
+    "command": [
+      "pwsh",
+      "-NoProfile",
+      "-File",
+      "tools/release/smoke-windows.ps1"
+    ],
+    "ids": [
+      "sdk/windows/relocated-activation",
+      "sdk/windows/versions",
+      "sdk/windows/build-runner-protocol",
+      "sdk/windows/compiler-type",
+      "sdk/windows/package-plan",
+      "sdk/windows/package-lock",
+      "sdk/windows/package-build",
+      "sdk/windows/package-test",
+      "sdk/windows/package-run",
+      "sdk/windows/standalone-native"
+    ]
+  },
+  "formatter-compatibility": {
+    "kind": "events",
+    "command": [
+      "python3",
+      "-B",
+      "tools/shared/test_formatter_compatibility.py"
+    ],
+    "prefix": "formatter/",
+    "list_args": [
+      "--framework-list"
+    ],
+    "exact": true
+  },
+  "release-metadata": {
+    "kind": "events",
+    "command": [
+      "bash",
+      "tools/release/check.sh",
+      "--metadata-only"
+    ],
+    "ids": [
+      "release/metadata/version",
+      "release/metadata/manifest-versions",
+      "release/metadata/changelog",
+      "release/metadata/shell-syntax",
+      "release/metadata/license",
+      "release/metadata/diff"
+    ]
+  },
+  "release-metadata-diff": {
+    "kind": "unittest",
+    "command": [
+      "python3",
+      "-B",
+      "tools/release/test_metadata_diff.py"
+    ],
+    "prefix": "release/metadata-diff/"
+  },
+  "release-build-receipts": {
+    "kind": "events",
+    "command": [
+      "python3",
+      "-B",
+      "tools/release/test-suite-build-receipts.py"
+    ],
+    "ids": [
+      "release/build-receipts/first-and-second",
+      "release/build-receipts/reject-null",
+      "release/build-receipts/reject-object",
+      "release/build-receipts/reject-string",
+      "release/build-receipts/reject-prepared-null",
+      "release/build-receipts/unchanged-inputs"
+    ],
+    "exact": true
+  },
+  "release-setup-macos": {
+    "kind": "events",
+    "command": [
+      "bash",
+      "tools/release/test-setup-macos.sh"
+    ],
+    "ids": [
+      "release/macos-dependencies/fresh-bottle",
+      "release/macos-dependencies/repeat-owned-tap",
+      "release/macos-dependencies/stale-receipt",
+      "release/macos-dependencies/benchmarks-closure",
+      "release/macos-dependencies/missing-pcre2",
+      "release/macos-dependencies/developer-host",
+      "release/macos-dependencies/self-hosted-runner",
+      "release/macos-dependencies/linux",
+      "release/macos-dependencies/intel",
+      "release/macos-dependencies/bottle-platform",
+      "release/macos-dependencies/prefix",
+      "release/macos-dependencies/dirty-tap",
+      "release/macos-dependencies/remote",
+      "release/macos-dependencies/fetch-failure",
+      "release/macos-dependencies/checkout-failure",
+      "release/macos-dependencies/commit",
+      "release/macos-dependencies/missing-bottle",
+      "release/macos-dependencies/unsafe-dependency",
+      "release/macos-dependencies/install-failure",
+      "release/macos-dependencies/wrong-keg"
+    ]
+  },
+  "release-package-publishing": {
+    "kind": "events",
+    "command": [
+      "bash",
+      "tools/release/test-package-publishing.sh"
+    ],
+    "ids": [
+      "release/package-publishing/local-preparation",
+      "release/package-publishing/invalid-preparation",
+      "release/package-publishing/exact-tag-and-upload",
+      "release/package-publishing/existing",
+      "release/package-publishing/moved",
+      "release/package-publishing/upload-failed",
+      "release/package-publishing/moved-during-upload",
+      "release/package-publishing/damaged-asset"
+    ]
+  },
+  "release-smoke-receipts": {
+    "kind": "events",
+    "command": [
+      "bash",
+      "tools/release/test-smoke-receipts.sh"
+    ],
+    "ids": [
+      "release/smoke-receipts/source-smoke/wrapper-args",
+      "release/smoke-receipts/source-smoke/runtime-profile",
+      "release/smoke-receipts/source-smoke/native-environment",
+      "release/smoke-receipts/source-smoke/direct-args",
+      "release/smoke-receipts/source-smoke/missing-seed",
+      "release/smoke-receipts/pr-smoke/wrapper-args",
+      "release/smoke-receipts/pr-smoke/runtime-profile",
+      "release/smoke-receipts/pr-smoke/native-environment",
+      "release/smoke-receipts/pr-smoke/direct-args",
+      "release/smoke-receipts/pr-smoke/missing-seed",
+      "release/smoke-receipts/extended-pr-smoke/wrapper-args",
+      "release/smoke-receipts/extended-pr-smoke/runtime-profile",
+      "release/smoke-receipts/extended-pr-smoke/native-environment",
+      "release/smoke-receipts/extended-pr-smoke/direct-args",
+      "release/smoke-receipts/extended-pr-smoke/missing-seed",
+      "release/smoke-receipts/no-native-dependencies"
+    ]
+  },
+  "release-fetch-seed": {
+    "kind": "events",
+    "command": [
+      "bash",
+      "tools/release/test-fetch-seed.sh"
+    ],
+    "ids": [
+      "release/seed-fetch/macos-arm64/accepted",
+      "release/seed-fetch/macos-arm64/ARCHIVE_SHA256",
+      "release/seed-fetch/macos-arm64/SOURCE_COMMIT",
+      "release/seed-fetch/macos-arm64/COMPILER_SHA256",
+      "release/seed-fetch/macos-arm64/MANAGER_SHA256",
+      "release/seed-fetch/linux-x64/accepted",
+      "release/seed-fetch/linux-x64/ARCHIVE_SHA256",
+      "release/seed-fetch/linux-x64/SOURCE_COMMIT",
+      "release/seed-fetch/linux-x64/COMPILER_SHA256",
+      "release/seed-fetch/linux-x64/MANAGER_SHA256",
+      "release/seed-fetch/unsupported-platform"
+    ]
+  },
+  "release-pr-gate": {
+    "kind": "events",
+    "command": [
+      "bash",
+      "tools/release/test-pr-gate.sh"
+    ],
+    "ids": [
+      "release/pr-gate/normal/complete",
+      "release/pr-gate/labeled/complete",
+      "release/pr-gate/normal/metadata/failure",
+      "release/pr-gate/normal/metadata/cancelled",
+      "release/pr-gate/normal/metadata/skipped",
+      "release/pr-gate/normal/metadata/pending",
+      "release/pr-gate/normal/metadata/missing",
+      "release/pr-gate/labeled/metadata/failure",
+      "release/pr-gate/labeled/metadata/cancelled",
+      "release/pr-gate/labeled/metadata/success",
+      "release/pr-gate/labeled/metadata/pending",
+      "release/pr-gate/labeled/metadata/missing",
+      "release/pr-gate/normal/native/failure",
+      "release/pr-gate/normal/native/cancelled",
+      "release/pr-gate/normal/native/skipped",
+      "release/pr-gate/normal/native/pending",
+      "release/pr-gate/normal/native/missing",
+      "release/pr-gate/labeled/native/failure",
+      "release/pr-gate/labeled/native/cancelled",
+      "release/pr-gate/labeled/native/success",
+      "release/pr-gate/labeled/native/pending",
+      "release/pr-gate/labeled/native/missing",
+      "release/pr-gate/normal/windows-runtime/failure",
+      "release/pr-gate/normal/windows-runtime/cancelled",
+      "release/pr-gate/normal/windows-runtime/skipped",
+      "release/pr-gate/normal/windows-runtime/pending",
+      "release/pr-gate/normal/windows-runtime/missing",
+      "release/pr-gate/labeled/windows-runtime/failure",
+      "release/pr-gate/labeled/windows-runtime/cancelled",
+      "release/pr-gate/labeled/windows-runtime/success",
+      "release/pr-gate/labeled/windows-runtime/pending",
+      "release/pr-gate/labeled/windows-runtime/missing",
+      "release/pr-gate/normal/build-runner/failure",
+      "release/pr-gate/normal/build-runner/cancelled",
+      "release/pr-gate/normal/build-runner/skipped",
+      "release/pr-gate/normal/build-runner/pending",
+      "release/pr-gate/normal/build-runner/missing",
+      "release/pr-gate/labeled/build-runner/failure",
+      "release/pr-gate/labeled/build-runner/cancelled",
+      "release/pr-gate/labeled/build-runner/success",
+      "release/pr-gate/labeled/build-runner/pending",
+      "release/pr-gate/labeled/build-runner/missing",
+      "release/pr-gate/normal/async-runtime/failure",
+      "release/pr-gate/normal/async-runtime/cancelled",
+      "release/pr-gate/normal/async-runtime/skipped",
+      "release/pr-gate/normal/async-runtime/pending",
+      "release/pr-gate/normal/async-runtime/missing",
+      "release/pr-gate/labeled/async-runtime/failure",
+      "release/pr-gate/labeled/async-runtime/cancelled",
+      "release/pr-gate/labeled/async-runtime/success",
+      "release/pr-gate/labeled/async-runtime/pending",
+      "release/pr-gate/labeled/async-runtime/missing",
+      "release/pr-gate/normal/async-language/failure",
+      "release/pr-gate/normal/async-language/cancelled",
+      "release/pr-gate/normal/async-language/skipped",
+      "release/pr-gate/normal/async-language/pending",
+      "release/pr-gate/normal/async-language/missing",
+      "release/pr-gate/labeled/async-language/failure",
+      "release/pr-gate/labeled/async-language/cancelled",
+      "release/pr-gate/labeled/async-language/success",
+      "release/pr-gate/labeled/async-language/pending",
+      "release/pr-gate/labeled/async-language/missing",
+      "release/pr-gate/normal/empty",
+      "release/pr-gate/labeled/empty",
+      "release/pr-gate/normal/additional-job",
+      "release/pr-gate/labeled/additional-job"
+    ]
+  },
+  "release-qualification-gate": {
+    "kind": "events",
+    "command": [
+      "bash",
+      "tools/release/test-qualification-gate.sh"
+    ],
+    "ids": [
+      "release/qualification-gate/complete",
+      "release/qualification-gate/benchmark-game/failure",
+      "release/qualification-gate/benchmark-game/cancelled",
+      "release/qualification-gate/benchmark-game/skipped",
+      "release/qualification-gate/benchmark-game/pending",
+      "release/qualification-gate/benchmark-game/missing",
+      "release/qualification-gate/linux-candidate/failure",
+      "release/qualification-gate/linux-candidate/cancelled",
+      "release/qualification-gate/linux-candidate/skipped",
+      "release/qualification-gate/linux-candidate/pending",
+      "release/qualification-gate/linux-candidate/missing",
+      "release/qualification-gate/linux-port/failure",
+      "release/qualification-gate/linux-port/cancelled",
+      "release/qualification-gate/linux-port/skipped",
+      "release/qualification-gate/linux-port/pending",
+      "release/qualification-gate/linux-port/missing",
+      "release/qualification-gate/linux-port-preparation/failure",
+      "release/qualification-gate/linux-port-preparation/cancelled",
+      "release/qualification-gate/linux-port-preparation/skipped",
+      "release/qualification-gate/linux-port-preparation/pending",
+      "release/qualification-gate/linux-port-preparation/missing",
+      "release/qualification-gate/linux-tests/failure",
+      "release/qualification-gate/linux-tests/cancelled",
+      "release/qualification-gate/linux-tests/skipped",
+      "release/qualification-gate/linux-tests/pending",
+      "release/qualification-gate/linux-tests/missing",
+      "release/qualification-gate/mac-bootstrap/failure",
+      "release/qualification-gate/mac-bootstrap/cancelled",
+      "release/qualification-gate/mac-bootstrap/skipped",
+      "release/qualification-gate/mac-bootstrap/pending",
+      "release/qualification-gate/mac-bootstrap/missing",
+      "release/qualification-gate/mac-port/failure",
+      "release/qualification-gate/mac-port/cancelled",
+      "release/qualification-gate/mac-port/skipped",
+      "release/qualification-gate/mac-port/pending",
+      "release/qualification-gate/mac-port/missing",
+      "release/qualification-gate/mac-port-preparation/failure",
+      "release/qualification-gate/mac-port-preparation/cancelled",
+      "release/qualification-gate/mac-port-preparation/skipped",
+      "release/qualification-gate/mac-port-preparation/pending",
+      "release/qualification-gate/mac-port-preparation/missing",
+      "release/qualification-gate/mac-prerequisites/failure",
+      "release/qualification-gate/mac-prerequisites/cancelled",
+      "release/qualification-gate/mac-prerequisites/skipped",
+      "release/qualification-gate/mac-prerequisites/pending",
+      "release/qualification-gate/mac-prerequisites/missing",
+      "release/qualification-gate/mac-started/failure",
+      "release/qualification-gate/mac-started/cancelled",
+      "release/qualification-gate/mac-started/skipped",
+      "release/qualification-gate/mac-started/pending",
+      "release/qualification-gate/mac-started/missing",
+      "release/qualification-gate/mac-tests/failure",
+      "release/qualification-gate/mac-tests/cancelled",
+      "release/qualification-gate/mac-tests/skipped",
+      "release/qualification-gate/mac-tests/pending",
+      "release/qualification-gate/mac-tests/missing",
+      "release/qualification-gate/mac-unit/failure",
+      "release/qualification-gate/mac-unit/cancelled",
+      "release/qualification-gate/mac-unit/skipped",
+      "release/qualification-gate/mac-unit/pending",
+      "release/qualification-gate/mac-unit/missing",
+      "release/qualification-gate/metadata/failure",
+      "release/qualification-gate/metadata/cancelled",
+      "release/qualification-gate/metadata/skipped",
+      "release/qualification-gate/metadata/pending",
+      "release/qualification-gate/metadata/missing",
+      "release/qualification-gate/windows/failure",
+      "release/qualification-gate/windows/cancelled",
+      "release/qualification-gate/windows/skipped",
+      "release/qualification-gate/windows/pending",
+      "release/qualification-gate/windows/missing",
+      "release/qualification-gate/empty",
+      "release/qualification-gate/additional-job"
+    ]
+  },
+  "release-qualification-jobs": {
+    "kind": "events",
+    "command": [
+      "bash",
+      "tools/release/test-qualification-jobs.sh"
+    ],
+    "ids": [
+      "release/qualification-jobs/default",
+      "release/qualification-jobs/linux-parallel",
+      "release/qualification-jobs/low-memory",
+      "release/qualification-jobs/darwin-parallel",
+      "release/qualification-jobs/darwin-serial",
+      "release/qualification-jobs/invalid/0",
+      "release/qualification-jobs/invalid/3",
+      "release/qualification-jobs/invalid/-1",
+      "release/qualification-jobs/invalid/02",
+      "release/qualification-jobs/invalid/invalid"
+    ]
+  },
+  "release-shared-candidate": {
+    "kind": "events",
+    "command": [
+      "bash",
+      "tools/release/test-shared-candidate.sh"
+    ],
+    "ids": [
+      "release/shared-candidate/export",
+      "release/shared-candidate/verify",
+      "release/shared-candidate/changed-publication/emlf",
+      "release/shared-candidate/changed-publication/mlfpkg",
+      "release/shared-candidate/changed-publication/compiler-tests",
+      "release/shared-candidate/missing-dependency-proof",
+      "release/shared-candidate/runner-bytes",
+      "release/shared-candidate/source-snapshot",
+      "release/shared-candidate/environment",
+      "release/shared-candidate/manifest/source",
+      "release/shared-candidate/manifest/platform",
+      "release/shared-candidate/manifest/root",
+      "release/shared-candidate/seed-built-runner",
+      "release/shared-candidate/scheduler",
+      "release/shared-candidate/dependency-receipt",
+      "release/shared-candidate/clean-import",
+      "release/shared-candidate/consumer-campaign"
+    ]
+  },
+  "release-unit-evidence": {
+    "kind": "events",
+    "command": [
+      "bash",
+      "tools/release/test-unit-evidence.sh"
+    ],
+    "ids": [
+      "release/unit-evidence/valid",
+      "release/unit-evidence/envelope/incomplete",
+      "release/unit-evidence/envelope/wrong-implementation",
+      "release/unit-evidence/envelope/wrong-group",
+      "release/unit-evidence/envelope/partial-unit",
+      "release/unit-evidence/changed-shard-binary",
+      "release/unit-evidence/changed-cli-helper",
+      "release/unit-evidence/missing-partial-receipt",
+      "release/unit-evidence/invented-aggregate-binary",
+      "release/unit-evidence/missing-target",
+      "release/unit-evidence/duplicate-target",
+      "release/unit-evidence/wrong-scope",
+      "release/unit-evidence/changed-invocation",
+      "release/unit-evidence/different-compile-tool",
+      "release/unit-evidence/receipt/failed-scheduler",
+      "release/unit-evidence/receipt/repeated-key",
+      "release/unit-evidence/receipt/over-parallel",
+      "release/unit-evidence/rehashed-inventory",
+      "release/unit-evidence/registry-formatting",
+      "release/unit-evidence/missing-registry-discovery",
+      "release/unit-evidence/changed-registry-discovery",
+      "release/unit-evidence/changed-registry-contract",
+      "release/unit-evidence/missing-semantic-case-report",
+      "release/unit-evidence/rehashed-registry/id",
+      "release/unit-evidence/rehashed-registry/name",
+      "release/unit-evidence/rehashed-registry/family",
+      "release/unit-evidence/rehashed-registry/duplicate",
+      "release/unit-evidence/rehashed-registry/missing",
+      "release/unit-evidence/rehashed-registry/total"
+    ]
+  },
+  "release-async-bootstrap": {
+    "kind": "events",
+    "command": [
+      "bash",
+      "tools/release/test-async-bootstrap.sh"
+    ],
+    "ids": [
+      "release/async-bootstrap/old-manager-rejection",
+      "release/async-bootstrap/failed-transition",
+      "release/async-bootstrap/retry-and-repeat",
+      "release/async-bootstrap/isolated-bridge"
+    ]
+  },
+  "release-shared-bootstrap-dispatch": {
+    "kind": "events",
+    "command": [
+      "bash",
+      "tools/release/test-shared-bootstrap-dispatch.sh"
+    ],
+    "ids": [
+      "release/shared-bootstrap-dispatch/shared-dispatch",
+      "release/shared-bootstrap-dispatch/released-seed",
+      "release/shared-bootstrap-dispatch/producer/native-MLF",
+      "release/shared-bootstrap-dispatch/producer/GHC",
+      "release/shared-bootstrap-dispatch/legacy-dispatch"
+    ]
+  },
+  "release-shared-bootstrap-orchestration": {
+    "kind": "events",
+    "command": [
+      "bash",
+      "tools/release/test-shared-bootstrap-orchestration.sh"
+    ],
+    "ids": [
+      "release/shared-bootstrap-orchestration/mock-seed-rejected",
+      "release/shared-bootstrap-orchestration/verify-only",
+      "release/shared-bootstrap-orchestration/ghc-seed-rejected",
+      "release/shared-bootstrap-orchestration/native-route",
+      "release/shared-bootstrap-orchestration/failed-build-invalidates",
+      "release/shared-bootstrap-orchestration/retry",
+      "release/shared-bootstrap-orchestration/source-mutation"
+    ]
+  },
+  "release-timed-async-bootstrap": {
+    "kind": "events",
+    "command": [
+      "bash",
+      "tools/release/test-timed-async-bootstrap.sh"
+    ],
+    "ids": [
+      "release/timed-bootstrap-controls/primitive/success",
+      "release/timed-bootstrap-controls/primitive/transition-failed",
+      "release/timed-bootstrap-controls/primitive/bad-capability",
+      "release/timed-bootstrap-controls/primitive/bad-hash",
+      "release/timed-bootstrap-controls/primitive/missing-helper",
+      "release/timed-bootstrap-controls/primitive/root-failed",
+      "release/timed-bootstrap-controls/primitive/rss",
+      "release/timed-bootstrap-controls/shared/success",
+      "release/timed-bootstrap-controls/shared/transition-failed",
+      "release/timed-bootstrap-controls/shared/missing-compiler",
+      "release/timed-bootstrap-controls/shared/nonexecutable-compiler",
+      "release/timed-bootstrap-controls/shared/root-failed",
+      "release/timed-bootstrap-controls/shared/rss"
+    ]
+  },
+  "release-direct-source-smoke": {
+    "kind": "events",
+    "command": [
+      "bash",
+      "tools/release/test-direct-source-smoke.sh"
+    ],
+    "ids": [
+      "release/direct-source-smoke/authenticated",
+      "release/direct-source-smoke/incomplete",
+      "release/direct-source-smoke/source-path",
+      "release/direct-source-smoke/runner-hash",
+      "release/direct-source-smoke/missing-host-inputs",
+      "release/direct-source-smoke/missing-flags",
+      "release/direct-source-smoke/changed-source",
+      "release/direct-source-smoke/native-route"
+    ]
+  },
+  "release-source-smoke-diagnostics": {
+    "kind": "events",
+    "command": [
+      "bash",
+      "tools/release/test-source-smoke-diagnostics.sh"
+    ],
+    "ids": [
+      "release/source-smoke-diagnostics/success",
+      "release/source-smoke-diagnostics/timeout",
+      "release/source-smoke-diagnostics/progress",
+      "release/source-smoke-diagnostics/telemetry"
+    ]
+  },
+  "release-pr-smoke-cli-watchdog": {
+    "kind": "events",
+    "command": [
+      "bash",
+      "tools/release/test-pr-smoke-cli-watchdog.sh"
+    ],
+    "ids": [
+      "release/pr-cli-watchdog/initial",
+      "release/pr-cli-watchdog/grace"
+    ]
+  },
+  "release-shared-seed-provenance": {
+    "kind": "events",
+    "command": [
+      "bash",
+      "tools/release/test-shared-seed-provenance.sh"
+    ],
+    "ids": [
+      "release/shared-seed-provenance/official-wrapper",
+      "release/shared-seed-provenance/direct-native",
+      "release/shared-seed-provenance/standalone-manager",
+      "release/shared-seed-provenance/mixed-bundles",
+      "release/shared-seed-provenance/undeclared-file",
+      "release/shared-seed-provenance/changed-bytes",
+      "release/shared-seed-provenance/symlink",
+      "release/shared-seed-provenance/parent-traversal",
+      "release/shared-seed-provenance/inconsistent-metadata",
+      "release/shared-seed-provenance/unknown-wrapper",
+      "release/shared-seed-provenance/wrapper-not-executed"
+    ]
+  },
+  "release-native-manager-identity": {
+    "kind": "events",
+    "command": [
+      "bash",
+      "tools/release/test-native-manager-identity.sh"
+    ],
+    "ids": [
+      "release/native-manager-identity/reject-GHC",
+      "release/native-manager-identity/reject-unknown",
+      "release/native-manager-identity/actual-ghc",
+      "release/native-manager-identity/reject-nonnative-output",
+      "release/native-manager-identity/accept-native"
+    ],
+    "allow_skip": true
+  },
+  "release-timed-shared-seed": {
+    "kind": "exit",
+    "command": [
+      "bash",
+      "tools/release/test-timed-shared-seed.sh"
+    ],
+    "ids": [
+      "release/bootstrap/official-seed-transition"
+    ]
+  },
+  "release-tag-controls": {
+    "kind": "events",
+    "command": [
+      "node",
+      "tools/release/test-release-tag.mjs"
+    ],
+    "ids": [
+      "release/tag/workflow-protection",
+      "release/tag/metadata/missing",
+      "release/tag/publish/missing",
+      "release/tag/metadata/same-named-branch",
+      "release/tag/publish/same-named-branch",
+      "release/tag/metadata/lightweight",
+      "release/tag/publish/lightweight",
+      "release/tag/metadata/annotated",
+      "release/tag/publish/annotated",
+      "release/tag/metadata/moved",
+      "release/tag/publish/moved"
+    ]
+  },
+  "release-native-ci-partition": {
+    "kind": "events",
+    "command": [
+      "node",
+      "tools/release/test-native-ci-partition.mjs"
+    ],
+    "prefix": "release/native-ci-partition/",
+    "list_args": [
+      "--framework-list"
+    ],
+    "exact": true
+  },
+  "release-macos-toolchain-workflow": {
+    "kind": "events",
+    "command": [
+      "node",
+      "tools/release/test-macos-toolchain-workflow.mjs"
+    ],
+    "prefix": "release/macos-toolchain-workflow/",
+    "list_args": [
+      "--framework-list"
+    ],
+    "exact": true
+  },
+  "release-ci-policy": {
+    "kind": "events",
+    "command": [
+      "node",
+      "tools/release/test-ci-policy.mjs"
+    ],
+    "ids": [
+      "release/ci/concurrency",
+      "release/ci/required-checks",
+      "release/ci/hosted-guest",
+      "release/ci/resource-and-output-bounds",
+      "release/ci/async-platforms",
+      "release/ci/native-and-publishing"
+    ]
+  },
+  "release-seed-artifact": {
+    "kind": "unittest",
+    "command": [
+      "python3",
+      "-B",
+      "tools/release/test-fetch-seed-artifact.py"
+    ],
+    "prefix": "release-seed-artifact/",
+    "allow_skip": true,
+    "exact": true
+  },
+  "release-async-change-scope": {
+    "kind": "unittest",
+    "command": [
+      "python3",
+      "-B",
+      "tools/release/test-async-change-scope.py"
+    ],
+    "prefix": "release-async-change-scope/",
+    "allow_skip": true,
+    "exact": true
+  },
+  "release-developer-commands": {
+    "kind": "unittest",
+    "command": [
+      "python3",
+      "-B",
+      "tools/developer/test_commands.py"
+    ],
+    "prefix": "release-developer-commands/",
+    "allow_skip": true,
+    "exact": true
+  },
+  "release-developer-process": {
+    "kind": "unittest",
+    "command": [
+      "python3",
+      "-B",
+      "tools/developer/test_process.py"
+    ],
+    "prefix": "release-developer-process/",
+    "allow_skip": true,
+    "exact": true
+  },
+  "release-shared-provenance": {
+    "kind": "unittest",
+    "command": [
+      "python3",
+      "-B",
+      "tools/shared/test_provenance.py"
+    ],
+    "prefix": "release-shared-provenance/",
+    "allow_skip": true,
+    "exact": true
+  },
+  "release-generated-string-pool": {
+    "kind": "unittest",
+    "command": [
+      "python3",
+      "-B",
+      "tools/shared/test_generated_string_pool.py"
+    ],
+    "prefix": "release-generated-string-pool/",
+    "allow_skip": true,
+    "exact": true
+  },
+  "release-prepared-verification": {
+    "kind": "unittest",
+    "command": [
+      "python3",
+      "-B",
+      "tools/shared/test_prepared_verification.py"
+    ],
+    "prefix": "release-prepared-verification/",
+    "allow_skip": true,
+    "exact": true
+  },
+  "release-performance-a1-platform": {
+    "kind": "unittest",
+    "command": [
+      "python3",
+      "-B",
+      "tools/performance/a1-private-index/test_platform.py"
+    ],
+    "prefix": "release-performance-a1-platform/",
+    "allow_skip": true,
+    "exact": true
+  },
+  "release-performance-local-transaction": {
+    "kind": "unittest",
+    "command": [
+      "python3",
+      "-B",
+      "tools/performance/c4-local-transaction/test_controls.py"
+    ],
+    "prefix": "release-performance-local-transaction/",
+    "allow_skip": true,
+    "exact": true
+  },
+  "release-performance-inference-controls": {
+    "kind": "unittest",
+    "command": [
+      "python3",
+      "-B",
+      "tools/shared/test_perf_inference.py"
+    ],
+    "prefix": "release-performance-inference-controls/",
+    "allow_skip": true,
+    "exact": true
+  },
+  "release-io-action-controls": {
+    "kind": "unittest",
+    "command": [
+      "python3",
+      "-B",
+      "tools/shared/test_io_action_sharing_controls.py"
+    ],
+    "prefix": "release-io-action-controls/",
+    "allow_skip": true,
+    "exact": true
+  },
+  "release-framework-controls": {
+    "kind": "unittest",
+    "command": [
+      "python3",
+      "-B",
+      "tools/shared/test_framework_controls.py"
+    ],
+    "prefix": "release-framework-controls/",
+    "allow_skip": true,
+    "exact": true
+  },
+  "release-framework-policy": {
+    "kind": "unittest",
+    "command": [
+      "python3",
+      "-B",
+      "tools/shared/test_framework_policy.py"
+    ],
+    "prefix": "release-framework-policy/",
+    "allow_skip": true,
+    "exact": true
+  },
+  "release-source-field-controls": {
+    "kind": "unittest",
+    "command": [
+      "python3",
+      "-B",
+      "tools/shared/test_source_field_layout_controls.py"
+    ],
+    "prefix": "release-source-field-controls/",
+    "allow_skip": true,
+    "exact": true
+  },
+  "release-watchdog-tests": {
+    "kind": "unittest",
+    "command": [
+      "python3",
+      "-B",
+      "tools/shared/test_resource_watchdog.py"
+    ],
+    "prefix": "release-watchdog-tests/",
+    "allow_skip": true,
+    "exact": true
+  },
+  "release-guest-framework-controls": {
+    "kind": "unittest",
+    "command": [
+      "python3",
+      "-B",
+      "tools/shared/test_guest_framework_controls.py"
+    ],
+    "prefix": "release-guest-framework-controls/",
+    "allow_skip": true,
+    "exact": true
+  },
+  "release-guest-state-controls": {
+    "kind": "unittest",
+    "command": [
+      "python3",
+      "-B",
+      "tools/shared/test_guest_state_laws_controls.py"
+    ],
+    "prefix": "release-guest-state-controls/",
+    "allow_skip": true,
+    "exact": true
+  },
+  "release-manifest-snapshot": {
+    "kind": "exit",
+    "command": [
+      "python3",
+      "-B",
+      "tools/testing/check_manifest_snapshot.py"
+    ],
+    "ids": [
+      "release/source-audit/manifest-snapshot"
+    ]
+  },
+  "release-core-registry-controls": {
+    "kind": "unittest",
+    "command": [
+      "python3",
+      "-B",
+      "tools/testing/test_core_registry_contract.py"
+    ],
+    "prefix": "release-core-registry-controls/",
+    "allow_skip": false,
+    "exact": true
+  },
+  "release-tuple-list-qualification": {
+    "kind": "events",
+    "command": [
+      "python3",
+      "-B",
+      "tools/release/test-tuple-list-qualification.py"
+    ],
+    "ids": [
+      "release/tuple-list-qualification/pass",
+      "release/tuple-list-qualification/dirty-source",
+      "release/tuple-list-qualification/unauthenticated",
+      "release/tuple-list-qualification/build-failure",
+      "release/tuple-list-qualification/bad-build-report",
+      "release/tuple-list-qualification/harness-failure",
+      "release/tuple-list-qualification/missing-marker",
+      "release/tuple-list-qualification/native-failure",
+      "release/tuple-list-qualification/mutated-source",
+      "release/tuple-list-qualification/mutated-tool",
+      "release/tuple-list-qualification/post-auth-failure"
+    ],
+    "exact": true
+  },
+  "release-watchdog-output": {
+    "kind": "events",
+    "command": [
+      "python3",
+      "-B",
+      "tools/shared/test_resource_watchdog_output.py"
+    ],
+    "ids": [
+      "release/watchdog-output/regular-bytes",
+      "release/watchdog-output/named-vanish",
+      "release/watchdog-output/unlisted-vanish",
+      "release/watchdog-output/nested-path",
+      "release/watchdog-output/root",
+      "release/watchdog-output/outside",
+      "release/watchdog-output/dotdot",
+      "release/watchdog-output/wrong-errno",
+      "release/watchdog-output/permission",
+      "release/watchdog-output/not-directory",
+      "release/watchdog-output/io",
+      "release/watchdog-output/no-filename",
+      "release/watchdog-output/absent-root",
+      "release/watchdog-output/file-root",
+      "release/watchdog-output/root-vanished",
+      "release/watchdog-output/root-replaced",
+      "release/watchdog-output/renamed-before-sample",
+      "release/watchdog-output/renamed-next-sample",
+      "release/watchdog-output/vanished-file",
+      "release/watchdog-output/symlink-excluded"
+    ]
+  },
+  "release-parameter-field-controls": {
+    "kind": "events",
+    "command": [
+      "python3",
+      "-B",
+      "tools/shared/test_parameter_field_graph.py",
+      "--self-test"
+    ],
+    "ids": [
+      "release/parameter-field-controls/complete-output",
+      "release/parameter-field-controls/missing-observation",
+      "release/parameter-field-controls/extra-observation",
+      "release/parameter-field-controls/duplicate-observation",
+      "release/parameter-field-controls/reordered-observations",
+      "release/parameter-field-controls/partial-output",
+      "release/parameter-field-controls/missing-banner",
+      "release/parameter-field-controls/wrong-banner",
+      "release/parameter-field-controls/diagnostic-stdout",
+      "release/parameter-field-controls/invalid-utf-8",
+      "release/parameter-field-controls/crlf-output",
+      "release/parameter-field-controls/missing-terminal-newline",
+      "release/parameter-field-controls/nonzero-exit",
+      "release/parameter-field-controls/signal",
+      "release/parameter-field-controls/stderr",
+      "release/parameter-field-controls/different-oracle"
+    ]
+  },
+  "release-qualification-check": {
+    "kind": "exit",
+    "command": [
+      "bash",
+      "tools/release/qualification-gate.sh"
+    ],
+    "ids": [
+      "release/native-qualification/all-required-jobs"
+    ]
+  },
+  "package-release-tests": {
+    "kind": "events",
+    "command": [
+      "python3",
+      "-B",
+      "tools/release/test-release-package.py"
+    ],
+    "prefix": "release/package-target/",
+    "list_args": [
+      "--framework-list"
+    ],
+    "exact": true
+  },
+  "macos-dependencies-record": {
+    "kind": "events",
+    "command": [
+      "bash",
+      "tools/release/test-macos-dependency-bytes.sh",
+      "record"
+    ],
+    "ids": [
+      "release/macos-dependencies/producer-byte-inventory"
+    ]
+  },
+  "macos-dependencies-verify": {
+    "kind": "events",
+    "command": [
+      "bash",
+      "tools/release/test-macos-dependency-bytes.sh",
+      "verify"
+    ],
+    "ids": [
+      "release/macos-dependencies/formula-revision",
+      "release/macos-dependencies/formula-closure",
+      "release/macos-dependencies/installed-bytes",
+      "release/macos-dependencies/clang-gmp-collector"
+    ]
+  }
+}

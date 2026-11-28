@@ -5,7 +5,7 @@ Subcommands:
   list     show endpoints, matrices, families and the cells a matrix resolves to
   prepare  build the fixed dependencies once (private GHC package DB, runtime,
            builtin checked pair) and write setup.json
-  run      execute one frozen cohort (filters: --family, --size, --repeats)
+  run      execute one frozen cohort and report its build performance checks
   sweep    run families one at a time and tabulate their paired build times
   growth   fit standard-size point exponents from a published CSV or sweep directory
   installed  compare two public installations with GHC using fresh and warm targets
@@ -27,6 +27,7 @@ import subprocess
 import sys
 
 import command_runner
+import fit_growth
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[2]
@@ -70,23 +71,18 @@ def resolve(matrix_name, families, sizes):
     for size in chosen_sizes:
         if not 0 < size <= 8192:
             raise SystemExit('size out of the bounded range: ' + str(size))
-    include_baseline = 'baseline' in chosen_families or bool(matrix['baseline'])
+    include_baseline = fit_growth.include_baseline(chosen_families, chosen_sizes, matrix['baseline'])
     chosen_families = [family for family in chosen_families if family != 'baseline']
     return matrix, chosen_families, chosen_sizes, include_baseline
 
 
 def compile_count(cells, repeats):
-    return cells * repeats * 2
+    return cells * repeats * 3
 
 
 def command_growth(args):
     import csv
-    try:
-        from matrix_growth import points
-    except ModuleNotFoundError as err:
-        if err.name != 'numpy':
-            raise
-        raise SystemExit('growth analysis requires NumPy') from err
+    from matrix_growth import points
     try:
         rows = list(points(args.input, registry()['matrices']['default']))
     except (OSError, KeyError, ValueError) as err:
@@ -105,6 +101,7 @@ def command_list(args):
     print('endpoint: ' + args.endpoint + ' (' + data['endpoints'][args.endpoint]['status'] + ')')
     print('families: ' + ', '.join(families))
     print('sizes:    ' + ', '.join(str(size) for size in sizes))
+    print('compiler baseline: HEAD when dirty, first parent when clean')
     print('baseline: ' + ('yes' if include_baseline else 'no'))
     print('cells:    ' + str(cells) + ', timed compilations: '
           + str(compile_count(cells, matrix['repeats'])))
@@ -116,6 +113,20 @@ def command_list(args):
     print('claim limits:')
     for limit in data['claim_limits']:
         print('  - ' + limit)
+
+
+def framework_list(argv):
+    import framework_results as framework
+    import generate
+    parser = argparse.ArgumentParser()
+    parser.add_argument('command', nargs='?', choices=('all', 'run', 'sweep'), default='sweep')
+    parser.add_argument('--matrix', default='default')
+    parser.add_argument('--baseline-family')
+    add_filters(parser)
+    args, _setup_options = parser.parse_known_args(argv)
+    _, families, sizes, baseline = resolve(args.matrix, args.family, args.size)
+    requested = ['baseline', *families] if baseline else families
+    framework.list_cases(generate.coordinates(sizes, requested, args.baseline_family))
 
 
 def prepare_setup(workdir, endpoint, producer, *, source=None, builtin_prefix=None,
@@ -186,7 +197,7 @@ def add_filters(parser):
                         help='repeat or comma-separate sizes')
 
 
-def command_run(args, setup=None):
+def command_run(args, setup=None, *, record_only=False):
     workdir = args.workdir.resolve()
     setup = Path(setup or args.setup or workdir / 'setup' / 'setup.json').resolve()
     if not setup.is_file():
@@ -196,17 +207,22 @@ def command_run(args, setup=None):
         raise SystemExit('cohort needs a plain directory label')
     output = workdir / 'cohorts' / cohort
     matrix, families, sizes, include_baseline = resolve(args.matrix, args.family, args.size)
-    repeats = args.repeats or matrix['repeats']
-    if repeats < 3:
-        raise SystemExit('fewer than three repetitions are qualification data, not samples; use --pilot in run.py')
+    repeats = matrix['repeats'] if args.repeats is None else args.repeats
+    if repeats < fit_growth.MIN_PAIRED_REPEATS:
+        raise SystemExit(f'run requires at least {fit_growth.MIN_PAIRED_REPEATS} pairs per size. '
+                         'For a one-pair qualification, use --pilot in run.py.')
     argv = [sys.executable, '-B', HERE / 'run.py', '--setup', setup, '--output', output,
             '--endpoint', args.endpoint, '--cohort', cohort, '--repeats', repeats]
+    if record_only:
+        argv.append('--record-only')
     if getattr(args, 'interleave_pairs', False):
         argv.append('--interleave-pairs')
     if getattr(args, 'cohort_output_gib', None) is not None:
         argv += ['--cohort-output-gib', args.cohort_output_gib]
     if include_baseline:
         argv += ['--family', 'baseline']
+    if getattr(args, 'baseline_family', None):
+        argv += ['--baseline-family', args.baseline_family]
     for family in families:
         argv += ['--family', family]
     for size in sizes:
@@ -236,8 +252,15 @@ def command_sweep(args):
 
 
 def main():
+    if sys.argv[1:2] == ['--framework-list']:
+        framework_list(sys.argv[2:])
+        return
     if sys.argv[1:2] == ['installed']:
-        run([sys.executable, '-B', HERE / 'installed.py', *sys.argv[2:]])
+        if any(flag in sys.argv[2:] for flag in ('-h', '--help')):
+            run([sys.executable, '-B', HERE / 'installed.py', *sys.argv[2:]])
+        else:
+            run([sys.executable, '-B', ROOT / 'tools/testing/run.py', 'compiler-shapes-installed',
+                 '--', *sys.argv[2:]])
         return
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -260,11 +283,13 @@ def main():
     prepare.add_argument('--endpoint', default=registry()['default_endpoint'])
     prepare.set_defaults(func=command_prepare)
 
-    runner = sub.add_parser('run', help='run one frozen cohort')
+    runner = sub.add_parser('run', help='run one frozen cohort and report its build performance checks')
     runner.add_argument('--workdir', type=Path, required=True)
     runner.add_argument('--cohort', required=True)
     runner.add_argument('--matrix', default='default')
     runner.add_argument('--endpoint', default=registry()['default_endpoint'])
+    runner.add_argument('--baseline-family',
+                        help='measure a zero-size cell with the same dependency graph')
     add_filters(runner)
     runner.add_argument('--repeats', type=int)
     runner.add_argument('--interleave-pairs', action='store_true')
@@ -320,7 +345,10 @@ def main():
         if not setup.is_file():
             setup = command_prepare(args)
         args.setup = setup
-        command_run(args, setup)
+        folder = command_run(args, setup, record_only=True)
+        if not json.loads((folder / 'receipt.json').read_text())['all_cases_passed']:
+            from analyze import save_recorded_growth
+            print(save_recorded_growth(folder), flush=True)
         analyze = argparse.Namespace(workdir=args.workdir, cohort=[args.cohort],
                                      label=args.label, plot=args.plot)
         command_analyze(analyze)

@@ -8,24 +8,26 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: formatter-compatibility-${{ github.ref }}
+  # Label notifications outside this workflow’s policy must not cancel real checks.
+  group: formatter-compatibility-${{ (!github.event.label || github.event.label.name == 'ci:skip') && github.ref || github.run_id }}
   cancel-in-progress: true
 jobs:
   formatter-compatibility:
-    name: Safe Ormolu 0.9.0.0 / current parser
-    if: github.event_name != 'pull_request' || !contains(github.event.pull_request.labels.*.name, 'ci:skip')
+    name: Safe Ormolu 0.9.0.0 / current parser${{ github.event.label && github.event.label.name != 'ci:skip' && ' (unrelated label)' || '' }}
+    if: >-
+      (!github.event.label || github.event.label.name == 'ci:skip') &&
+      (github.event_name != 'pull_request' || !contains(github.event.pull_request.labels.*.name, 'ci:skip'))
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: ./.github/actions/linux-ghc-bindist
       - name: Install pinned official GHC and Ormolu
         run: |
           set -euo pipefail
           sudo apt-get update
           sudo apt-get install -y build-essential libgmp-dev libnuma-dev libncurses-dev xz-utils unzip
           archive="$RUNNER_TEMP/ghc-9.14.1.tar.xz"
-          curl -fsSL https://downloads.haskell.org/~ghc/9.14.1/ghc-9.14.1-x86_64-deb12-linux.tar.xz -o "$archive"
-          printf '%s  %s\n' 60f7ab75f28df892729fbaff3a54f58ee3ad7e731929f1b2f3eb0208f73de841 "$archive" | sha256sum -c -
           tar -xJf "$archive" -C "$RUNNER_TEMP"
           (cd "$RUNNER_TEMP/ghc-9.14.1-x86_64-unknown-linux" && ./configure --prefix="$RUNNER_TEMP/ghc" && make install)
           echo "$RUNNER_TEMP/ghc/bin" >> "$GITHUB_PATH"
@@ -37,13 +39,13 @@ jobs:
           echo "$RUNNER_TEMP/ormolu" >> "$GITHUB_PATH"
       - name: Test runner failure guards
         run: |
-          python3 -B tools/shared/test_formatter_compatibility_controls.py
-          python3 -O -B tools/shared/test_formatter_compatibility_controls.py
-          python3 -B tools/shared/test_source_prologue.py
-          python3 -O -B tools/shared/test_source_prologue.py
-          python3 -B tools/testing/test_manifest_snapshot.py
+          python3 -B tools/testing/run.py python-shared-formatter-compatibility-controls
+          python3 -B tools/testing/run.py python-shared-formatter-compatibility-controls --python-optimization
+          python3 -B tools/testing/run.py python-shared-source-prologue
+          python3 -B tools/testing/run.py python-shared-source-prologue --python-optimization
+          python3 -B tools/testing/run.py python-testing-manifest-snapshot
       - name: Format isolated copies and compare current parser ASTs
-        run: python3 -B tools/shared/test_formatter_compatibility.py --output .mlf-build/formatter-compatibility
+        run: python3 -B tools/testing/run.py formatter-compatibility -- --output .mlf-build/formatter-compatibility
       - name: Preserve receipts and diagnostics
         if: always()
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6

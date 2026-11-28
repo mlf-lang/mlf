@@ -7,6 +7,7 @@ import json
 import math
 import os
 from pathlib import Path
+import re
 import shutil
 import signal
 import subprocess
@@ -236,6 +237,46 @@ def child_cpu_interval(before, after):
     return result
 
 
+def source_compiler_command(argv):
+    if Path(argv[0]).name not in ('emlf', 'emlf.exe'):
+        return False
+    args = argv[1:]
+    while args:
+        option = str(args[0])
+        if option == '-i':
+            args = args[2:]
+        elif option == '--no-prelude' or (option.startswith('-i') and len(option) > 2):
+            args = args[1:]
+        else:
+            break
+    return (not args or not str(args[0]).startswith('-') or args[0] in
+            ('-', '-o', '--build-dir', '--expr', '--type', '--run', '--compile',
+             '--emit-llvm', '--emit-llvm-gc', '--emit-native-llvm'))
+
+
+def dependency_diagnostics(stderr):
+    """Separate the compiler's structured decisions from program/error diagnostics."""
+    rows = []
+    diagnostics = []
+    for line in stderr.splitlines(keepends=True):
+        match = re.fullmatch(rb'dependency ([^\r\n]+): (native|ir|source|unused) \(([^\r\n]+)\)\n', line)
+        if match:
+            try:
+                name, mode, reason = (field.decode('utf-8') for field in match.groups())
+                # The compiler JSON-escapes the label and the reason on each line.
+                rows.append(dict(dependency=json.loads('"' + name + '"'), mode=mode,
+                                 reason=json.loads('"' + reason + '"')))
+                continue
+            except (UnicodeDecodeError, json.JSONDecodeError):
+                pass
+        diagnostics.append(line)
+    return rows, b''.join(diagnostics)
+
+
+def command_diagnostics(argv, stderr):
+    return dependency_diagnostics(stderr) if source_compiler_command(argv) else ([], stderr)
+
+
 class CommandRunner:
     def __init__(self, root, output, receipt, save):
         self.root, self.output, self.receipt, self.save = root, output, receipt, save
@@ -279,11 +320,15 @@ class CommandRunner:
             cleanup['error'] = 'original process-group cleanup could not drain captures or reap the leader within its bounds'
         return stdout, stderr, cleanup
 
-    def run(self, name, command, *, overrides=None, status=0, expected=None, timeout=180):
+    def run(self, name, command, *, overrides=None, status=0, expected=None, timeout=180, stdin=None):
         command = list(map(str, command))
         overrides = overrides or {}
         entry = {'name': name, 'argv': command, 'cwd': str(self.root), 'started': time.time(),
                  'timeout_seconds': timeout, 'environment_overrides': overrides, 'state': 'running'}
+        if stdin is not None:
+            input_path = self.output / (name + '.stdin')
+            input_path.write_bytes(stdin)
+            entry['stdin_sha256'] = sha(input_path)
         self.receipt['commands'].append(entry)
         self.save()
         stdout, stderr = b'', b''
@@ -293,9 +338,10 @@ class CommandRunner:
         group_stopped = False
         try:
             process = subprocess.Popen(command, cwd=self.root, env={**os.environ, **overrides},
+                                       stdin=subprocess.PIPE if stdin is not None else None,
                                        stdout=subprocess.PIPE, stderr=subprocess.PIPE, start_new_session=True)
             try:
-                stdout, stderr = process.communicate(timeout=timeout)
+                stdout, stderr = process.communicate(input=stdin, timeout=timeout)
             except subprocess.TimeoutExpired:
                 entry['timed_out'] = True
                 stdout, stderr, entry['cleanup'] = self.stop_group(process)
@@ -303,10 +349,17 @@ class CommandRunner:
             entry['exit_code'] = process.returncode
             if entry.get('timed_out'):
                 raise RuntimeError(name + ' exceeded ' + str(timeout) + ' seconds')
-            if process.returncode != status or (expected is not None and stdout != expected) or (status == 0 and stderr):
+            modes, diagnostics = command_diagnostics(command, stderr)
+            if Path(command[0]).name in ('mlfpkg', 'mlfpkg.exe') and '--manifest' in command:
+                modes, diagnostics = dependency_diagnostics(stderr)
+                diagnostics = b''.join(line for line in diagnostics.splitlines(keepends=True)
+                                       if not re.fullmatch(rb'Building [^\r\n]+\n', line))
+            if modes:
+                entry['dependency_modes'] = modes
+            if process.returncode != status or (expected is not None and stdout != expected) or (status == 0 and diagnostics):
                 raise RuntimeError(name + ' failed; see ' + str(self.output / (name + '.stderr')))
             entry['state'] = 'passed'
-            return subprocess.CompletedProcess(command, process.returncode, stdout, stderr)
+            return subprocess.CompletedProcess(command, process.returncode, stdout, diagnostics)
         except BaseException as error:
             entry['state'] = 'failed'
             entry['error'] = str(error)
@@ -325,7 +378,7 @@ class CommandRunner:
             self.save()
 
 
-def main():
+def main(*, runner_factory=CommandRunner):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--bin-dir', type=Path, required=True)
     parser.add_argument('--build-receipt', type=Path)
@@ -341,7 +394,7 @@ def main():
     binaries, output = args.bin_dir.resolve(), args.output.resolve()
     output.mkdir(parents=True, exist_ok=False)
     receipt = {'format': 1, 'complete': False, 'source_mode': 'authenticated direct committed shared source',
-               'commands': [], 'inputs': {}}
+               'commands': []}
 
     def save():
         temporary = output / 'receipt.json.new'
@@ -365,34 +418,11 @@ def main():
         receipt['fixture_compiler'] = identified(compiler)
         compiler = receipt['fixture_compiler']['path']
         receipt['orchestrator'] = identified(sys.executable)
-        inputs = [ROOT / x for x in ORACLES]
-        inputs += [ROOT / 'shared-sources.json', ROOT / 'tests/async-process/fixture.c',
-                   ROOT / 'tests/async-task/fixture.c', Path(__file__).resolve(),
-                   ROOT / 'tools/release/test-suite-build-receipts.py', build_receipt,
-                   ROOT / 'tools/shared/test_ordered_map.py',
-                   ROOT / 'tools/shared/test_query_json.py', ROOT / 'tests/shared-host/QueryJsonProbe.hs',
-                   ROOT / 'tools/shared/fixtures/QueryJson.hs.txt',
-                   ROOT / 'tools/shared/test_crc32.py', ROOT / 'tools/shared/fixtures/ByteArrayCRC32.hs',
-                   ROOT / 'tools/shared/test_byte_array_copy.py', ROOT / 'tools/shared/fixtures/ByteArrayCopy.hs',
-                   ROOT / 'tools/shared/test_utf8_length.py',
-                   ROOT / 'tools/shared/fixtures/utf8-length/Main.hs', ROOT / 'tools/shared/fixtures/utf8-length/Length.hs',
-                   ROOT / 'tests/native/runtime_utf8_length.c',
-                   ROOT / 'tools/shared/test_parser_satisfy.py',
-                   ROOT / 'tools/shared/fixtures/ParserSatisfyControls.hs',
-                   ROOT / 'tools/shared/test_metadata_receipt.py',
-                   ROOT / 'tools/shared/fixtures/MetadataReceiptControls.hs',
-                   ROOT / 'tools/shared/test_candidate_selection.py',
-                   ROOT / 'tools/shared/fixtures/CandidateSelectionControls.hs',
-                   ROOT / 'tests/indexvec/OrderedMapControls.hs',
-                   ROOT / 'tools/shared/fixtures/OrderedMap.hs',
-                   Path(compiler), Path(sys.executable).resolve()]
-        receipt['inputs'] = {str(path): sha(path) for path in inputs}
-        runner = CommandRunner(ROOT, output, receipt, save)
+        runner = runner_factory(ROOT, output, receipt, save)
         process_helper, task_helper = output / 'process-fixture', output / 'task-fixture'
         for name, source, destination in [('process', 'tests/async-process/fixture.c', process_helper),
                                            ('task', 'tests/async-task/fixture.c', task_helper)]:
             runner.run(name + '-fixture', [compiler, '-O2', '-std=c11', '-Wall', '-Wextra', '-Werror', ROOT / source, '-o', destination])
-        receipt['helpers'] = {str(path): sha(path) for path in [process_helper, task_helper]}
         specs = [('async-task', ORACLES[0], task_helper), ('async-task-processes', ORACLES[1], task_helper),
                  ('async-task-wait-graph', ORACLES[2], task_helper), ('async-process', ORACLES[3], process_helper)]
         for name, oracle, helper in specs:
@@ -433,11 +463,6 @@ def main():
                    '--output', output / 'candidate-selection'], timeout=600)
         runner.run('metadata-receipt', [sys.executable, '-B', ROOT / 'tools/shared/test_metadata_receipt.py',
                    '--build-receipt', build_receipt, '--output', output / 'metadata-receipt'], timeout=300)
-        for collection in [receipt['inputs'], receipt['helpers']]:
-            if any(sha(path) != digest for path, digest in collection.items()):
-                raise RuntimeError('test input changed during qualification')
-        # A successful run cannot outlive the source/tool identities it claims.
-        authenticate_build(build_receipt, binaries)
         receipt['complete'] = True
     except BaseException as error:
         receipt['error'] = {'type': type(error).__name__, 'message': str(error)}

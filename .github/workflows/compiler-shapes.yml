@@ -14,9 +14,9 @@ on:
         type: string
         default: ''
       repeats:
-        description: Repetitions per compiler per cell (minimum 3)
+        description: Paired builds per size (minimum 2)
         type: string
-        default: '6'
+        default: '2'
       cohort:
         description: Label for the uploaded benchmark evidence
         type: string
@@ -34,7 +34,7 @@ jobs:
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
-          fetch-depth: 1
+          fetch-depth: 2
       - name: Install pinned direct-host GHC 9.14.1
         run: |
           set -euo pipefail
@@ -55,7 +55,7 @@ jobs:
           SIZES: ${{ inputs.sizes }}
           REPEATS: ${{ inputs.repeats }}
         run: |
-          python3 -B tools/dev.py bench shapes --prune-build-products \
+          python3 -B tools/testing/run.py compiler-shapes --report .mlf-build/test-framework/compiler-shapes.json -- sweep --prune-build-products \
             --family "$FAMILIES" --size "$SIZES" --repeats "$REPEATS"
       - name: Show the human summary
         if: always()
@@ -72,9 +72,11 @@ jobs:
           include-hidden-files: true
           retention-days: 30
           path: |
+            .mlf-build/test-framework/
             .mlf-build/compiler-shapes/producer/receipt.json
             .mlf-build/compiler-shapes/summary.md
             .mlf-build/compiler-shapes/summary.csv
+            .mlf-build/compiler-shapes/growth.json
             .mlf-build/compiler-shapes/setup/setup.json
             .mlf-build/compiler-shapes/setup/preparation.json
             .mlf-build/compiler-shapes/cohorts/**/plan.json

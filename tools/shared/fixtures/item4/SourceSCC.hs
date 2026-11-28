@@ -141,13 +141,13 @@ main=do
      [compact]=[obj|obj<-objects,U.unitName(U.objectInterface obj)==groupId]
      cacheFile=cache++"/"++B.unpack digest++".mlfq"
  (exactKey,rawObject)<-decodeRawSourceCache keys cache digest compact
- let rawIface=U.objectInterface rawObject
- let rawParameters=map(\(n,t)->(X.nameHint n,t))(fst(U.splitParameters(strip(U.objectTerm rawObject))))
- _<-expect "counterexample generic validator accepts compact with same dependency context"(Q.decodeCached exactKey groupId rawParameters (U.unitData rawIface) ["sameDeps"] (Q.encodeCached exactKey compact))
  keyFields<-expect "source query framing"(U.unpack exactKey)
  assert "raw cache uses exact new source namespace"(head keyFields=="MLF-SOURCE-CRATE-QUERY-7")
- assert "raw provisional is not compact final object"(Q.encodeCached exactKey compact/=Q.encodeCached exactKey rawObject)
- writeFile cacheFile(B.unpack(Q.encodeCached exactKey compact))
+ assert "raw provisional is not compact final object"(U.encodeObject compact/=U.encodeObject rawObject)
+ Q.writeSourceCached T.Nothing (B.literal cache) (B.literal cacheFile) exactKey compact
+   >>= expect "publish final object in current raw cache format"
+ (_,published)<-decodeRawSourceCache keys cache digest compact
+ assert "generic cache reader accepts the unmodified final object"(U.encodeObject published==U.encodeObject compact)
  (repairedObjects,repaired,_)<-Q.compileSourceGroups "dispatch" (B.literal cache) [] M.empty plan >>= expect "reject normalized-as-raw cache"
  assert "normalized final payload fails raw cache validation and reinfers"(Q.inferredCount repaired==1&&Q.reusedCount repaired==fromIntegral(length objects-1))
  assert "repaired cold/miss object parity"(map U.encodeObject repairedObjects==map U.encodeObject objects)

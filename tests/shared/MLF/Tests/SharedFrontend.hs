@@ -24,6 +24,7 @@ module MLF.Tests.SharedFrontend where {
   import qualified Bootstrap.Lexer as L;
   import qualified Bootstrap.Module as Modules;
   import qualified Bootstrap.Surface as Surface;
+  import qualified Bootstrap.Dependency as Dependency;
   import qualified Bootstrap.SourceEquality as SourceEquality;
   import qualified Bootstrap.Map as M;
   import qualified Bootstrap.Compiler as C;
@@ -43,6 +44,9 @@ module MLF.Tests.SharedFrontend where {
   import qualified Tests.IndependentCheck as Independent;
   import qualified Tests.IndependentType as IndependentType;
   import qualified MLF.Tests.ClassDemand as ClassDemandTests;
+  import qualified Test.Assert as A;
+  import qualified Test.Case as Case;
+  import qualified Test.Runner as Runner;
   prologue :: String;
   prologue =
     "-- mlf:syntax shared-haskell-v1\n{-# LANGUAGE NoImplicitPrelude, NoMonomorphismRestriction, RankNTypes, KindSignatures, FlexibleContexts, FlexibleInstances, MultiParamTypeClasses, OverloadedStrings #-}\n";
@@ -173,20 +177,35 @@ module MLF.Tests.SharedFrontend where {
     };
   linkRaw text = case P.parseModule "Example.hs" (prologue ++ text) of { Left _ -> False; Right m -> isRight (Modules.linkModules ImplicitPrelude ((:) m [])) };
 
-  evaluated :: String -> Either String Runtime.RValue;
+  evaluated :: String -> IO (Either String Runtime.RValue);
   evaluated body = do {
-    result <- mapLeft C.prettyError (C.compile "Example.hs" (source body));
-    let { term = C.compiledTerm result };
-    state <- Runtime.prepare False term;
-    Runtime.evaluate (fst state) (Runtime.REnv M.empty) (X.erase term)
+    compilation <- C.compile "Example.hs" (source body);
+    ioReturn (do {
+      result <- mapLeft C.prettyError compilation;
+      let { term = C.compiledTerm result };
+      state <- Runtime.prepare False term;
+      Runtime.evaluate (fst state) (Runtime.REnv M.empty) (X.erase term)
+    })
   };
-  evaluatesInt :: String -> Int -> Bool;
-  evaluatesInt body expected = case evaluated body of {
-    Right (Runtime.RInteger actual) -> actual == expected;
+  evaluatesInt :: String -> Int -> IO Bool;
+  evaluatesInt body expected = do {
+    result <- evaluated body;
+    ioReturn (case result of { Right (Runtime.RInteger actual) -> actual == expected; _ -> False })
+  };
+  failsWith :: String -> String -> IO Bool;
+  failsWith body expected = do {
+    result <- evaluated body;
+    ioReturn (case result of { Left actual -> eqString actual expected; Right _ -> False })
+  };
+  saturatedPrimitiveRouting = let {
+    predicate = SApp (SApp (SPrimitive PEqInt) (SIntLit 1)) (SIntLit 1);
+    program = SProgram [] (SApp (SApp (SApp (SPrimitive PIfThenElse) predicate) (SIntLit 7)) (SIntLit 9));
+    form = mapEither (compose Constraint.form Constraint.skeleton)
+  } in case (,) (form (Constraint.generateFileProgram program)) (form (Constraint.generateProgram program)) of {
+    (,) (Right (FApplyPrimitive PIfThenElse [_]
+      [PrimitiveUse (Typed _ (FApplyPrimitive PEqInt [] [_,_])) _,_,_])) (Right (FApply _ _ _ _)) -> True;
     _ -> False
   };
-  failsWith :: String -> String -> Bool;
-  failsWith body expected = case evaluated body of { Left actual -> eqString actual expected; Right _ -> False };
   boxFunctor :: String;
   boxFunctor = "data Box a = Box a\ninstance Functor Box where { fmap f (Box x) = Box (f x) }\nunBox (Box x) = x\n";
   boxApplicative :: String;
@@ -197,21 +216,22 @@ module MLF.Tests.SharedFrontend where {
   check name okay =
     if okay
     then ioReturn ()
-    else do {
-           putErr ("shared frontend failure: " ++ (name ++ "\n"));
-           exitWith 1
-         };
+    else ioError (userError (textToChars ("shared frontend failure: " ++ name)));
+  checkIO :: String -> IO Bool -> IO ();
+  checkIO name action = ioBind action (check name);
   -- Unsigned groups now pass parsing. The negative operator case belongs to
   -- module resolution: shadowed infix uses must still select the canonical
   -- primitive binding, independently of recursive signature availability.
-  recursiveInfixRejected body =
-    case C.compile "Example.hs" (source body) of {
+  recursiveInfixRejected body = do {
+    compilation <- C.compile "Example.hs" (source body);
+    ioReturn (case compilation of {
       Left error ->
         (case C.phase error of { ModuleResolution -> True; _ -> False }) &&
         eqString (C.diagnostic error)
           "Example.hs: shared infix use requires a canonical MLF.Primitive binding; use the symbolic binding in prefix form";
       Right _ -> False
-    };
+    })
+  };
   captureDefaults :: String;
   captureDefaults = "data Box a = Box a\ndefaultX f (Box x) = Box (f x)\ninstance Functor Box where { fmap = defaultX }\nunBox (Box x) = x\nmain = let { mlfInternal_36_102 = 40 } in unBox (mlfInternal_36_102 <$ Box 2)\n";
   targetRoundTrip term =
@@ -229,11 +249,13 @@ module MLF.Tests.SharedFrontend where {
   hintRoundTrip hint =
     let { n = XName 17 (Constraint.targetNameHint hint) } in
     targetRoundTrip (XAbs n (XCon "Int" []) (XVarTerm n));
-  sourceRoundTrip body =
-    case C.compile "Example.hs" (source body) of {
+  sourceRoundTrip body = do {
+    compilation <- C.compile "Example.hs" (source body);
+    ioReturn (case compilation of {
       Left _ -> False;
       Right compiled -> targetRoundTrip (C.compiledTerm compiled)
-    };
+    })
+  };
   builtinRoundTrip =
     case Artifact.builtinPrelude of {
       Left _ -> False;
@@ -277,8 +299,9 @@ module MLF.Tests.SharedFrontend where {
   };
   recursiveAccepted :: String -> String -> XType -> IO XTerm;
   recursiveAccepted label program expected = do {
+    compilation <- C.compile "RecursiveInference.emlf" program;
     result <- recursiveRight (label ++ " source compilation")
-      (mapLeft C.prettyError (C.compile "RecursiveInference.emlf" program));
+      (mapLeft C.prettyError compilation);
     recursiveCompilation label result expected
   };
   recursiveCompilation :: String -> C.Compilation -> XType -> IO XTerm;
@@ -297,8 +320,9 @@ module MLF.Tests.SharedFrontend where {
   };
   recursiveModulesAccepted :: String -> Map String ((,) String String) -> String -> XType -> IO XTerm;
   recursiveModulesAccepted label modules program expected = do {
+    compilation <- C.compileModules modules "Main.emlf" program;
     result <- recursiveRight (label ++ " module compilation")
-      (mapLeft C.prettyError (C.compileModules modules "Main.emlf" program));
+      (mapLeft C.prettyError compilation);
     recursiveCompilation label result expected
   };
   recursiveStartsWith :: String -> String -> Bool;
@@ -311,8 +335,9 @@ module MLF.Tests.SharedFrontend where {
     else eqString (stringSlice text (stringLength text - stringLength suffix)
                    (stringLength suffix)) suffix;
   recursiveRejected :: String -> String -> String -> IO ();
-  recursiveRejected label program diagnostic =
-    case C.compile "RecursiveInference.emlf" program of {
+  recursiveRejected label program diagnostic = do {
+    compilation <- C.compile "RecursiveInference.emlf" program;
+    case compilation of {
       Left error -> do {
         check (label ++ " inference phase")
           (case C.phase error of { Inference -> True; _ -> False });
@@ -320,7 +345,8 @@ module MLF.Tests.SharedFrontend where {
           (recursiveStartsWith diagnostic (C.diagnostic error))
       };
       Right _ -> check (label ++ " unexpectedly accepted") False
-    };
+    }
+  };
   recursiveGroups :: XErased -> [] ([] String);
   recursiveGroups term =
     case term of {
@@ -436,8 +462,9 @@ module MLF.Tests.SharedFrontend where {
       (isLeft (Independent.checkClosed malformed))
   };
   recursiveResolutionRejected :: String -> String -> IO ();
-  recursiveResolutionRejected label program =
-    case C.compile "RecursiveInference.emlf" program of {
+  recursiveResolutionRejected label program = do {
+    compilation <- C.compile "RecursiveInference.emlf" program;
+    case compilation of {
       Left error -> do {
         check (label ++ " resolution phase")
           (case C.phase error of { Resolution -> True; _ -> False });
@@ -450,7 +477,8 @@ module MLF.Tests.SharedFrontend where {
           (recursiveStartsWith prefix message && recursiveEndsWith suffix message)
       };
       Right _ -> check (label ++ " unexpectedly accepted") False
-    };
+    }
+  };
   qualifiedRecursiveChecks :: IO ();
   qualifiedRecursiveChecks = do {
     let {
@@ -1089,8 +1117,9 @@ module MLF.Tests.SharedFrontend where {
       "unknown field type: Missing";
     -- A live alias forall is not empty. Its graph/target agreement limitation
     -- remains unresolved and must not be hidden by dropping the binder.
+    compilation <- C.compile "FrontendRepair.emlf" "data Abs = Abs (forall a. a); Abs";
     check "live alias forall constructor remains explicit residual"
-      (case C.compile "FrontendRepair.emlf" "data Abs = Abs (forall a. a); Abs" of {
+      (case compilation of {
         Left error -> (case C.phase error of { Verification -> True; _ -> False }) &&
           eqString "elaboration changed the inferred type" (C.diagnostic error);
         Right _ -> False
@@ -1556,6 +1585,10 @@ module MLF.Tests.SharedFrontend where {
       scope = foldl (\env binding -> M.delete X.compareName (fst binding) env) names bindings
     } in XELetRec (map (\((,) name rhs) -> (,) name (monomorphicAdministrative scope rhs)) bindings)
       (monomorphicAdministrative scope body);
+    XECase subject alternatives -> XECase (monomorphicAdministrative names subject)
+      (map (\(XErasedAlternative pattern body) -> let {
+        scope = foldl (\env name -> M.delete X.compareName name env) names (X.patternNames pattern)
+      } in XErasedAlternative pattern (monomorphicAdministrative scope body)) alternatives);
     _ -> term
   };
   monomorphicErasure names left right = case (,) left right of {
@@ -1572,18 +1605,47 @@ module MLF.Tests.SharedFrontend where {
         scope = foldl (\env ((,) a b) -> M.insert X.compareName (fst a) (fst b) env) names (zip xs ys)
       } in all (\((,) a b) -> monomorphicErasure scope (snd a) (snd b)) (zip xs ys) &&
         monomorphicErasure scope body rest;
+    (,) (XECase subject alternatives) (XECase other branches) ->
+      monomorphicErasure names subject other &&
+      eqList (\(XErasedAlternative pattern body) (XErasedAlternative target result) ->
+        case erasurePatternScope names pattern target of {
+          Just scope -> monomorphicErasure scope body result;
+          Nothing -> False
+        }) alternatives branches;
     _ -> X.equalErased left right
+  };
+  erasurePatternScope names left right = let {
+    binder env pair = case pair of {
+      (,) Nothing Nothing -> Just env;
+      (,) (Just a) (Just b) -> Just (M.insert X.compareName a b env);
+      _ -> Nothing
+    };
+    fields env a b = case (,) a b of {
+      (,) [] [] -> Just env;
+      (,) ((:) x xs) ((:) y ys) -> case binder env ((,) x y) of {
+        Just scope -> fields scope xs ys;
+        Nothing -> Nothing
+      };
+      _ -> Nothing
+    }
+  } in case (,) left right of {
+    (,) (XConstructorPattern a xs) (XConstructorPattern b ys) ->
+      if eqString a b then fields names xs ys else Nothing;
+    (,) (XDefaultPattern a) (XDefaultPattern b) -> binder names ((,) a b);
+    _ -> Nothing
   };
   monomorphicGroupCase = inferenceGroupCase Inference.monomorphicIndexed;
   groundGroupCase = inferenceGroupCase Inference.groundIndexed;
-  inferenceGroupCase route label expectedFast parameters members = do {
-    prepared <- recursiveRight label (Inference.prepareIndexedGroup parameters [] members);
+  inferenceGroupCase route label expectedFast parameters members =
+    inferenceGroupCaseWithData route label expectedFast [] parameters members;
+  inferenceGroupCaseWithData route label expectedFast datatypes parameters members = do {
+    prepared <- recursiveRight label (Inference.prepareIndexedGroup parameters datatypes members);
     let { candidate = route parameters members (snd prepared) };
     check (label ++ " route") (isRight candidate == expectedFast);
     ordinary <- recursiveRight (label ++ " ordinary")
       (Inference.finishOpenGroup (fst prepared) (map snd members) (snd prepared));
     actual <- recursiveRight (label ++ " indexed")
-      (Inference.compileOpenGroupIndexed "control" parameters [] members);
+      (Inference.compileOpenGroupIndexed "control" parameters datatypes members);
     let { a = Open.closedTerm actual; b = Open.closedTerm ordinary };
     check (label ++ " erasure") (monomorphicErasure M.empty (monomorphicAdministrative M.empty (X.erase a))
       (monomorphicAdministrative M.empty (X.erase b)));
@@ -1679,6 +1741,8 @@ module MLF.Tests.SharedFrontend where {
     checkedGroundUses;
     groundAliasChecks;
     groundRecursiveChecks;
+    groundRecursiveSourceRoutes;
+    groundCaseEvidenceCheck;
     let { a = XTyVar 100; b = XTyVar 101; c = XTyVar 102;
       xa = XVar a; xb = XVar b; xc = XVar c;
       int = SCon "Int" []; arrow = SArrow int int;
@@ -1719,6 +1783,7 @@ module MLF.Tests.SharedFrontend where {
       (row int (SApp (SApp use (SIntLit 7)) localIdentity));
     groundGroupCase "ground specialization leaves local generalization to solver" False []
       (row int (SLet "id" localIdentity (SApp (SVar "id") (SIntLit 7))));
+    groundLocalLetChecks;
     groundGroupCase "ground specialization never generalizes unsigned exports" False []
       [(,) (Index.fromInt 10) ((,,) "function" Nothing localIdentity)];
     groundGroupCase "ground specialization leaves higher-rank argument to solver" False
@@ -1747,6 +1812,121 @@ module MLF.Tests.SharedFrontend where {
         (isLeft (Inference.compileOpenGroupIndexed "control" (parameter identity) [] members))
     }) bad
   };
+  groundLocalLetChecks = do {
+    let { int = recursiveInt; a = Index.fromInt 33; b = Index.fromInt 34;
+      sig = Just (SAnnotation [] (SCon "Int" []));
+      identity = SLam "value" Nothing (SVar "value");
+      app f x = SApp f (SIntLit x);
+      add x y = SApp (SApp (SPrimitive PAddInt) x) y;
+      conditional b yes no = SApp (SApp (SApp (SPrimitive PIfThenElse) b) yes) no;
+      lexical = SVar "id"; owned = SGlobal a "misleading"; shadow = SGlobal b "id";
+      local body = SLet "id" identity body;
+      indexed body = SDeclScope [a] (local body);
+      selected route = case route of { Inference.IndexedSignedGround -> True; _ -> False };
+      ordinary route = case route of { Inference.IndexedOrdinary -> True; _ -> False };
+      run label strict route rhs answer = groundLocalLetCase label sig strict route rhs int
+        (\term -> groundLocalInt label term answer);
+      candidate ref = SWantedScope "CaseDictionary" (CandidateEnvironment 0 [(,) GivenEvidence ref]);
+      lexicalWanted = candidate (LexicalRef "id");
+      ownedWanted = candidate (DeclRef a "other hint") };
+    run "signed lexical one-use specialization" False selected (local (app lexical 7)) 7;
+    run "signed resolved one-use with an identically named shadow" False selected
+      (indexed (add (app owned 7) (app (SDeclScope [b] (SLam "id" Nothing shadow)) 2))) 9;
+    run "repeated polymorphic local at different types" False ordinary
+      (local (conditional (SApp lexical (SBoolLit True)) (app lexical 7) (SIntLit 0))) 7;
+    run "repeated polymorphic local at the same type" False ordinary
+      (indexed (add (app owned 7) (app (SGlobal a "id") 8))) 15;
+    run "repeated closed local stays specialized" True selected
+      (SLet "f" (SLam "x" Nothing (add (SVar "x") (SIntLit 1)))
+        (add (app (SVar "f") 7) (app (SVar "f") 9))) 18;
+    check "one potential implicit use is not one explicit use"
+      (not (Inference.groundSingleUse Nothing "id" lexicalWanted));
+    check "an explicit use plus a lexical wanted candidate cannot specialize"
+      (not (Inference.groundSingleUse Nothing "id" (SApp lexical lexicalWanted)));
+    check "an explicit use plus a resolved wanted candidate cannot specialize"
+      (not (Inference.groundSingleUse (Just a) "id" (SApp owned ownedWanted)));
+    check "two implicit sites cannot specialize"
+      (not (Inference.groundSingleUse (Just a) "id" (SApp ownedWanted ownedWanted)));
+    check "an unrelated same-spelled resolved candidate is not a use"
+      (Inference.groundSingleUse (Just a) "owner" (SApp owned (candidate (DeclRef b "owner"))));
+    groundLocalLetCase "escaped local identity retains its principal export"
+      Nothing False ordinary (local lexical) recursiveIdentity groundLocalPrincipalUse;
+    let { collision =
+      "class LocalRouteValue a where { localRouteValue :: a -> Int }\n" ++
+      ("instance LocalRouteValue Int where { localRouteValue x = addInt x 3 }\n" ++
+        ("useLocalRoute :: forall a. LocalRouteValue a => a -> Int\n" ++
+          ("useLocalRoute givenDictionary0 = let once = \\v -> v in if once True then (\\givenDictionary1 -> addInt (localRouteValue givenDictionary0) givenDictionary1) 4 else 0\n" ++
+            "main = useLocalRoute 7"))) };
+    compilation <- C.compile "Example.hs" (source collision);
+    result <- recursiveRight "qualified source permits user givenDictionary names"
+      (mapLeft C.prettyError compilation);
+    check "qualified source collision result type"
+      (IndependentType.alphaEq recursiveInt (C.inferredType result));
+    groundLocalInt "qualified source given names do not capture evidence" (C.compiledTerm result) 14
+  };
+  groundLocalLetCase label annotation strict route rhs expected use = do {
+    let { members = [(,) (Index.fromInt 10) ((,,) "answer" annotation rhs)];
+      bind = Surface.bindIndexedMembers };
+    env <- recursiveRight (label ++ " environment") (Open.environment []);
+    (,) external lowered <- recursiveRight (label ++ " prepare")
+      (Inference.prepareIndexedGroupIn (Just env) bind [] [] members);
+    check (label ++ " conservative admission")
+      (isRight (Inference.groundIndexed [] members lowered) == strict);
+    (,) selected actual <- recursiveRight (label ++ " file compiler")
+      (Inference.compileFileGroupRoutingIn (,) env bind "local-let-control" [] [] members);
+    check (label ++ " selected route") (route selected);
+    ordinary <- recursiveRight (label ++ " ordinary solver") (Inference.finishOpenGroup external (map snd members) lowered);
+    let { target fragment = case (,) (Open.bindings fragment) (Open.body fragment) of {
+      (,) [(,) binder ty] (XLet owner value (XConstructor "()" [])) ->
+        if eqString (X.nameHint binder) "answer" && X.equalName owner binder && XT.alphaEq ty expected
+        then Right (XWithData (Open.declarations (Open.context fragment)) (XLet owner value (XVarTerm binder)))
+        else Left "wrong export";
+      _ -> Left "expected one exported let"
+    } };
+    actualTerm <- recursiveRight (label ++ " select actual export") (target actual);
+    ordinaryTerm <- recursiveRight (label ++ " select ordinary export") (target ordinary);
+    recursiveCheckedType (label ++ " actual independent export") expected (Independent.checkClosed actualTerm);
+    recursiveCheckedType (label ++ " ordinary independent export") expected (Independent.checkClosed ordinaryTerm);
+    check (label ++ " erasure agrees with ordinary")
+      (monomorphicErasure M.empty (monomorphicAdministrative M.empty (X.erase actualTerm))
+        (monomorphicAdministrative M.empty (X.erase ordinaryTerm)));
+    use actualTerm;
+    use ordinaryTerm
+  };
+  groundLocalInt label term expected = do {
+    state <- recursiveRight (label ++ " runtime data") (Runtime.prepare False term);
+    actual <- recursiveRight label (Runtime.evaluate (fst state) (Runtime.REnv M.empty) (X.erase term));
+    check label (case actual of { Runtime.RInteger n -> n == expected; _ -> False })
+  };
+  groundLocalPrincipalUse term = case term of {
+    XWithData datatypes (XLet owner rhs variable) -> do {
+      let { applied ty arg =
+        XWithData datatypes (XLet owner rhs (XApp (X.instantiate variable (X.typeApplication ty)) arg));
+        int = applied recursiveInt (XIntTerm 7);
+        bool = applied recursiveBool (XBoolTerm True) };
+      recursiveCheckedType "escaped identity instantiated at Int" recursiveInt (Independent.checkClosed int);
+      recursiveCheckedType "escaped identity instantiated at Bool" recursiveBool (Independent.checkClosed bool);
+      groundLocalInt "escaped identity runtime at Int" int 7;
+      state <- recursiveRight "escaped identity Bool runtime data" (Runtime.prepare False bool);
+      value <- recursiveRight "escaped identity Bool evaluation"
+        (Runtime.evaluate (fst state) (Runtime.REnv M.empty) (X.erase bool));
+      check "escaped identity runtime at Bool" (case value of { Runtime.RBoolean actual -> actual; _ -> False })
+    };
+    _ -> check "escaped identity target has one let" False
+  };
+  groundCaseEvidenceCheck = let {
+    datatypes = [DataDecl "CaseDictionary" ["a"]
+      [ConstructorDecl "CaseDictionary" [Function (Parameter "a") (Parameter "a")]]];
+    variable = STVar "a";
+    annotation = SAnnotation [] (SForall Flexible "a" SBottom
+      (SArrow (SCon "CaseDictionary" [variable]) (SArrow variable variable)));
+    wanted = SWantedScope "CaseDictionary" (CandidateEnvironment 0 []);
+    rhs = SLam "dictionary" Nothing (SLam "input" Nothing (SGivenScope ["dictionary"]
+      (SCase wanted [SAlternative (SConstructorPattern "CaseDictionary" [Just "method"])
+        (SApp (SVar "method") (SVar "input"))])));
+    members = [(,) (Index.fromInt 10) ((,,) "applyDictionary" (Just annotation) rhs)]
+  } in inferenceGroupCaseWithData Inference.groundIndexed
+    "signed polymorphic case with lexical evidence" True datatypes [] members;
   groundRecursiveChecks = do {
     let { int = SCon "Int" []; bool = SCon "Bool" [];
       sig = \ty -> Just (SAnnotation [] (SArrow int ty));
@@ -1779,6 +1959,74 @@ module MLF.Tests.SharedFrontend where {
         (,) (Left expected) (Left actual) -> eqString expected actual;
         _ -> False
       })
+  };
+  groundRecursiveSourceRoutes = do {
+    let { sourceRows = "goSigned :: Int -> Int\ngoSigned x = if eqInt x 0 then 7 else goForward x\n";
+      forwarder = "goForward x = goSigned x";
+      mixed route = case route of { Inference.IndexedMixedForwarder -> True; _ -> False };
+      signed route = case route of { Inference.IndexedSignedRecursion -> True; _ -> False };
+      ordinary route = case route of { Inference.IndexedOrdinary -> True; _ -> False } };
+    groundRecursiveSourceCase "one unsigned forwarder selects mixed recursion" mixed (sourceRows ++ forwarder);
+    groundRecursiveSourceCase "two signed peers select signed recursion" signed
+      (sourceRows ++ ("goForward :: Int -> Int\n" ++ forwarder));
+    groundRecursiveSourceCase "unsigned computation falls back to ordinary recursion" ordinary
+      (sourceRows ++ "goForward x = addInt (goSigned x) 1")
+  };
+  groundRecursiveSourceCase label expectedRoute text = do {
+    parsed <- recursiveRight (label ++ " parse") (parse text);
+    resolved <- recursiveRight (label ++ " resolve")
+      (Modules.resolveCrate NoImplicitPrelude M.empty Modules.spelling [parsed]);
+    -- Resolution installs the primitive facade as a real module. Its own
+    -- declarations are not members of the test's source compilation unit.
+    let { modules = filter (\entry -> eqString (Modules.moduleIdentity parsed)
+          (Modules.moduleIdentity (Modules.resolvedSource entry))) (Modules.resolvedCrateModules resolved);
+      values = Modules.boundIn resolved modules;
+      scopes = Modules.resolvedValueScopesIn resolved modules;
+      reads = Dependency.fileLastDeclarationOccurrences;
+      bind = Surface.bindIndexedMembersWith (Dependency.occurrenceGlobalIds reads) };
+    (,) planned _ <- recursiveRight (label ++ " plan")
+      (Source.prepareResolvedSourcePlan values M.empty [] [] [] [] scopes []);
+    original <- case planned of { Just plan -> ioReturn plan; Nothing -> panic (label ++ " lacks a resolved plan") };
+    (,) plan open <- recursiveRight (label ++ " query plan")
+      (Source.protectedQueryPlanReading Dependency.fileDeclarationOccurrences original M.empty);
+    contracts <- recursiveRight (label ++ " initial contracts") (Source.initialContracts plan M.empty M.empty);
+    (,) checked steps <- recursiveRight (label ++ " open contracts") (open contracts);
+    (,) owners prepare <- case steps of {
+      [step] -> ioReturn step; _ -> panic (label ++ " must be one source SCC")
+    };
+    (,) slots prepared <- recursiveRight (label ++ " prepared slots") (do {
+      group <- prepare checked;
+      Source.slotPreparedWith (Dependency.fileLastValueOccurrences False) checked owners group
+    });
+    members <- recursiveRight (label ++ " indexed members") (Source.indexedMembers slots prepared);
+    inventory <- recursiveRight (label ++ " datatype inventory") (Query.prepareData (Source.planData plan));
+    let { parameters = Source.expectedParameters slots prepared;
+      datatypes = Query.requiredFileDataIn inventory (Source.groupMembers prepared)
+        (append (Source.groupBindings prepared) (Source.groupCandidateBindings prepared));
+      int = XCon "Int" []; expectedType = XArrow int int;
+      types fragment = let { bindings = Open.bindings fragment } in
+        eqList eqString (sortBy compareString (map (compose X.nameHint fst) bindings)) ["goForward","goSigned"] &&
+        all (\entry -> XT.alphaEq expectedType (snd entry)) bindings;
+      knot fragment = case Open.body fragment of {
+        XLetRec [_,_] (XConstructor "()" []) -> True;
+        _ -> False
+      } };
+    check (label ++ " closed inputs") (null parameters);
+    env <- recursiveRight (label ++ " environment") (Open.environment datatypes);
+    (,) route actual <- recursiveRight (label ++ " file compile")
+      (Inference.compileFileGroupRoutingIn (,) env bind "mixed-source-control" parameters datatypes members);
+    check (label ++ " selected route") (expectedRoute route);
+    _ <- recursiveRight (label ++ " validate prepared fragment") (Source.validatePreparedOpen slots prepared actual);
+    (,) external lowered <- recursiveRight (label ++ " prepare ordinary")
+      (Inference.prepareIndexedGroupIn (Just env) bind parameters datatypes members);
+    ordinary <- recursiveRight (label ++ " ordinary") (Inference.finishOpenGroup external (map snd members) lowered);
+    check (label ++ " exact exports and recursive knot") (types actual && types ordinary && knot actual && knot ordinary);
+    let { a = Open.closedTerm actual; b = Open.closedTerm ordinary };
+    check (label ++ " erasure") (monomorphicErasure M.empty (monomorphicAdministrative M.empty (X.erase a))
+      (monomorphicAdministrative M.empty (X.erase b)));
+    actualType <- recursiveRight (label ++ " frozen target") (Independent.checkClosed a);
+    ordinaryType <- recursiveRight (label ++ " ordinary frozen target") (Independent.checkClosed b);
+    check (label ++ " independent type") (XT.alphaEq actualType ordinaryType)
   };
   groundAliasDepth known identity = case IM.lookup identity known of {
     Just (Inference.GroundVar next) -> 1 + groundAliasDepth known next;
@@ -1887,7 +2135,17 @@ module MLF.Tests.SharedFrontend where {
     check "direct entry accepts checked closed monotype"
       (case Artifact.linkEntry 3 [ordinary] ordinary value entry of { Right (XVarTerm n) -> X.nameId n == 0; _ -> False });
     check "direct entry rejects import type mismatch"
-      (isLeft (Artifact.linkEntry 3 [ordinary] ordinary (M.fromList compareString [(,) entry ((,) (XName 0 "main") (XCon "Bool" []))]) entry))
+      (isLeft (Artifact.linkEntry 3 [ordinary] ordinary (M.fromList compareString [(,) entry ((,) (XName 0 "main") (XCon "Bool" []))]) entry));
+    let { variable = XTyVar 5;
+      scheme = XForall variable XBot
+        (XArrow (XCon "Dict_Eq" [XVar variable]) (XArrow (XVar variable) (XCon "Bool" [])));
+      polymorphic = iface [(,) entry scheme];
+      polyValue = M.fromList compareString [(,) entry ((,) (XName 0 "same") scheme)] };
+    check "direct entry retains quantified dictionary arguments"
+      (case Artifact.linkEntry 3 [polymorphic] polymorphic polyValue entry of {
+        Right (XVarTerm name) -> X.nameId name == 0;
+        _ -> False
+      })
   };
   sourceCandidateChecks = do {
     let { int = SCon "Int" [];
@@ -2073,7 +2331,10 @@ module MLF.Tests.SharedFrontend where {
   -- associativity and non-associative comparison diagnostic are tested together.
   precedenceParserChecks :: IO ();
   precedenceParserChecks = let {
-    at choices = P.sharedOperatorParser choices;
+    at choices = Parsing.pMap (\((,) location operator) a b ->
+      SApp (SApp (SCallSite (P.referenceLeaf operator) location
+        (SVar (P.sourceOperatorName operator))) a) b)
+      (Parsing.pWithSpan (P.sharedInfix choices));
     product = Parsing.pChainl P.operand (at ["*","/","%"]);
     sum = Parsing.pChainl product (at ["+","-"]);
     concatOp = Parsing.pChoice (Parsing.pMap (\_ -> P.sourceConsExpression) (Parsing.pToken ":")) (at ["++"]);
@@ -2101,7 +2362,7 @@ module MLF.Tests.SharedFrontend where {
     };
     operators = append [":"] Lexer.sharedValueOperators;
     combinations = concatMap (\a -> map (\b -> ["x",a,"y",b,"z",")"]) operators) operators;
-    examples = [[],["x"],["x","M",".","+","y"],["x","M","."],["M",".","x","+","y"],["x","+"],
+    examples = [[],["x"],["x","M",".","+","y"],["x","M",".+","y"],["x","M",".","N",".++","y"],["x","M","."],["M",".","x","+","y"],["x","+"],
       ["x","<","y","==","z"],["(","x","+","y",")","*","z"],["(",")"],["(","-","1",")"],
       ["(","+",")","x"],["(",",",")"],["1.5",";"],["f","[","x",",","y","]"],["(","let"],["1","(","x"]]
   } in check "shared infix precedence, associativity, spans, residual tokens and errors"
@@ -2329,7 +2590,7 @@ module MLF.Tests.SharedFrontend where {
       (not (linkRaw "module Example where\nimport MLF.Primitive hiding (($))\nmain = addInt 40 $ 2\n"));
     check "shadowed application operator is accepted in prefix form"
       (linked "main = let { ($) x y = subInt x y } in ($) 10 3");
-    check "shadowed application operator is rejected in infix form"
+    checkIO "shadowed application operator is rejected in infix form"
       (recursiveInfixRejected "main = let { ($) x y = subInt x y } in 10 $ 3");
     check "ordinary symbolic local prefix" (linked "main = let { (++) x y = subInt x y } in (++) 10 3");
     check "noncanonical infix explicit rejection" (not (linked "main = let { (++) x y = subInt x y } in 10 ++ 3 ++ 1"));
@@ -2339,8 +2600,8 @@ module MLF.Tests.SharedFrontend where {
     check "standard hierarchy defaults" (linked "data Box a = Box a\ninstance Functor Box where { fmap f (Box x) = Box (f x) }\ninstance Applicative Box where { pure = Box; (<*>) (Box f) (Box x) = Box (f x) }\ninstance Monad Box where { (>>=) (Box x) f = f x }\nmain = do { Box 1; return 2 }");
     check "standard liftA2 minimum" (linked "data Box a = Box a\ninstance Functor Box where { fmap f (Box x) = Box (f x) }\ninstance Applicative Box where { pure = Box; liftA2 f (Box x) (Box y) = Box (f x y) }\nmain = pure 1");
     check "standard missing minimum rejected" (not (linked "data Box a = Box a\ninstance Functor Box where { (<$) x y = Box x }\nmain = Box 1"));
-      check "recursive local infix rejected" (recursiveInfixRejected "main = let { (+) x y = x + y } in (+) 1 2");
-      check "signed recursive local infix rejected" (recursiveInfixRejected "main = let { (+) :: Int -> Int -> Int; (+) x y = x + y } in (+) 1 2");
+      checkIO "recursive local infix rejected" (recursiveInfixRejected "main = let { (+) x y = x + y } in (+) 1 2");
+      checkIO "signed recursive local infix rejected" (recursiveInfixRejected "main = let { (+) :: Int -> Int -> Int; (+) x y = x + y } in (+) 1 2");
       check "qualified operator whitespace rejected" (reject "main = 1 MLF.Primitive . + 2");
       check "legacy Prelude excluded" (isLeft (P.parseModule "Example.hs" (prologue ++ "module Example where\nimport Prelude\nmain = 1\n")));
       check "legacy Prelude identity excluded" (isLeft (P.parseModule "Prelude.hs" (prologue ++ "module Prelude where\nmain = 1\n")));
@@ -2368,7 +2629,7 @@ module MLF.Tests.SharedFrontend where {
       check "valid hint preserved λ" (eqString (Constraint.targetNameHint "λ") "λ");
       check "valid hint preserved let" (eqString (Constraint.targetNameHint "let") "let");
       check "valid hint preserved mlfInternal_36_102" (eqString (Constraint.targetNameHint "mlfInternal_36_102") "mlfInternal_36_102");
-      check "default and generated-name capture roundtrip" (sourceRoundTrip captureDefaults);
+      checkIO "default and generated-name capture roundtrip" (sourceRoundTrip captureDefaults);
 
       recursiveInferenceChecks;
       putStrLn "shared frontend: parser and namespace checks passed"
@@ -2411,30 +2672,44 @@ module MLF.Tests.SharedFrontend where {
         "require ordinal actual rest = if actual == 42 then rest else ordinal\nmain = " ++
         foldr requireExpression "0" numbered
     } in
-    case evaluated fixture of {
+    ioBind (evaluated fixture) (\result -> case result of {
       Right (Runtime.RInteger 0) -> ioReturn ();
       Right (Runtime.RInteger ordinal) -> check (fst (index cases (ordinal - 1))) False;
       Right _ -> check "list-expression controls returned an unexpected value" False;
       Left error -> check ("list-expression controls: " ++ error) False
-    };
+    });
   nativeFirst :: IO ();
   nativeFirst = do {
     listExpressionChecks;
-    check "default and generated-name capture execution" (evaluatesInt captureDefaults 40);
-    check "native standard hierarchy inference" (evaluatesInt (boxMonad ++ "main = unBox (do { x <- pure 40; return (x + 2) })") 42);
-    check "native Applicative defaults" (evaluatesInt (boxApplicative ++ "main = unBox (liftA2 addInt (Box 30) (Box 12))") 42);
-    check "native Applicative liftA2 minimum" (evaluatesInt (boxFunctor ++ "instance Applicative Box where { pure = Box; liftA2 f (Box x) (Box y) = Box (f x y) }\nmain = unBox (Box (addInt 30) <*> Box 12)") 42);
-    check "native do preserves overridden sequencing" (failsWith (boxApplicative ++ "instance Monad Box where { (>>=) (Box x) f = f x; (>>) a b = panic \"overridden sequence\" }\nmain = unBox (do { Box 1; Box 2 })") "overridden sequence");
-    check "native fmap default partial demand" (failsWith "data Box a = Box a\ninstance Functor Box where { fmap = panic \"fmap bottom\" }\nmain = seq (((<$) 1) :: Box Int -> Box Int) 7" "fmap bottom");
+    check "file-owned constraints specialize saturated primitives" saturatedPrimitiveRouting;
+    checkIO "wildcard columns stay lazy and a binder in a later row shadows the outer name"
+      (evaluatesInt
+        ("outer = 40\npick _ _ _ True = outer\npick _ _ outer False = outer\n" ++
+         "unused :: Int\nunused = panic \"unused pattern column\"\n" ++
+         "main = addInt (pick unused unused unused True) (pick unused unused 2 False)")
+        42);
+    checkIO "saturated conditional preserves rank and lazy integer alternatives"
+      (evaluatesInt
+        ("choose :: Bool -> (forall a. a -> a) -> (forall a. a -> a) -> Int\n" ++
+         "choose test f g = (if test then f else g) 13\n" ++
+         "pick n = case n of { 1 -> choose True (\\x -> x) (\\x -> panic \"unselected function\"); 0 -> panic \"unselected alternative\"; _ -> 16 }\n" ++
+         "main = addInt (pick 1) (pick 8)")
+        29);
+    checkIO "default and generated-name capture execution" (evaluatesInt captureDefaults 40);
+    checkIO "native standard hierarchy inference" (evaluatesInt (boxMonad ++ "main = unBox (do { x <- pure 40; return (x + 2) })") 42);
+    checkIO "native Applicative defaults" (evaluatesInt (boxApplicative ++ "main = unBox (liftA2 addInt (Box 30) (Box 12))") 42);
+    checkIO "native Applicative liftA2 minimum" (evaluatesInt (boxFunctor ++ "instance Applicative Box where { pure = Box; liftA2 f (Box x) (Box y) = Box (f x y) }\nmain = unBox (Box (addInt 30) <*> Box 12)") 42);
+    checkIO "native do preserves overridden sequencing" (failsWith (boxApplicative ++ "instance Monad Box where { (>>=) (Box x) f = f x; (>>) a b = panic \"overridden sequence\" }\nmain = unBox (do { Box 1; Box 2 })") "overridden sequence");
+    checkIO "native fmap default partial demand" (failsWith "data Box a = Box a\ninstance Functor Box where { fmap = panic \"fmap bottom\" }\nmain = seq (((<$) 1) :: Box Int -> Box Int) 7" "fmap bottom");
       putStrLn "shared frontend: first native semantics checks passed"
     };
   nativeSecond :: IO ();
   nativeSecond = do {
-    check "native ap default function demand" (failsWith (boxFunctor ++ "instance Applicative Box where { pure = Box; liftA2 = panic \"liftA2 bottom\" }\nmain = seq ((<*>) :: Box (Int -> Int) -> Box Int -> Box Int) 7") "liftA2 bottom");
-    check "native left default function demand" (failsWith (boxFunctor ++ "instance Applicative Box where { pure = Box; liftA2 = panic \"liftA2 bottom\" }\nmain = seq ((<*) :: Box Int -> Box Int -> Box Int) 7") "liftA2 bottom");
-    check "native liftA2 default partial demand" (failsWith (boxFunctor ++ "instance Applicative Box where { pure = Box; (<*>) = panic \"ap bottom\" }\nmain = seq (liftA2 addInt (Box 1) :: Box Int -> Box Int) 7") "ap bottom");
-    check "native return default function demand" (failsWith (boxFunctor ++ "instance Applicative Box where { pure = panic \"pure bottom\"; (<*>) (Box f) (Box x) = Box (f x) }\ninstance Monad Box where { (>>=) (Box x) f = f x }\nmain = seq (return :: Int -> Box Int) 7") "pure bottom");
-    check "native sequencing default partial WHNF" (evaluatesInt (boxApplicative ++ "instance Monad Box where { (>>=) = panic \"bind bottom\" }\nmain = seq (((>>) (Box 1)) :: Box Int -> Box Int) 7") 7);
+    checkIO "native ap default function demand" (failsWith (boxFunctor ++ "instance Applicative Box where { pure = Box; liftA2 = panic \"liftA2 bottom\" }\nmain = seq ((<*>) :: Box (Int -> Int) -> Box Int -> Box Int) 7") "liftA2 bottom");
+    checkIO "native left default function demand" (failsWith (boxFunctor ++ "instance Applicative Box where { pure = Box; liftA2 = panic \"liftA2 bottom\" }\nmain = seq ((<*) :: Box Int -> Box Int -> Box Int) 7") "liftA2 bottom");
+    checkIO "native liftA2 default partial demand" (failsWith (boxFunctor ++ "instance Applicative Box where { pure = Box; (<*>) = panic \"ap bottom\" }\nmain = seq (liftA2 addInt (Box 1) :: Box Int -> Box Int) 7") "ap bottom");
+    checkIO "native return default function demand" (failsWith (boxFunctor ++ "instance Applicative Box where { pure = panic \"pure bottom\"; (<*>) (Box f) (Box x) = Box (f x) }\ninstance Monad Box where { (>>=) (Box x) f = f x }\nmain = seq (return :: Int -> Box Int) 7") "pure bottom");
+    checkIO "native sequencing default partial WHNF" (evaluatesInt (boxApplicative ++ "instance Monad Box where { (>>=) = panic \"bind bottom\" }\nmain = seq (((>>) (Box 1)) :: Box Int -> Box Int) 7") 7);
       putStrLn "shared frontend: checks passed"
     };
 
@@ -2447,18 +2722,56 @@ module MLF.Tests.SharedFrontend where {
       Right _ -> checkFiles (i + 1) count
     }
   };
+  -- The old flags and frozen driver use these same case actions. The
+  -- grouped actions keep their existing source-sharing and exact banners.
+  recoverFrontend :: IO () -> A.Test ();
+  recoverFrontend action =
+    A.Test (catchIOError (do { action; ioReturn (Right ()) }) (\error ->
+      let { message = textFromChars (ioeGetErrorString error) } in
+      if recursiveStartsWith "shared frontend failure: " message
+      then ioReturn (Left (A.Failure message Nothing))
+      else ioError error));
+  frontendCase name label action =
+    Case.test ("shared-frontend/" ++ name) label ["family:shared-frontend"] (recoverFrontend action);
+  standard = [
+    frontendCase "frontend" "parser, declarations and recursive inference" frontendChecks,
+    frontendCase "native-first" "first native semantics group" nativeFirst,
+    frontendCase "native-second" "second native semantics group" nativeSecond
+  ];
+  frontendRegistry = append standard [
+    frontendCase "recursive-inference" "focused recursive inference" recursiveInferenceChecks,
+    frontendCase "formatter" "formatter grammar"
+      (do { formatterChecks; putStrLn "shared frontend: formatter checks passed" })
+  ];
+  argumentsFrom index count =
+    if index >= count then ioReturn []
+    else do {
+      arg <- getArg index;
+      rest <- argumentsFrom (index + 1) count;
+      ioReturn ((:) arg rest)
+    };
   main :: IO ();
   main = do {
     count <- getArgCount;
-    if count == 0 then do { frontendChecks; nativeFirst; nativeSecond }
-    else do {
-      mode <- getArg 0;
-      if eqString mode "--recursive-inference" then recursiveInferenceChecks
-      else if eqString mode "--formatter" then do { formatterChecks; putStrLn "shared frontend: formatter checks passed" }
-      else if eqString mode "--frontend" then frontendChecks
-      else if eqString mode "--native-first" then nativeFirst
-      else if eqString mode "--native-second" then nativeSecond
-      else checkFiles 0 count
+    args <- argumentsFrom 0 count;
+    case args of {
+      [] -> mapM_ (\entry -> A.orExit (Case.action entry)) standard;
+      (:) mode _ ->
+        let {
+          selects = startsRegistry mode;
+          legacy = if recursiveStartsWith "--" mode then find (\entry -> eqString (Case.id entry)
+            ("shared-frontend/" ++ (stringSlice mode 2 (stringLength mode - 2)))) frontendRegistry else Nothing
+        } in
+        if selects then do {
+          code <- Runner.run args frontendRegistry;
+          if code == 0 then ioReturn () else exitWith code
+        } else
+          case legacy of {
+            Just entry -> A.orExit (Case.action entry);
+            Nothing -> checkFiles 0 count
+          }
     }
-  }
+  };
+  startsRegistry mode =
+    elem eqString mode ["--list", "--exact", "--filter", "--tag", "--group", "--format", "--report"]
 }

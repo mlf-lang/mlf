@@ -14,6 +14,7 @@
       "Test.Runner": "Test/Runner.hs",
       "Test.Descriptor": "Test/Descriptor.hs",
       "Test.Registry": "Test/Registry.hs",
+      "Test.CaseSelection": "Test/CaseSelection.hs",
       "Test.Outcome": "Test/Outcome.hs",
       "Test.Expectation": "Test/Expectation.hs",
       "Test.Evidence": "Test/Evidence.emlf",

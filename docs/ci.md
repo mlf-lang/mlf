@@ -13,10 +13,10 @@ complete qualification campaign. The extended framework receipt includes a
 fourth, separately reviewed catalog-contract checkpoint, including selection
 and evidence-mutation checks. The
 [selection guide](../tests/README.md) and
-[pre-merge family validation record](test-family-selection-validation.json)
+[pre-merge family validation record](https://github.com/mlf-lang/mlf/blob/0704d216b8cf6d887d3737efa30a2eae3c152f0a/docs/test-family-selection-validation.json)
 describe the protocol and its verified historical scope. Fresh checks after
 integrating the split libraries and parallel-build changes are recorded in the
-[PR integration validation record](test-family-pr-integration-validation.json).
+[PR integration validation record](https://github.com/mlf-lang/mlf/blob/0704d216b8cf6d887d3737efa30a2eae3c152f0a/docs/test-family-pr-integration-validation.json).
 `smoke`, `full`, `stress` and `release` remain
 execution-profile concepts; this workflow owns its actual CI selections.
 

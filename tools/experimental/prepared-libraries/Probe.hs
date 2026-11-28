@@ -11,6 +11,7 @@ module Main where {
   import qualified Bootstrap.Parser as Parser;
   import qualified Bootstrap.Module as Modules;
   import qualified Bootstrap.Compiler as Compiler;
+  import qualified Bootstrap.SourceCrate as Source;
   import qualified Bootstrap.CompilerCore as Core;
   import qualified Bootstrap.Classes as Classes;
   import qualified Bootstrap.Data as D;
@@ -53,35 +54,16 @@ module Main where {
   ];
   declarations checked = case Checked.term checked of { XWithData ds _ -> ds; _ -> [] };
   data Result = Result Checked.CheckedTerm Bool (Map Modules.Entity String) (Map String String);
-  ordinaryDictionaries preludeMode sources = do {
-    linked <- Core.atPhase ModuleResolution (Modules.linkModules preludeMode sources);
-    canonical <- Core.atPhase Inference (Classes.canonicalSourceProgram S.empty (Modules.linkedProgram linked));
-    lowered <- Core.atPhase Inference (Classes.lowerClassesWithScopes
-      (Modules.linkedValueScopes linked) (Modules.linkedInstanceScopes linked) canonical);
-    Right (snd lowered)
-  };
-  ordinaryNames preludeMode sources = do {
-    resolution <- Core.atPhase ModuleResolution (Modules.resolveCrateWithAllocator
-      preludeMode M.empty Modules.freshNames sources);
-    case Modules.resolvedCrateNames resolution of { Modules.Names names -> Right names }
-  };
-  compile route registry preludeMode loaded = do {
-    let { sources = Modules.loadedSources loaded };
+  compile route registry preludeMode loaded =
     if eqString route "ordinary" then do {
-      compiled <- Compiler.compileLinked preludeMode sources;
-      names <- ordinaryNames preludeMode sources;
-      dictionaries <- ordinaryDictionaries preludeMode sources;
-      Right (Result (Core.checkedTerm compiled) False names dictionaries)
+      outcome <- Compiler.compileLinked preludeMode (Modules.loadedSources loaded);
+      ioReturn (mapEither (\compiled -> Result (Compiler.checkedTerm compiled) False
+        (Source.nameMap compiled) (Source.dictionaryIdentities compiled)) outcome)
     } else if eqString route "prepared" then do {
-      compiled <- Prepared.compileLoaded registry preludeMode loaded;
-      let { names = Prepared.nameMap compiled; used = Prepared.reused compiled };
-      dictionaries <- if used then Right (M.fromList compareString
-        (map (\((,) entity actual) -> (,) ("Dict_" ++ actual) actual)
-          (filter (\((,) entity _) -> Modules.isRole Modules.Class entity) (M.toList names))))
-        else ordinaryDictionaries preludeMode sources;
-      Right (Result (Prepared.checkedTerm compiled) used names dictionaries)
-    } else Left (CompileError ModuleResolution "unknown qualification route")
-  };
+      outcome <- Prepared.compileLoaded registry preludeMode loaded;
+      ioReturn (mapEither (\compiled -> Result (Prepared.checkedTerm compiled) (Prepared.reused compiled)
+        (Prepared.nameMap compiled) (Prepared.dictionaryIdentities compiled)) outcome)
+    } else ioReturn (Left (CompileError ModuleResolution "unknown qualification route"));
   -- Qualification-only corruptions of compiler-owned data. This probe is not
   -- an external registry loader and the production adapter exposes no variant.
   staleWitness value = case value of {
@@ -209,7 +191,10 @@ module Main where {
   run operation route request = do {
     selectedRegistry <- require (registry request);
     loaded <- load request;
-    let { outcome = bindEither loaded (compile route selectedRegistry (mode request)) };
+    outcome <- case loaded of {
+      Left err -> ioReturn (Left err);
+      Right graph -> compile route selectedRegistry (mode request) graph
+    };
     if eqString operation "inspect" then do {
       value <- require (report outcome);
       let { reads = case loaded of {

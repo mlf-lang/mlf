@@ -6,6 +6,7 @@ module Tests.Catalog where {
   import MLF.Primitive;
   import Bootstrap.Types;
   import qualified Bootstrap.Std as S;
+  import qualified Bootstrap.Map as Map;
   import qualified Package.Json as J;
   import qualified Package.OS as O;
   groups =
@@ -170,6 +171,45 @@ module Tests.Catalog where {
               _ -> 0
             })
          selected);
+  matrixRowCounts selected =
+    S.concatMap
+      (\entry ->
+         let { evidence = J.get "evidence" entry } in
+         S.zip (J.getStrings "labels" evidence)
+           (S.map (\value -> case value of { J.Number text -> readInt text; _ -> (0 - 1) })
+              (J.values (J.get "row_counts" evidence))))
+      selected;
+  -- Counts are reviewed catalog evidence, independent of the executing registry.
+  -- A permitted label and the correct grand total cannot prove an exact matrix.
+  validateMatrixRows :: Bool -> [] J.Json -> [] J.Json -> Either String ();
+  validateMatrixRows port selected actual =
+    do {
+      let {
+        backends = if port then (:) "llvm" [] else O.words "interpreter llvm";
+        expected = if port
+          then S.map (\name -> (,) ("MLF compiler port: " ++ name) 1) (fixtures selected)
+          else matrixRowCounts selected;
+        allowed = Map.fromList compareString expected;
+        counts = S.foldlStrict
+          (\found row -> Map.insertWith compareString addInt (J.getText "label" "" row) 1 found)
+          Map.empty actual
+      };
+      ensure (S.length actual == matrixRows selected)
+        "matrix row report differs from the reviewed selection";
+      ensure
+        (S.and (S.mapIndexed
+          (\index row -> keys (O.words "label index backends") row &&
+            (nonemptyString (J.get "label" row) &&
+             (J.equal (J.get "index" row) (J.num index) &&
+              J.equal (J.get "backends" row) (J.stringArray backends)))) actual))
+        "invalid, incomplete or out-of-order matrix row";
+      ensure (S.all (\name -> Map.member compareString name allowed) (Map.keys counts))
+        "matrix executed a fixture outside the selected families";
+      S.mapM_
+        (\((,) name count) -> ensure (Map.findWithDefault compareString 0 name counts == count)
+          ("matrix execution count changed for fixture: " ++ name))
+        expected
+    };
   fixtures selected = S.map (J.getText "fixture" "") selected;
   validate :: J.Json -> Either String ();
   validate catalog =
@@ -177,12 +217,17 @@ module Tests.Catalog where {
       ensure
         (keys
            (O.words
-              "schema_version granularity groups levels inputs oracles purposes profiles campaigns units families")
+              "schema_version granularity groups levels inputs oracles purposes profiles external_adapters campaigns units families")
            catalog &&
          J.equal (J.get "schema_version" catalog) (J.num 2))
         "invalid test catalog schema";
       ensure (J.equal (J.get "granularity" catalog) (J.str "verified-case-or-family"))
         "unsupported catalog granularity";
+      ensure
+        (stringList (J.get "external_adapters" catalog) &&
+         (S.not (S.null (J.getStrings "external_adapters" catalog)) &&
+          unique (J.getStrings "external_adapters" catalog)))
+        "invalid external adapter inventories";
       S.mapM_
         (\((,) field allowed) ->
            ensure
@@ -273,7 +318,8 @@ module Tests.Catalog where {
              then do {
                     ensure
                       (eqString kind "matrix" &&
-                       (keys (O.words "kind rows fixtures labels") evidence &&
+                       (keys (O.words (if eqString name "backends"
+                         then "kind rows fixtures labels row_counts" else "kind rows fixtures labels")) evidence &&
                         (natural (J.get "rows" evidence) &&
                          (natural (J.get "fixtures" evidence) &&
                           stringList (J.get "labels" evidence)))))
@@ -295,7 +341,16 @@ module Tests.Catalog where {
                               J.equal (J.get "labels" evidence)
                                 (J.Array ((:) (J.get "fixture" entry) [])))))
                            "invalid port family"
-                    else Right ()
+                    else do {
+                      ensure (case J.get "row_counts" evidence of {
+                        J.Array counts -> S.length counts == S.length (J.getStrings "labels" evidence) &&
+                          S.all natural counts;
+                        _ -> False
+                      }) "invalid per-fixture matrix row counts";
+                      ensure
+                        (S.sum (S.map S.snd (matrixRowCounts ((:) entry []))) == matrixRows ((:) entry []))
+                        "matrix row counts disagree with family total"
+                    }
                   }
              else if S.elem eqString name (O.words "parity self-host")
                   then ensure (eqString kind "unit" && keys ((:) "kind" []) evidence)

@@ -1,5 +1,8 @@
 # 全部测试迁入自有框架：实施设计
 
+> 历史记录（2026-10-23）：下文保留当时的结论和命令。已从当前树移除的清单、迁移审计和证据可在 Git 提交 `496dcae024cae1a93096d9bdb9d6b93e57359dc0` 中查阅。
+> 当前维护入口见[历史基础设施退役说明](testing-history-retirement.md)和[测试指南](../tests/README.md)。
+
 > 状态：详尽实施设计，尚未实施迁移或执行完整验证。代码基线 `8a3e69b165765931c3ff762379a78db9659b2cd8`；main `77ac8a7bc551ac71747b38c79fc5812d385165e3`，整合 #9/#11/#12/#16。各 PR 的历史资格认证不能代替组合树认证。
 
 ## 1. 目标与完成定义
@@ -10,7 +13,7 @@
 
 本次只交付设计和静态清单，不改变完整 campaign 的覆盖，不重写所有测试，不运行完整测试、bootstrap、self-host 或基准。
 
-相关交付：[本地整合与验证记录](local-integration-20261023.md)、[完整迁移清单 JSON](testing-migration-inventory-20261023.json)、[全仓资产清单 TSV](testing-inventory-20261023.tsv)、[外部入口逐项矩阵](testing-external-entrypoints-20261023.tsv)。
+相关交付：[本地整合与验证记录](local-integration-20261023.md)、[完整迁移清单 JSON](https://github.com/mlf-lang/mlf/blob/496dcae024cae1a93096d9bdb9d6b93e57359dc0/docs/testing-migration-inventory-20261023.json)、[全仓资产清单 TSV](https://github.com/mlf-lang/mlf/blob/496dcae024cae1a93096d9bdb9d6b93e57359dc0/docs/testing-inventory-20261023.tsv)、[外部入口逐项矩阵](https://github.com/mlf-lang/mlf/blob/496dcae024cae1a93096d9bdb9d6b93e57359dc0/docs/testing-external-entrypoints-20261023.tsv)。
 
 ## 2. 现状与清单契约
 

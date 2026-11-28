@@ -4,7 +4,7 @@
              MultiParamTypeClasses, OverloadedStrings #-}
 module Bootstrap.InstalledPreludeWholeRoot
   (InstalledPrelude, WholeRootOutcome, restoreVerified, snapshot, compileInstalledRoot,
-   checkedTerm, reused, routeReason, rawRootCompilation, rootDictionaryMap) where {
+   checkedTerm, reused, routeReason, rootInferredType, rootDictionaryMap) where {
   import MLF.Primitive;
   import Bootstrap.Types;
   import Bootstrap.Std;
@@ -28,10 +28,10 @@ module Bootstrap.InstalledPreludeWholeRoot
   -- comparison is NOT a replacement for that cryptographic verification.
   data InstalledPrelude = InstalledPrelude String Artifact.CrateInterface
     Artifact.FragmentState Modules.Names Modules.Interface (Set String) (Set String);
-  data WholeRootOutcome = OriginalFallback String Core.Compilation |
+  data WholeRootOutcome = OriginalFallback String Compiler.Compilation |
     InstalledRoot Checked.CheckedTerm Core.Compilation (Map String String) Standalone.RewrittenRoot;
   checkedTerm outcome = case outcome of {
-    OriginalFallback _ compiled -> Core.checkedTerm compiled;
+    OriginalFallback _ compiled -> Compiler.checkedTerm compiled;
     InstalledRoot checked _ _ _ -> checked
   };
   reused outcome = case outcome of { OriginalFallback _ _ -> False; InstalledRoot _ _ _ _ -> True };
@@ -41,9 +41,9 @@ module Bootstrap.InstalledPreludeWholeRoot
   };
   -- Actual user-root inference with checked import parameters, not a fabricated
   -- grafted Compilation or proof of baseline principal-scheme equivalence.
-  rawRootCompilation outcome = case outcome of {
-    OriginalFallback _ compiled -> compiled;
-    InstalledRoot _ compiled _ _ -> compiled
+  rootInferredType outcome = case outcome of {
+    OriginalFallback _ compiled -> Compiler.inferredType compiled;
+    InstalledRoot _ compiled _ _ -> Core.inferredType compiled
   };
   rootDictionaryMap outcome = case outcome of {
     OriginalFallback _ _ -> M.empty;
@@ -129,7 +129,11 @@ module Bootstrap.InstalledPreludeWholeRoot
     Left (CompileError phase message) -> Left (CompileError phase (Modules.displayNames diagnosticNames message));
     Right compiled -> Right compiled
   };
-  original reason mode program = mapEither (OriginalFallback reason) (Compiler.compileProgramWithPrelude mode program);
+  original reason _ _ = Right (Left reason);
+  fallback reason mode program = do {
+    compiled <- Compiler.compileProgramWithPrelude mode program;
+    ioReturn (mapEither (OriginalFallback reason) compiled)
+  };
   -- Conservative namespace admission. Intrinsic tuple/list syntax does not
   -- declare a replaceable imported value. Other canonical-name occurrences
   -- may conservatively fall back, never count as installed-root successes.
@@ -154,12 +158,17 @@ module Bootstrap.InstalledPreludeWholeRoot
     case Modules.chooseName used "installedUserInstance" index of {
       (,) name next -> (,) (snoc names name) next
     }) ((,) [] 0) instances);
-  compileInstalledRoot :: InstalledPrelude -> PreludeMode -> SProgram -> Either CompileError WholeRootOutcome;
-  compileInstalledRoot (InstalledPrelude _ iface linked names env sourceValues protected) mode program =
+  compileInstalledRoot :: InstalledPrelude -> PreludeMode -> SProgram -> IO (Either CompileError WholeRootOutcome);
+  compileInstalledRoot context mode program = case planRoot context mode program of {
+    Left err -> ioReturn (Left err);
+    Right (Left reason) -> fallback reason mode program;
+    Right (Right result) -> ioReturn (Right result)
+  };
+  planRoot (InstalledPrelude _ iface linked names env sourceValues protected) mode program =
     if collides protected program then original "canonical installed identifier collision" mode program
     else do {
       root <- Core.atPhase ModuleResolution (Standalone.rewriteRootWithNames mode names env program);
-      if not (Standalone.rewrittenNeeded root) then original "no facade use; unchanged pure route" mode program
+      if not (Standalone.rewrittenNeeded root) then original "no facade use; ordinary crate request" mode program
       else if ownSupportCollision protected root then original "own class stable support collision" mode program
       else do {
         let {
@@ -201,7 +210,7 @@ module Bootstrap.InstalledPreludeWholeRoot
         checked <- Core.atPhase Verification (Checked.check (XWithData declarations grafted));
         Core.atPhase Verification (ensure (T.alphaEq (Checked.typeOf checked) (Core.inferredType compiled))
           "installed Prelude graft changed actual root type");
-        Right (InstalledRoot checked compiled (snd lowered) root)
+        Right (Right (InstalledRoot checked compiled (snd lowered) root))
       }
     }
 }

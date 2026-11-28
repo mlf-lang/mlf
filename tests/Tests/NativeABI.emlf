@@ -7,6 +7,14 @@ import qualified Package.Verification as V
 import qualified Tests.Basic as H
 import qualified Package.Benchmark as B
 import qualified Tests.Bytes as Bytes
+-- Preserve the captured bytes. Only source compilation and interpretation
+-- may add dependency decisions to a program's stderr.
+sourceDiagnostics : String -> String -> IO String
+sourceDiagnostics directory input = do
+ let output = directory ++ "/source.diagnostics"
+ code <- O.exec "" (O.words "bash tools/testing/compiler-diagnostics.sh") input output (directory ++ "/filter.err") 60
+ H.assert (code == 0) "could not read compiler diagnostics"
+ readFile output
 capture : String -> [] String -> String -> IO ((,,) Int String String)
 capture directory argv input = do
  code <- O.exec "" argv input (directory ++ "/out") (directory ++ "/err") 1800
@@ -72,7 +80,8 @@ compileLLVM : String -> String -> String -> [] String -> [] String -> IO String
 compileLLVM directory source runtime macros objects = do
  compiler <- getEnv "MLF_BOOTSTRAP_COMPILER"
  (,,) code out err <- capture directory ((:) compiler ((:) "--emit-llvm" ((:) source []))) ""
- H.assert (code == 0 && eqString err "") "selected compiler failed LLVM emission"
+ diagnostics <- sourceDiagnostics directory (directory ++ "/err")
+ H.assert (code == 0 && eqString diagnostics "") ("selected compiler failed LLVM emission: " ++ err)
  writeFile (directory ++ "/program.ll") out
  gmpOnly <- flags directory
  gc <- collectorFlags directory
@@ -93,7 +102,8 @@ rawConsole = H.withScratch (\directory -> do
  S.mapM_ (\argv -> do
   code <- O.exec "" argv (directory ++ "/input") (directory ++ "/bytes.out") (directory ++ "/bytes.err") 60
   out <- Bytes.readFile (directory ++ "/bytes.out")
-  err <- readFile (directory ++ "/bytes.err")
+  let stderrPath = directory ++ "/bytes.err"
+  err <- if eqString (S.head argv) compiler then sourceDiagnostics directory stderrPath else readFile stderrPath
   H.assert (code == 0 && S.eqList eqInt (Bytes.unpack out) (S.append (Bytes.unpack inputBytes) (B.textBytes "0\n")) && eqString err "") "raw console bytes or EOF changed") ((:) ((:) compiler ((:) "--run" ((:) (directory ++ "/console.emlf") []))) ((:) ((:) binary []) [])))
 
 allTables : IO ()
@@ -123,7 +133,7 @@ generatedForce = H.withScratch (\directory -> do
  gc <- collectorFlags directory
  gmp <- flags directory
  let source = "tests/native/runtime_inline_force.c"
- code <- O.exec "" ((:) compiler (O.words "--emit-llvm-gc --expr 0")) "" (directory ++ "/original.ll") (directory ++ "/emission.err") 30
+ code <- O.exec "" [compiler, "--emit-llvm-gc", "--expr", "ioReturn ()"] "" (directory ++ "/original.ll") (directory ++ "/emission.err") 30
  O.require (code == 0) "force probe LLVM emission failed"
  llvm <- readFile (directory ++ "/original.ll")
  O.require (H.contains "define private ptr @mlf.force" llvm && H.contains "define i32 @main(" llvm) "missing generated force or main"

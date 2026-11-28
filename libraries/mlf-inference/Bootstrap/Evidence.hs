@@ -98,8 +98,9 @@ module Bootstrap.Evidence where {
     givens = candidatePairs GivenEvidence globals;
     selectors = candidatePairs SuperclassEvidence globals;
     terms = candidateTerms globals;
+    checkIn = Check.checkerWithModuleBindings datatypes terms;
     inTypes gamma = let {
-      check = Check.checkerWithEarlierBindings datatypes (XEnv gamma terms);
+      check = checkIn gamma;
       base = proveDictionary datatypes gamma givens selectors instances (check M.empty)
     } in \locals -> case locals of {
       [] -> base;

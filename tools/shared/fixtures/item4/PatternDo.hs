@@ -18,43 +18,43 @@ announce name action = do
   putStrLn (P.show now P.++ " BEGIN: " P.++ name)
   action
 source body = B.literal $ "-- mlf:syntax shared-haskell-v1\n{-# LANGUAGE NoImplicitPrelude, NoMonomorphismRestriction, RankNTypes, KindSignatures, FlexibleContexts, FlexibleInstances, MultiParamTypeClasses, OverloadedStrings #-}\nmodule Example where\nimport MLF.Primitive\n" P.++ body P.++ "\n"
-run body = case C.compile "Example.hs" (source body) of
+run body = C.compile "Example.hs" (source body) P.>>= \outcome -> P.pure $ case outcome of
   T.Left err -> T.Left (C.prettyError err)
   T.Right result -> let term = C.compiledTerm result in
     case R.prepare P.False term of
       T.Left err -> T.Left err
       T.Right ((,) env _) -> R.evaluate env (R.REnv M.empty) (X.erase term)
-check name body expected = announce name $ case run body of
+check name body expected = announce name $ run body P.>>= \outcome -> case outcome of
   T.Right (R.RInteger actual) | actual == expected -> putStrLn ("pass: " P.++ name)
   T.Left err -> error (name P.++ ": " P.++ B.unpack err)
   _ -> error (name P.++ ": wrong result")
-reject name body = announce name $ case run body of
+reject name body = announce name $ run body P.>>= \outcome -> case outcome of
   T.Left _ -> putStrLn ("pass: reject " P.++ name)
   _ -> error (name P.++ ": unexpectedly accepted")
-rejectConstraint name body expected = announce name $ case C.compile "Example.hs" (source body) of
+rejectConstraint name body expected = announce name $ C.compile "Example.hs" (source body) P.>>= \outcome -> case outcome of
   T.Left (T.CompileError T.Resolution message) | contains expected (B.unpack message) -> putStrLn ("pass: reject " P.++ name)
   T.Left err -> error (name P.++ ": wrong failure " P.++ B.unpack (C.prettyError err))
   T.Right _ -> error (name P.++ ": unexpectedly accepted")
-rejectInference name body expected = announce name $ case C.compile "Example.hs" (source body) of
+rejectInference name body expected = announce name $ C.compile "Example.hs" (source body) P.>>= \outcome -> case outcome of
   T.Left (T.CompileError T.Inference message) | contains expected (B.unpack message) -> putStrLn ("pass: reject " P.++ name)
   T.Left err -> error (name P.++ ": wrong failure " P.++ B.unpack (C.prettyError err))
   T.Right _ -> error (name P.++ ": unexpectedly accepted")
 contains needle text = P.any (L.isPrefixOf needle) (L.tails text)
-fails name body expected = announce name $ case run body of
+fails name body expected = announce name $ run body P.>>= \outcome -> case outcome of
   T.Left message | B.unpack message == expected -> putStrLn ("pass: " P.++ name)
   T.Left message -> error (name P.++ ": wrong failure " P.++ B.unpack message)
   _ -> error (name P.++ ": unexpectedly succeeded")
 moduleSource name exports body = B.literal $ "-- mlf:syntax shared-haskell-v1\n{-# LANGUAGE NoImplicitPrelude, NoMonomorphismRestriction, RankNTypes, KindSignatures, FlexibleContexts, FlexibleInstances, MultiParamTypeClasses, OverloadedStrings #-}\nmodule " P.++ name P.++ exports P.++ " where\nimport MLF.Primitive\n" P.++ body P.++ "\n"
 familySources = M.singleton "Family" ((,) "Family.hs" (moduleSource "Family" " (Choice(Only), makeOther)" "data Choice = Only | Other\nmakeOther = Other"))
 familyCompile body = C.compileModules familySources "Example.hs" (source ("import qualified Family as F\n" P.++ body))
-checkFamily name body expected = announce name $ case familyCompile body of
+checkFamily name body expected = announce name $ familyCompile body P.>>= \outcome -> case outcome of
   T.Left err -> error (name P.++ ": " P.++ B.unpack (C.prettyError err))
   T.Right result -> case R.prepare P.False (C.compiledTerm result) of
     T.Left err -> error (B.unpack err)
     T.Right ((,) env _) -> case R.evaluate env (R.REnv M.empty) (X.erase (C.compiledTerm result)) of
       T.Right (R.RInteger actual) | actual == expected -> putStrLn ("pass: " P.++ name)
       _ -> error (name P.++ ": wrong result")
-rejectFamily name body phase expected = announce name $ case familyCompile body of
+rejectFamily name body phase expected = announce name $ familyCompile body P.>>= \outcome -> case outcome of
   T.Left (T.CompileError actual message) | C.prettyPhase actual == C.prettyPhase phase P.&& contains expected (B.unpack message) -> putStrLn ("pass: reject " P.++ name)
   T.Left err -> error (name P.++ ": wrong failure " P.++ B.unpack (C.prettyError err))
   T.Right _ -> error (name P.++ ": unexpectedly accepted")

@@ -8,6 +8,7 @@ module Test.Runner where {
   import qualified Bootstrap.Std as S;
   import qualified Test.Assert as A;
   import qualified Test.Case as C;
+  import qualified Test.CaseSelection as Selection;
   import qualified Test.Descriptor as D;
   import qualified Test.Registry as Registry;
   import qualified Test.Outcome as Outcome;
@@ -263,16 +264,15 @@ module Test.Runner where {
   validate :: [] C.Case -> Either String ();
   validate cases = Registry.validate (S.map C.descriptor cases);
   plan :: [] String -> [] C.Case -> Either String ((,) Options ([] C.Case));
-  plan args cases =
-    do {
-      options <- parse args;
-      validate cases;
-      let {
-        selected =
-          S.filter (\entry -> S.all (\selector -> matches selector entry) (selectors options)) cases
-      };
-      if S.null selected then Left "no tests matched selection" else Right ((,) options selected)
-    };
+  plan args cases = do {
+    (,) options selection <- executionPlan args cases;
+    Right ((,) options (Selection.cases selection))
+  };
+  executionPlan args cases = do {
+    options <- parse args;
+    selection <- Selection.matching (\entry -> S.all (\selector -> matches selector entry) (selectors options)) cases;
+    Right ((,) options selection)
+  };
   typedOutcome :: Result -> Outcome.Outcome;
   typedOutcome (Result _ result) =
     case result of {
@@ -390,83 +390,104 @@ module Test.Runner where {
            (showInt successes ++
             (",\"failed\":" ++ (showInt (S.length results - successes) ++ "}"))))))))));
   run :: [] String -> [] C.Case -> IO Int;
-  -- Replace a previous report before actions run. A crash leaves an incomplete
-  -- start record; only a returned run may publish a complete summary.
-  -- Compare actual IDs to the plan, not merely their counts.
-  run args cases =
-    case plan args cases of {
+  run = runObserved (\_ -> ioReturn ());
+  runObserved :: (Result -> IO ()) -> [] String -> [] C.Case -> IO Int;
+  runObserved observe args cases =
+    case executionPlan args cases of {
       Left error ->
         do {
           putErr ("test: " ++ (error ++ "\n"));
           ioReturn 2
         };
-      Right ((,) options selected) ->
-        do {
-          let {
-            total = S.length cases
-          };
-          let {
-            count = S.length selected
-          };
-          if listing options
-          then do {
-                 let {
-                   inventory =
-                     (prefix "inventory" ++
-                      (selectionFields total count ++
-                       (",\"cases\":[" ++
-                        (S.intercalate ","
-                           (S.map (\entry -> ("{" ++ (descriptor entry ++ "}"))) selected) ++
-                         "]}"))))
-                 };
-                 saveReport options (inventory ++ "\n");
-                 if json options
-                 then putStrLn inventory
-                 else S.mapM_ (\entry -> putStrLn (C.id entry ++ ("  " ++ C.name entry))) selected;
-                 ioReturn 0
-               }
-          else do {
-                 let {
-                   start =
-                     (prefix "start" ++
-                      (selectionFields total count ++
-                       (",\"ids\":" ++ (strings (S.map C.id selected) ++ "}"))))
-                 };
-                 saveReport options (start ++ "\n");
-                 if json options then putStrLn start else ioReturn ();
-                 results <-
-                   executeWith
-                     (\result ->
-                        putStrLn (if json options then resultJson result else resultText result))
-                     selected;
-                 let {
-                   failures = S.length (S.filter (\result -> S.not (passed result)) results)
-                 };
-                 let {
-                   exact =
-                     case Registry.exactInventory (S.map C.id selected)
-                            (S.map identity results) of {
-                       Right () -> True;
-                       Left _ -> False
-                     }
-                 };
-                 let {
-                   summary = summaryJsonFor total selected results
-                 };
-                 saveReport options
-                   (S.intercalate "\n"
-                      ((:) start (S.append (S.map resultJson results) ((:) summary []))) ++
-                    "\n");
-                 if json options
-                 then putStrLn summary
-                 else putStrLn
-                        (showInt count ++
-                         (" checks; " ++
-                          (showInt failures ++
-                           (" failures (" ++ (scope total count ++ " inventory)")))));
-                 ioReturn (if (exact && (failures == 0)) then 0 else 1)
-               }
-        }
+      Right ((,) options selected) -> runSelected observe options selected
+    };
+  runOptions :: Options -> [] C.Case -> [] C.Case -> IO Int;
+  runOptions = runOptionsObserved (\_ -> ioReturn ());
+  -- Selection adapters pass a validated projection of the full inventory.
+  -- Replace a stale report before running and check exact result identities.
+  runOptionsObserved :: (Result -> IO ()) -> Options -> [] C.Case -> [] C.Case -> IO Int;
+  runOptionsObserved = runOptionsObservedWith executeWith;
+  -- A suite may share identical fixture outcomes while retaining every selected
+  -- identity. Selection validation, reporting and completion remain common.
+  runOptionsObservedWith :: ((Result -> IO ()) -> [] C.Case -> IO ([] Result)) ->
+    (Result -> IO ()) -> Options -> [] C.Case -> [] C.Case -> IO Int;
+  runOptionsObservedWith execute observe options cases selected = case Selection.project cases selected of {
+    Left message -> do { putErr ("test: " ++ message ++ "\n"); ioReturn 2 };
+    Right selection -> runSelectedWith execute observe options selection
+  };
+  runSelected :: (Result -> IO ()) -> Options -> Selection.CaseSelection -> IO Int;
+  runSelected = runSelectedWith executeWith;
+  runSelectedWith :: ((Result -> IO ()) -> [] C.Case -> IO ([] Result)) ->
+    (Result -> IO ()) -> Options -> Selection.CaseSelection -> IO Int;
+  runSelectedWith execute observe options selection =
+    do {
+      let { selected = Selection.cases selection };
+      let {
+        total = Selection.total selection
+      };
+      let {
+        count = S.length selected
+      };
+      if listing options
+      then do {
+             let {
+               inventory =
+                 (prefix "inventory" ++
+                  (selectionFields total count ++
+                   (",\"cases\":[" ++
+                    (S.intercalate ","
+                       (S.map (\entry -> ("{" ++ (descriptor entry ++ "}"))) selected) ++
+                     "]}"))))
+             };
+             saveReport options (inventory ++ "\n");
+             if json options
+             then putStrLn inventory
+             else S.mapM_ (\entry -> putStrLn (C.id entry ++ ("  " ++ C.name entry))) selected;
+             ioReturn 0
+           }
+      else do {
+             let {
+               start =
+                 (prefix "start" ++
+                  (selectionFields total count ++
+                   (",\"ids\":" ++ (strings (S.map C.id selected) ++ "}"))))
+             };
+             saveReport options (start ++ "\n");
+             if json options then putStrLn start else ioReturn ();
+             results <-
+               execute
+                 (\result -> do {
+                    putStrLn (if json options then resultJson result else resultText result);
+                    observe result
+                  })
+                 selected;
+             let {
+               failures = S.length (S.filter (\result -> S.not (passed result)) results)
+             };
+             let {
+               exact =
+                 case Registry.exactInventory (S.map C.id selected)
+                        (S.map identity results) of {
+                   Right () -> True;
+                   Left _ -> False
+                 }
+             };
+             let {
+               summary = summaryJsonFor total selected results
+             };
+             saveReport options
+               (S.intercalate "\n"
+                  ((:) start (S.append (S.map resultJson results) ((:) summary []))) ++
+                "\n");
+             if json options
+             then putStrLn summary
+             else putStrLn
+                    (showInt count ++
+                     (" checks; " ++
+                      (showInt failures ++
+                       (" failures (" ++ (scope total count ++ " inventory)")))));
+             ioReturn (if (exact && (failures == 0)) then 0 else 1)
+           }
     };
   saveReport options text =
     if eqString (report options) "" then ioReturn () else writeFile (report options) text;

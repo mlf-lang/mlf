@@ -116,7 +116,7 @@ class RunnerControls(unittest.TestCase):
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory(prefix='source-field-layout-controls-')
         self.addCleanup(self.temporary.cleanup)
-        self.root = Path(self.temporary.name)
+        self.root = Path(self.temporary.name).resolve()
         self.producer_dir = self.root / 'producer'
         (self.producer_dir / 'objects').mkdir(parents=True)
         self.receipt = self.producer_dir / 'receipt.json'

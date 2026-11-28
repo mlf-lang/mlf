@@ -142,25 +142,42 @@ module Bootstrap.LLVM.Analysis where {
       fs;
   captureIndexed :: Map XName ((,) ([] XName) (Set XName)) ->
                     Map XName WorkerFunction -> Map XName WorkerFunction;
-  captureIndexed inputs fs =
-    let {
-      next =
-        M.mapWithKey
-          (\name f ->
-             case M.get O.compareName name inputs of {
-               (,) names parameterNames ->
-                 WorkerFunction (parameters f) (functionBody f)
-                   (S.toList
-                      (S.difference O.compareName
-                         (S.unions O.compareName (L.map (neededName fs) names))
-                         parameterNames))
-                   (strict f) (entrySummary f)
-             })
-          fs
-    } in
-    if M.eqMap O.eqName (\a b -> sameNames (captures a) (captures b)) fs next
-    then fs
-    else captureIndexed inputs next;
+  captureIndexed inputs fs = let {
+    callers = M.foldlWithKeyStrict addCaller M.empty inputs;
+    addCaller index caller ((,) names _) = L.foldlStrict
+      (\tree name -> if M.member O.compareName name fs
+        then M.insertWith O.compareName L.append name [caller] tree else tree) index names;
+    -- Store only changed capture sets. Unchanged workers keep their initial
+    -- captures; lexical names outside the worker table still capture themselves.
+    neededSet previous name = case M.lookup O.compareName name previous of {
+      Just captured -> captured;
+      Nothing -> neededName fs name
+    };
+    unchanged previous name captured = case M.lookup O.compareName name previous of {
+      Just old -> S.eqSet O.eqName old captured;
+      Nothing -> case captures (M.get O.compareName name fs) of {
+        [] -> S.null captured;
+        old -> sameNames old (S.toList captured)
+      }
+    };
+    propagate previous pending = let {
+      update ((,) current dirty) name = case M.get O.compareName name inputs of {
+        (,) names parameterNames -> let {
+          captured = S.difference O.compareName
+            (S.unions O.compareName (L.map (neededSet previous) names)) parameterNames
+        } in if unchanged previous name captured then (,) current dirty else let {
+          next = M.insert O.compareName name captured current;
+          dependents = M.findWithDefault O.compareName [] name callers;
+          affected = L.foldlStrict (\set caller -> S.insert O.compareName caller set) dirty dependents
+        } in seq next (seq affected ((,) next affected))
+      }
+    } in case L.foldlStrict update ((,) previous S.empty) pending of {
+      (,) current dirty -> if S.null dirty then current else propagate current (S.toList dirty)
+    };
+    publish table name captured = M.adjust O.compareName
+      (\f -> WorkerFunction (parameters f) (functionBody f) (S.toList captured)
+        (strict f) (entrySummary f)) name table
+  } in M.foldlWithKeyStrict publish fs (propagate M.empty (M.keys fs));
   demandFixed :: Map XName WorkerFunction -> Map XName WorkerFunction;
   demandFixed fs =
     let {
@@ -217,6 +234,25 @@ module Bootstrap.LLVM.Analysis where {
     if demandComplete first
     then EntryDemand (appendNames (demandNames first) (demandNames next)) (demandComplete next)
     else first;
+  -- Share summaries only along this lexical let spine. Each summary describes
+  -- its body with open names, independent of the emitter's current WHNF facts.
+  data LetDemands = LetDemands EntryDemand (Maybe LetDemands);
+  letBodyDemands :: Map XName WorkerFunction -> XErased -> LetDemands;
+  letBodyDemands fs term = case term of {
+    XELet binder rhs body -> let {
+      rest = letBodyDemands fs body;
+      entry = case rest of { LetDemands demand _ -> demand }
+    } in LetDemands (bindDemand binder (entryDemand fs M.empty rhs) entry) (Just rest);
+    _ -> LetDemands (entryDemand fs M.empty term) Nothing
+  };
+  -- Substitute at the first force. A partial RHS cuts off later forces,
+  -- and appendDemand removes repeated names shared with either neighbor.
+  bindDemand :: XName -> EntryDemand -> EntryDemand -> EntryDemand;
+  bindDemand binder rhs demand = case L.break (O.eqName binder) (demandNames demand) of {
+    (,) before ((:) _ after) ->
+      appendDemand (EntryDemand before True) (appendDemand rhs (EntryDemand after (demandComplete demand)));
+    _ -> demand
+  };
   entryDemand :: Map XName WorkerFunction -> Map XName EntryDemand -> XErased -> EntryDemand;
   entryDemand fs local expression = case expression of {
     XEVar name ->

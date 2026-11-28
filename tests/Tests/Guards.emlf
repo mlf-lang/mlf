@@ -1,4 +1,7 @@
 module Tests.Guards where
+import Prelude hiding (Monad, return, bind)
+import MLF.Primitive (Monad, return, bind)
+import qualified Test.Assert as A
 import Bootstrap.Types
 import qualified Bootstrap.Std as S
 import qualified Tests.Helpers as H
@@ -10,22 +13,22 @@ import Bootstrap.X.Pretty (prettyTerm)
 import qualified Bootstrap.X.Syntax as X
 import qualified Bootstrap.X.Type as T
 
-sameExpr : String -> String -> String -> (,) String (IO ())
+sameExpr : String -> String -> String -> (,) String (A.Test ())
 sameExpr label guarded ordinary = (,) ("guards parser: " ++ label) (do
-  actual <- H.right (parseExpr "<guards expression>" guarded)
-  expected <- H.right (parseExpr "<ordinary conditional>" ordinary)
-  H.assert (H.eq (H.layoutExpr actual) (H.layoutExpr expected)) ("guard lowering changed AST: " ++ H.show actual))
+  actual <- A.right H.show (parseExpr "<guards expression>" guarded)
+  expected <- A.right H.show (parseExpr "<ordinary conditional>" ordinary)
+  A.assert (H.eq (H.layoutExpr actual) (H.layoutExpr expected)) ("guard lowering changed AST: " ++ H.show actual))
 
-sameProgram : String -> String -> String -> (,) String (IO ())
+sameProgram : String -> String -> String -> (,) String (A.Test ())
 sameProgram label guarded ordinary = (,) ("guards program: " ++ label) (do
-  actual <- H.right (parseProgram "<guards program>" guarded)
-  expected <- H.right (parseProgram "<ordinary program>" ordinary)
-  H.assert (H.eq (H.layoutProgram actual) (H.layoutProgram expected)) ("guard lowering changed program: " ++ H.show actual))
+  actual <- A.right H.show (parseProgram "<guards program>" guarded)
+  expected <- A.right H.show (parseProgram "<ordinary program>" ordinary)
+  A.assert (H.eq (H.layoutProgram actual) (H.layoutProgram expected)) ("guard lowering changed program: " ++ H.show actual))
 
-programAST : String -> String -> SExpr -> (,) String (IO ())
+programAST : String -> String -> SExpr -> (,) String (A.Test ())
 programAST label source expected = (,) ("guards parser: " ++ label) (do
-  actual <- H.right (parseProgram "<guards annotation boundary>" source)
-  H.assert (H.eq (H.layoutProgram actual) (SProgram [] expected)) (H.show actual))
+  actual <- A.right H.show (parseProgram "<guards annotation boundary>" source)
+  A.assert (H.eq (H.layoutProgram actual) (SProgram [] expected)) (H.show actual))
 
 -- The source parser starts in package main, module Main. Physical positions
 -- are normalized by the comparison; labels and owners remain explicit.
@@ -35,18 +38,20 @@ sourceReference name = SCallSite name (SourceSpan "main" "Main" "" 0 0 0 0) (SVa
 conditional : SExpr -> SExpr -> SExpr -> SExpr
 conditional condition yes no = SApp (SApp (SApp (SPrimitive PIfThenElse) condition) yes) no
 
-hasType : String -> String -> XType -> (,) String (IO ())
+hasType : String -> String -> XType -> (,) String (A.Test ())
 hasType label source expected = (,) ("guards checking: " ++ label) (do
-  result <- H.right (compile "<guards test>" source)
-  term <- H.right (XP.parseTerm "<guards xMLF>" (prettyTerm (compiledTerm result)))
-  actual <- H.right (C.checkClosed term)
-  H.assert (T.alphaEq actual expected && T.alphaEq actual (inferredType result)) ("wrong type: " ++ sourceType result)
-  H.assert (H.eq (X.erase term) (X.erase (compiledTerm result))) "xMLF round trip changed erasure")
+  result <- A.andThen (A.liftIO (compile "<guards test>" source)) (A.right H.show)
+  term <- A.right H.show (XP.parseTerm "<guards xMLF>" (prettyTerm (compiledTerm result)))
+  actual <- A.right H.show (C.checkClosed term)
+  A.assert (T.alphaEq actual expected && T.alphaEq actual (inferredType result)) ("wrong type: " ++ sourceType result)
+  A.assert (H.eq (X.erase term) (X.erase (compiledTerm result))) "xMLF round trip changed erasure")
 
-rejects : String -> String -> Phase -> String -> (,) String (IO ())
-rejects label source expectedPhase reason = (,) ("guards rejection: " ++ label) (case compile "<invalid guards>" source of
-  Left err -> H.assert (H.eq (phase err) expectedPhase && H.contains reason (diagnostic err)) ("wrong rejection: " ++ H.show err)
-  Right result -> H.fail ("unexpected acceptance: " ++ sourceType result))
+rejects : String -> String -> Phase -> String -> (,) String (A.Test ())
+rejects label source expectedPhase reason = (,) ("guards rejection: " ++ label) (do
+  compilation <- A.liftIO (compile "<invalid guards>" source)
+  case compilation of
+    Left err -> A.assert (H.eq (phase err) expectedPhase && H.contains reason (diagnostic err)) ("wrong rejection: " ++ H.show err)
+    Right result -> A.fail ("unexpected acceptance: " ++ sourceType result))
 
 int : XType
 int = XCon "Int" []
@@ -57,11 +62,11 @@ bool = XCon "Bool" []
 ioUnit : XType
 ioUnit = XCon "IO" ((:) (XCon "()" []) [])
 
-guardTests : [] ((,) String (IO ()))
+guardTests : [] ((,) String (A.Test ()))
 guardTests = S.append parserTests (S.append checkingTests (S.append rejectionTests
   (S.map (\((,,,) label source _ _) -> hasType label source ioUnit) guardPrograms)))
 
-parserTests : [] ((,) String (IO ()))
+parserTests : [] ((,) String (A.Test ()))
 parserTests = (:)
   (sameExpr "ordered expression arms" "if { | a -> x; | b -> y; | otherwise -> z }" "if a then x else if b then y else z") ((:)
   (sameExpr "fallback-only expression" "if { | otherwise -> 42 }" "42") ((:)
@@ -85,11 +90,11 @@ parserTests = (:)
       (SAnn (sourceReference "flag") (SAnnotation [] (SCon "Bool" []))) (SIntLit 1) (SIntLit 0)))
       (SApp (sourceReference "g") (SBoolLit true)))) ((:)
   ((,) "guards parser: diagnostics keep original line and column" (case parseExpr "guards-position.emlf" "if {\n  | true -> 1;\n  | otherwise -> )\n}" of
-    Left err -> H.assert (H.contains "guards-position.emlf:3:18:" err) err
-    Right parsed -> H.fail (H.show parsed)))
+    Left err -> A.assert (H.contains "guards-position.emlf:3:18:" err) err
+    Right parsed -> A.fail (H.show parsed)))
   [])))))))))))))))
 
-checkingTests : [] ((,) String (IO ()))
+checkingTests : [] ((,) String (A.Test ()))
 checkingTests = (:)
   (hasType "guarded values generalize" "pick | true = (\\x -> x) | otherwise = (\\x -> x); n = pick 1; main = pick true;" bool) ((:)
   (hasType "separate whole-function signature" "choose : Int -> Int; choose x | x > 0 = x | otherwise = 0; main = choose 42;" int) ((:)
@@ -100,11 +105,11 @@ checkingTests = (:)
   (hasType "guard condition can contain an expression guard" "if { | if { | false -> false; | otherwise -> true } -> 42; | otherwise -> 0 }" int) ((:)
   (hasType "unselected branches preserve polymorphism" "id x = x; main = (if { | false -> id; | otherwise -> id }) 42;" int) ((:)
   ((,) "guards checking: no implicit prelude required" (do
-    result <- H.right (compileWithPrelude NoImplicitPrelude "<guards without prelude>" "choose x | x > 0 = x | otherwise = 0; main = if { | true -> choose 42; | otherwise -> 0 };")
-    H.assert (T.alphaEq (inferredType result) int) (sourceType result)))
+    result <- A.andThen (A.liftIO (compileWithPrelude NoImplicitPrelude "<guards without prelude>" "choose x | x > 0 = x | otherwise = 0; main = if { | true -> choose 42; | otherwise -> 0 };")) (A.right H.show)
+    A.assert (T.alphaEq (inferredType result) int) (sourceType result)))
   []))))))))
 
-rejectionTests : [] ((,) String (IO ()))
+rejectionTests : [] ((,) String (A.Test ()))
 rejectionTests = (:)
   (rejects "expression condition requires Bool" "if { | 1 -> 42; | otherwise -> 0 }" Inference "type constructor mismatch") ((:)
   (rejects "function condition requires Bool" "choose x | x = 42 | otherwise = 0; main = choose 1;" Inference "type constructor mismatch") ((:)

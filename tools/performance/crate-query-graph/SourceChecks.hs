@@ -1,10 +1,11 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Main where
 import Prelude
-import Control.Monad (unless, foldM)
-import System.Environment (getArgs)
+import Control.Monad (unless, foldM, when)
+import System.Environment (getArgs, lookupEnv)
 import System.Directory (createDirectoryIfMissing, doesFileExist)
-import Data.List (isInfixOf)
+import Data.List (isInfixOf, isPrefixOf)
+import Data.Maybe (fromMaybe)
 import qualified Data.ByteString as BS
 import qualified Bootstrap.Types as T
 import qualified Bootstrap.Std as S
@@ -135,7 +136,7 @@ sourceChecks root = do
  assert "warm final parity" (map (view.snd) cold==map (view.snd) warm && contractView contracts==contractView warmContracts)
  putStrLn "PASS source query raw reuse, evidence, protection, independent old contracts/bodies, and runtime oracle"
 
-sourceChanges root = do
+sourceChanges root selected = do
  let plain n e=(n,T.Nothing,e)
      ident=T.SLam "x" T.Nothing (T.SVar "x")
      caller=plain "greeting" (T.SLam "x" T.Nothing (app "getName" (T.SVar "x")))
@@ -157,6 +158,12 @@ sourceChanges root = do
        ("scope",[scoped [],scoped[("tagBool",instBool)],scoped []]),
        ("scope-order",[scoped[("tagInt",instInt),("tagBool",instBool)],scoped[("tagBool",instBool),("tagInt",instInt)]])]
      rawHashes (Old.QueryReport _ _ groups)=[h|Old.GroupResult _ _ _ _ h<-groups]
+     requested label versions
+       | null selected = zip [0::Int ..] versions
+       | otherwise = case [version | (version, _) <- zip [0::Int ..] versions,
+                                    selected == changeLabel label version] of
+           [version] -> take (version + 1) (zip [0::Int ..] versions)
+           _ -> []
  mapM_ (\(label,versions)->mapM_ (\(version,(ds,classes,instances,scopes,instanceScopes,members))->do
    prepared<-expect "changed source plan"(SI.prepareSourcePlan M.empty ds classes instances scopes instanceScopes members)
    plan<-case prepared of T.Just p->pure p;_->error "changed source fallback"
@@ -172,7 +179,10 @@ sourceChanges root = do
    (warm,warmReport,_)<-CG.compileSourceGroups True identity cache [] M.empty plan >>= expect "changed source warm"
    assert "changed source all warm hits"(Old.inferredCount warmReport==0 && length inc==length warm && map(view.snd) inc==map(view.snd) warm)
    if label=="body" && version==1 then assert "source body edit one inferred"(Old.inferredCount report==1) else pure ()
-   putStrLn("PASS source change "++label++" "++show version)) (zip [0::Int ..] versions)) cases
+   when (null selected || selected == changeLabel label version) (putStrLn ("PASS " ++ changeLabel label version)))
+   (requested label versions)) cases
+
+changeLabel label version = "source change " ++ label ++ " " ++ show (version :: Int)
 
 finishHashChecks group fragment = do
  let refs = [("a","version-a"),("b","version-b")]
@@ -211,10 +221,10 @@ graphChecks root = do
  assert "actual dictionary changes identity with fixed compiler" (Old.sourceFormatFor actualBuiltinChange/=Old.sourceQueryFormat)
  let poison=G.QueryNode (G.key "Q" "poison") (error "later dependency forced after red edge") [] T.Nothing
      old=M.fromList P.compareString [(G.key "Q" "caller",G.QueryNode (G.key "Q" "caller") "hash" [(G.nodeKey changed,"different"),(G.key "Q" "poison","poison")] T.Nothing),(G.key "Q" "poison",poison)]
-     selected=G.Session path config "" old (M.fromList P.compareString [(G.nodeKey changed,changed)]) M.empty
+     selected=G.Session G.MemoryStore config "" old (M.fromList P.compareString [(G.nodeKey changed,changed)]) M.empty
  assert "old read order short-circuits after first changed edge" (case fst (G.validate (G.key "Q" "caller") selected) of T.Nothing->True;_->False)
  let cyclic=M.fromList P.compareString [(G.key "Q" "a",G.QueryNode (G.key "Q" "a") "h" [(G.key "Q" "b","h")] T.Nothing),(G.key "Q" "b",G.QueryNode (G.key "Q" "b") "h" [(G.key "Q" "a","h")] T.Nothing)]
- assert "query cycle rejected" (case fst(G.validate (G.key "Q" "a") (G.Session path config "" cyclic M.empty M.empty)) of T.Nothing->True;_->False)
+ assert "query cycle rejected" (case fst(G.validate (G.key "Q" "a") (G.Session G.MemoryStore config "" cyclic M.empty M.empty)) of T.Nothing->True;_->False)
  putStrLn "PASS graph read order, red/green propagation, compiler/builtin namespace, and cycle handling"
 
 formalChecks file = do
@@ -233,11 +243,11 @@ formalChecks file = do
    digest<-P.fileDigest path
    pure(Libraries.LibrarySource name path source digest (Modules.sourceSyntax parsed))) names
  identity<-P.fileDigest(B.literal file)
- raw<-expect "prepared library open-object admission" (Libraries.prepareFresh identity T.ImplicitPrelude sources objects)
- _<-expect "prepared native literal compatibility" (Libraries.nativeLibrary raw)
- let (declarations,expression)=Literal.rawLibraryPieces raw
+ raw<-Libraries.prepareFresh identity T.ImplicitPrelude sources objects >>= expect "prepared library open-object admission"
+ _<-Libraries.admitLibrary raw >>= expect "prepared open-object admission"
+ (declarations,expression)<-Literal.rawLibraryPieces raw >>=expect "prepared literal object encoding"
  assert "prepared literal rendered" (P.stringLength declarations>0 && P.stringLength expression>0)
- putStrLn "PASS cross-executable formal loading and legacy prepared-native literal compatibility"
+ putStrLn "PASS cross-executable formal loading and prepared open-object literal compatibility"
 
 loweredChecks root = do
  let members=[("copy",T.Nothing,T.SSourceDefinition(T.SIntLit 42)),
@@ -301,11 +311,16 @@ sessionTransactionChecks root = do
 
 main = do
  arguments <- getArgs
- let directory=head arguments
+ selected <- fromMaybe "" <$> lookupEnv "MLF_SOURCE_QUERY_LABEL"
+ let directory = head arguments
+ let wanted label = null selected || selected == label
  createDirectoryIfMissing True directory
- graphChecks directory
- sourceChecks directory
- sourceChanges directory
- loweredChecks directory
- sessionTransactionChecks directory
- case tail arguments of []->pure (); [file]->formalChecks file; _->error "expected directory [formal-interface]"
+ when (wanted "graph read order, red/green propagation, compiler/builtin namespace, and cycle handling") (graphChecks directory)
+ when (wanted "source query raw reuse, evidence, protection, independent old contracts/bodies, and runtime oracle") (sourceChecks directory)
+ when (null selected || "source change " `isPrefixOf` selected) (sourceChanges directory selected)
+ when (wanted "actual copied-definition fallback, legacy parity, runtime result, and warm graph reuse") (loweredChecks directory)
+ when (wanted "actual Session same-process failure/retry, lock release, whole-crate publication and retained generation") (sessionTransactionChecks directory)
+ case tail arguments of
+  [] -> pure ()
+  [file] -> when (wanted "cross-executable formal loading and prepared open-object literal compatibility") (formalChecks file)
+  _ -> error "expected directory [formal-interface]"

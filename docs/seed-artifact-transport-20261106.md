@@ -94,6 +94,6 @@ runner token or real CLI network access.
   and focused-preparation controls successfully. This is not a full Core run.
 - All 378 historical snapshot hashes and 155 actual build-source hashes match.
 
-[Transport validation and captured controls](../tools/release/evidence/seed-artifact-20261106/validation.json)
+[Transport validation and captured controls](https://github.com/mlf-lang/mlf/blob/0704d216b8cf6d887d3737efa30a2eae3c152f0a/tools/release/evidence/seed-artifact-20261106/validation.json)
 record the actual bytes and limits. The complete sealed-history and fresh-checkout
 results, followed by GitHub's new commit checks, are publication prerequisites.

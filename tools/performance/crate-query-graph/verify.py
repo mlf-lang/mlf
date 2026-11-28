@@ -13,9 +13,12 @@ from concurrent.futures import ThreadPoolExecutor
 
 ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / 'tools/shared'))
+sys.path.insert(0, str(ROOT / 'tools/testing'))
+from receipt_selection import identity, select
+
+PREFIX = 'query-graph-acceptance/'
 from artifact_binary_reference import read_document, tree_document, Invalid, require
-from test_query_index import read_index
-from artifact_binary_typed import value_node as node, text, list_values as items, unpack
+from artifact_binary_typed import value_node as node, text, list_values as items, unpack, n, s, l
 from query_generation import Generation, cache_directory
 from finish_receipts import (check_receipts, forge_generation, wrong_template_stamp,
                              forge_template_generation, forge_direct_binding_generation)
@@ -27,9 +30,9 @@ def frame(values): return ''.join(f'{len(v)}:{v}' for v in values)
 
 def verifier_inputs():
     paths = [Path(__file__), Path(__file__).with_name('finish_receipts.py'),
-             Path(__file__).with_name('template_receipts.py')]
+             Path(__file__).with_name('template_receipts.py'), ROOT / 'tools/testing/receipt_selection.py']
     paths += [ROOT / 'tools/shared' / name for name in (
-        'query_generation.py', 'test_query_index.py', 'artifact_binary_reference.py',
+        'query_generation.py', 'artifact_binary_reference.py',
         'artifact_binary_typed.py', 'artifact_binary_open.py', 'artifact_structure_contract.json')]
     return {str(path.relative_to(ROOT)): sha(path.read_bytes()) for path in paths}
 
@@ -48,60 +51,6 @@ def read(path, schema): return read_document(path.read_bytes(), schema).values()
 def pair(value): return node(value, 2, 2)
 
 
-def index_data(raw, *, expected=None):
-    """Read either index version through the independent, bounded oracle."""
-    values = read_document(raw, 6).values()
-    require(len(values) == 1, 'query graph root count')
-    value = values[0]
-    require(value[0] == 'node' and value[1] in (411, 412), 'query graph index tag')
-    version = 1 if value[1] == 411 else 2
-    fields = node(value, value[1], 3 if version == 1 else 4)
-    configuration = text(fields[1])
-    records, _ = read_index(raw, configuration, expected=expected)
-    return version, configuration, {
-        key: {'sha': digest, 'reads': reads, 'payload': location}
-        for key, (digest, reads, location) in records.items()
-    }
-
-
-def index_bytes(configuration, records, *, version):
-    """Independent fixture writer, including intentionally invalid closure.
-
-    Rebuild the dictionary after edits so a missing/stale dependency is not
-    accidentally rejected for an unrelated unused string or noncanonical ID.
-    Never deduplicate or reorder the provider's reads.
-    """
-    require(version in (1, 2), 'fixture query graph version')
-    def n(tag, *children): return ('node', tag, tuple(children))
-    def s(value): return ('text', value)
-    def i(value): return ('int', value)
-    def sequence(values): return n(1, *values)
-    ordered = sorted(records.items())
-    if version == 1:
-        rows = [n(410, s(key), s(entry['sha']),
-                  sequence(n(2, s(k), s(h)) for k, h in entry['reads']),
-                  n(4) if entry['payload'] is None else n(5, s(entry['payload'])))
-                for key, entry in ordered]
-        value = n(411, s('MLF-CRATE-QUERY-GRAPH-1'), s(configuration), sequence(rows))
-    else:
-        strings = set()
-        for key, entry in ordered:
-            strings.update((key, entry['sha']))
-            for dependency, expected in entry['reads']:
-                strings.update((dependency, expected))
-            if entry['payload'] is not None:
-                strings.add(entry['payload'])
-        dictionary = sorted(strings)
-        ids = {value: index for index, value in enumerate(dictionary)}
-        rows = [n(413, i(ids[key]), i(ids[entry['sha']]),
-                  sequence(n(2, i(ids[k]), i(ids[h])) for k, h in entry['reads']),
-                  n(4) if entry['payload'] is None else n(5, i(ids[entry['payload']])))
-                for key, entry in ordered]
-        value = n(412, s('MLF-CRATE-QUERY-GRAPH-2'), s(configuration),
-                  sequence(map(s, dictionary)), sequence(rows))
-    return tree_document([value], schema=6)
-
-
 def replace_result(records, wanted, digest):
     """Repin a trusted result and all reads of it without changing read order."""
     require(wanted in records, 'fixture result key missing')
@@ -114,14 +63,31 @@ def replace_result(records, wanted, digest):
     }
 
 
-def reject_index(raw, configuration, reason):
-    """Require the intended semantic rejection, not an incidental bad encoding."""
-    try:
-        read_index(raw, configuration)
-    except Invalid as error:
-        require(str(error) == reason, 'unexpected query-index rejection: ' + str(error))
-    else:
-        raise Invalid('invalid query-index fixture was accepted')
+def dangling_generation(wire):
+    """Break one read while retaining the generation's wire format."""
+    rows = list(wire.rows)
+    for index, row in enumerate(rows):
+        key, result, reads, location = node(row, 410, 4)
+        edges = list(items(reads))
+        if edges:
+            _, expected = pair(edges[0])
+            edges[0] = n(2, s(frame(['Binding', 'absent-definition'])), expected)
+            rows[index] = n(410, key, result, l(*edges), location)
+            return wire.encode_rows(rows)
+    raise Invalid('dangling fixture requires a dependency')
+
+
+def repin_generation(wire, key, digest):
+    """Repin the result, location and every incoming read in the original layout."""
+    rows = []
+    for row in wire.rows:
+        name, result, reads, location = node(row, 410, 4)
+        edges = [n(2, dep, s(digest) if text(dep) == key else observed)
+                 for dep, observed in map(pair, items(reads))]
+        if text(name) == key:
+            result, location = s(digest), n(5, s(digest))
+        rows.append(n(410, name, result, l(*edges), location))
+    return wire.encode_rows(rows)
 
 
 def graph(cache):
@@ -138,6 +104,18 @@ def graph(cache):
             require(tree_document(read_document(raw, 6).values(), schema=6) == raw,
                     'query payload canonical bytes')
     return current, result
+
+
+def check_payload_recovery(report, original, payload):
+    """One checked refill serves every owner of the damaged content address."""
+    owners = {g['id'] for g in original['groups'] if g['query_key'] == payload}
+    misses = [g['id'] for g in report['groups'] if g['cached'] is False]
+    require(len(misses) == 1 and misses[0] in owners,
+            'payload recovery must re-infer one owner of the damaged result')
+    expected = dict(original, inferred_groups=1, reused_groups=len(original['groups']) - 1,
+                    groups=[dict(g, cached=g['id'] != misses[0]) for g in original['groups']])
+    require(report == expected,
+            'payload recovery changed unrelated groups, contracts or reuse counts')
 
 
 def execute(binary, argv, *, env=None, success=True):
@@ -190,12 +168,24 @@ CASES = {
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('binary', type=Path)
-    parser.add_argument('output', type=Path)
+    parser.add_argument('binary', type=Path, nargs='?')
+    parser.add_argument('output', type=Path, nargs='?')
+    parser.add_argument('--framework-list', action='store_true')
     parser.add_argument('--smoke', action='store_true')
     parser.add_argument('--case', choices=list(CASES), help='run a single named control')
     parser.add_argument('--resume', action='store_true', help='retain completed cases for the same binary and rerun incomplete cases in fresh directories')
     args = parser.parse_args()
+    available = [name for name in CASES if (not args.smoke or name == 'body')
+                 and (args.case is None or name == args.case)]
+    if not available:
+        parser.error('--smoke and --case must select at least one control')
+    focused = select(PREFIX, available)
+    selected = [focused] if focused is not None else available
+    if args.framework_list:
+        print(json.dumps([identity(PREFIX, name) for name in selected]))
+        return
+    if args.binary is None or args.output is None:
+        parser.error('binary and output are required')
     binary, output = args.binary.resolve(strict=True), args.output.resolve()
     output.mkdir(parents=True, exist_ok=args.resume)
     builtin = output / 'builtin'
@@ -207,11 +197,15 @@ def main():
     if args.resume:
         record.setdefault('resumptions', []).append(dict(script_sha256=sha(Path(__file__).read_bytes()),
             completed_cases=list(record.get('recovery', []))))
-    def save(): (output / 'results.json').write_text(json.dumps(record, indent=2) + '\n')
+    record['selected_cases'] = selected
+    def save():
+        record['framework_cases'] = [name for name in record.get('recovery', []) if name in selected]
+        temporary = output / 'results.json.new'
+        temporary.write_text(json.dumps(record, indent=2) + '\n')
+        temporary.replace(output / 'results.json')
     save()
     for name, versions in CASES.items():
-        if args.smoke and name != 'body': continue
-        if args.case and name != args.case: continue
+        if name not in selected: continue
         if args.resume and name in record.get('recovery', []): continue
         folder = output / name
         if folder.exists():
@@ -319,6 +313,9 @@ def main():
             if name == 'body' and version == 1:
                 assert report['inferred_groups'] == 1, 'body edit should reuse same-contract callers'
         # A corrupt/missing result is repaired; final output remains exact.
+        # Multiple owners can share one content address. The first miss queues
+        # checked bytes in the current session, so later owners can reuse them
+        # before publication instead of independently re-inferring the payload.
         current, nodes = graph(cache)
         raw_payloads = [n['payload'] for k, n in nodes.items() if unpack(k)[0] == 'InferScc']
         payload = max(raw_payloads, key=raw_payloads.count) if name in ('template-rebind', 'signed-template-rebind') else raw_payloads[0]
@@ -326,18 +323,25 @@ def main():
         if name in ('template-rebind', 'signed-template-rebind'):
             require(affected == 2, 'shared-template corruption must target both actual owners')
         damaged = cache_directory(cache) / 'results' / (payload + '.mlfqr')
+        original_payload = damaged.read_bytes()
         damaged.write_bytes(b'corrupt checked record')
         repaired = compile('repaired')
-        assert json.loads(repaired.with_suffix('.queries').read_text())['inferred_groups'] == affected
-        assert outputs(repaired) == outputs(inc)
-        graph(cache)
+        check_payload_recovery(json.loads(repaired.with_suffix('.queries').read_text()), report, payload)
+        require(outputs(repaired) == outputs(inc), 'corrupt payload repair changed formal outputs')
+        require(graph(cache) == (current, nodes) and damaged.read_bytes() == original_payload,
+                'corrupt payload repair did not restore the original graph and checked bytes')
+        check_receipts(repaired, cache, nodes)
         damaged.unlink()
         missing = compile('missing')
-        assert json.loads(missing.with_suffix('.queries').read_text())['inferred_groups'] == affected
-        assert outputs(missing) == outputs(inc)
-        graph(cache)
+        check_payload_recovery(json.loads(missing.with_suffix('.queries').read_text()), report, payload)
+        require(outputs(missing) == outputs(inc), 'missing payload repair changed formal outputs')
+        require(graph(cache) == (current, nodes) and damaged.read_bytes() == original_payload,
+                'missing payload repair did not restore the original graph and checked bytes')
+        check_receipts(missing, cache, nodes)
         if name in ('template-rebind', 'signed-template-rebind'):
-            record.setdefault('shared_template_payload_recovery', {})[name] = dict(owners=affected, corrupt=True, missing=True)
+            record.setdefault('shared_template_payload_recovery', {})[name] = dict(
+                owners=affected, inferred_per_repair=1, reused_owners=affected - 1,
+                corrupt=True, missing=True)
         # Failed source/output/publication cannot advance the generation pointer.
         pointer = cache_directory(cache) / 'CURRENT'; old = pointer.read_bytes()
         source.write_text(source_text(versions[-1] + '\ninvalid = missingDefinition\n'))
@@ -373,29 +377,14 @@ def main():
         execute(binary, ['--link-crate', resumed.with_suffix('.mlfci')], success=False)
         objectfile.write_bytes(saved)
         # Broken, checksum-correct references reject the whole generation.
-        valid_generation, valid_nodes = graph(cache)
+        valid_generation, _ = graph(cache)
         index = cache_directory(cache) / 'generations' / (valid_generation + '.mlfqg')
         wire = Generation(index.read_bytes())
-        damaged_entries = []
-        changed = False
-        for value in wire.rows:
-            k, h, reads, location = node(value, 410, 4)
-            if not changed and items(reads):
-                edges = list(items(reads))
-                _, expected = pair(edges[0])
-                edges[0] = ('node', 2, (('text', frame(['Binding','absent-definition'])), expected))
-                value = ('node', 410, (k,h,('node',1,tuple(edges)),location))
-                changed = True
-            damaged_entries.append(value)
-        require(changed and len(damaged_entries) == len(wire.rows),
-                'dangling fixture preserves all original rows')
-        bad_bytes = wire.encode_rows(damaged_entries)
+        bad_bytes = dangling_generation(wire)
         try:
             Generation(bad_bytes, configuration=text(wire.config))
         except Invalid as error:
-            expected_error = ('missing dependency' if wire.dictionary_format else
-                              'missing/stale dependency' if wire.version == 1 else 'dangling query read')
-            require(str(error) == expected_error, 'dangling fixture exact semantic rejection')
+            require(str(error) == 'dangling query read', 'dangling fixture exact semantic rejection')
         else:
             raise Invalid('dangling fixture was admitted')
         bad_hash = sha(bad_bytes)
@@ -406,6 +395,25 @@ def main():
         assert outputs(rebuilt) == outputs(inc)
         graph(cache)
         if name == 'body':
+            # A valid old-format generation and its pointer must still miss.
+            old_generation = tree_document([
+                n(411, s('MLF-CRATE-QUERY-GRAPH-1'), wire.config, l(*wire.rows))
+            ], schema=6)
+            old_hash = sha(old_generation)
+            old_index = index.parent / (old_hash + '.mlfqg')
+            old_index.write_bytes(old_generation)
+            pointer.write_bytes(tree_document([s(old_hash)], schema=6))
+            replacement = compile('old-index-rebuild')
+            old_report = json.loads(replacement.with_suffix('.queries').read_text())
+            assert old_report['reused_groups'] == 0 and old_report['inferred_groups'] == len(old_report['groups'])
+            assert outputs(replacement) == outputs(inc) and graph(cache)[0] != old_hash
+            assert old_index.read_bytes() == old_generation
+            warm = compile('old-index-rebuilt-warm')
+            warm_report = json.loads(warm.with_suffix('.queries').read_text())
+            assert warm_report['inferred_groups'] == 0 and warm_report['reused_groups'] == len(warm_report['groups'])
+            assert outputs(warm) == outputs(replacement)
+            record['old_index_rejected_rebuilt_and_reused'] = True
+
             # Deliberately forge a *trusted* receipt with a valid byte SHA and
             # graph closure. This is an audit-policy test, not corruption: the
             # normal reader/ICH must not silently become a second typechecker.
@@ -427,15 +435,7 @@ def main():
             assert changed[0]
             raw = tree_document([forged],schema=6); forged_hash = sha(raw)
             (path.parent/(forged_hash+'.mlfqr')).write_bytes(raw)
-            new_entries = []
-            for value in wire.rows:
-                k,h,edges,location = node(value,410,4)
-                new_edges = tuple(('node',2,(dep,('text',forged_hash) if text(dep)==key else digest))
-                                  for dep,digest in map(pair,items(edges)))
-                if text(k)==key:
-                    h=('text',forged_hash); location=('node',5,(('text',forged_hash),))
-                new_entries.append(('node',410,(k,h,('node',1,new_edges),location)))
-            encoded = wire.encode_rows(new_entries)
+            encoded = repin_generation(wire, key, forged_hash)
             checked = Generation(encoded, configuration=text(wire.config))
             require(checked.nodes == replace_result(wire.nodes, key, forged_hash),
                     'trusted fixture changed logical graph')
@@ -469,18 +469,15 @@ def main():
                     'multi-member fixture must retain two finish receipts')
             target = next(n for k,n in nodes.items() if unpack(k)[0] == 'FinishScc')
             assert target['payload'] is None, 'rebuilt finish receipt must not require a result file'
-            directory = cache_directory(cache)
-            layout = Generation((directory / 'generations' / (generation + '.mlfqg')).read_bytes()).version
-            address_attack = 'payload-row-range' if layout == 3 else 'wrong-address'
-            modes = ('swapped', 'stale', 'reordered', address_attack, 'finish-as-raw', 'previous-format')
+            modes = ('swapped', 'stale', 'reordered', 'payload-row-range', 'finish-as-raw', 'previous-format')
             for mode in modes:
                 forged = forge_generation(cache, generation, mode)
-                if mode not in ('wrong-address', 'payload-row-range'):
+                if mode != 'payload-row-range':
                     assert graph(cache)[0] == forged  # Valid checksums and dependency closure.
                 repaired = compile('repair-finish-' + mode)
                 assert graph(cache)[0] == generation and outputs(repaired) == outputs(inc)
                 report = json.loads(repaired.with_suffix('.queries').read_text())
-                expected = len(report['groups']) if mode in ('wrong-address', 'payload-row-range', 'previous-format') else int(mode == 'finish-as-raw')
+                expected = len(report['groups']) if mode in ('payload-row-range', 'previous-format') else int(mode == 'finish-as-raw')
                 assert report['inferred_groups'] == expected
             record['finish_receipt_recovery'] = ['reconstructed', *modes]
         if name == 'body':
@@ -502,9 +499,7 @@ def main():
             assert all(outputs(p) == outputs(inc) for p in writes)
             graph(cache); record['serialized_writers'] = True
         record.setdefault('recovery', []).append(name); save()
-    selected = [name for name in CASES if (not args.smoke or name=='body') and (not args.case or name==args.case)]
-    assert set(selected).issubset(record['recovery'])
-    record['selected_cases'] = selected
+    require(set(selected).issubset(record['recovery']), 'selected control did not finish')
     record['complete'] = True; save()
     print('PASS query graph acceptance', flush=True)
 

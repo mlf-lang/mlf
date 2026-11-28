@@ -10,6 +10,7 @@ import qualified Bootstrap.Map as BootstrapMap
 import qualified Bootstrap.Compiler as Compiler
 import qualified Bootstrap.Parser as Parser
 import qualified Bootstrap.Crate as Crate
+import qualified Bootstrap.CrateSession as Session
 import qualified Bootstrap.CrateArtifact as Artifact
 import qualified Bootstrap.ArtifactStorage as Storage
 import qualified Bootstrap.Separate as Separate
@@ -149,7 +150,10 @@ crateInputDependencies directory = do
   H.assert (Cache.inputReused second) "entry-independent recursive body reran the optimizer"
   sameCode (Cache.codeChunks first) second
   key <- H.right (LLVM.crateInputKey false original)
-  H.assert (H.contains "MLF-CODEGEN-CRATE-INPUT-COMPACT-4-RESULT-SUM-1-LAZY-PRODUCER-1-STRING-INDEX-1-READY-TOTAL-3-SEQ-DEMAND-1-CONCAT-LIST-1-ORDERED-DEMAND-1-READY-LET-1" key && H.contains "compact-bdwgc-v1" key) "entry key omits the fixed compact ABI"
+  H.assert (H.contains "MLF-CODEGEN-CRATE-INPUT-COMPACT-4-RESULT-SUM-1-LAZY-PRODUCER-1-STRING-INDEX-1-READY-TOTAL-3-SEQ-DEMAND-1-CONCAT-LIST-1-ORDERED-DEMAND-1-READY-LET-1" key) "crate input key omits its format"
+  checkedKey <- H.right (LLVM.checkedInputKey false original)
+  prepared <- H.right (LLVM.prepareChecked false original)
+  H.assert (S.all (H.contains "mlf_require_runtime_v5_abi") ((:) key ((:) checkedKey ((:) (LLVM.preparedKey prepared) [])))) "code generation key omits the current runtime ABI"
   H.reject (LLVM.crateInputKey true original)
   let withData = \name -> XWithData ((:) (DataDecl name [] ((:) (ConstructorDecl name []) [])) []) (XIntTerm 42)
   crateKeyAgreement "entry key omits unused constructor ABI entries" false (withData "First") (withData "Second")
@@ -207,7 +211,7 @@ compileFixture directory identity entry dependencies prefix moduleName text = do
   loaded <- Artifact.loadInterfaces dependencies
   interfaces <- H.right loaded
   let spec = Crate.CrateSpec identity entry NoImplicitPrelude ((:) ((,) moduleName path) []) dependencies (directory ++ "/queries/" ++ identity) (directory ++ "/builtin")
-  compiled <- Crate.compileSources spec ((:) source []) interfaces prefix
+  compiled <- Session.compileSources spec ((:) source []) interfaces prefix
   _ <- H.right compiled
   metadata <- Artifact.readInterface (prefix ++ ".mlfci")
   storedInterface <- H.right metadata

@@ -11,6 +11,25 @@ module Bootstrap.CrateCodegen where {
   import qualified Bootstrap.CrateArtifact as Artifact;
   import qualified Bootstrap.CrateQuery as Query;
   import qualified Bootstrap.Separate as Separate;
+  import qualified Bootstrap.Map as M;
+
+  -- The producer checks its own implementation. Foreign factory arguments
+  -- and their data layouts need only the authenticated dependency interfaces.
+  loadNativeFile :: String -> IO (Either String ((,) ([] ((,) String Artifact.CrateInterface)) Artifact.CrateObject));
+  loadNativeFile path = do {
+    loaded <- Artifact.loadInterfaces [path];
+    case loaded of {
+      Left message -> ioReturn (Left message);
+      Right rows -> case reverse rows of {
+        [] -> ioReturn (Left "no root crate metadata");
+        (:) root _ -> do {
+          let { headers = map snd rows };
+          result <- Artifact.readClosureObject Nothing M.empty headers root;
+          ioReturn (mapEither ((,) rows) result)
+        }
+      }
+    }
+  };
   -- Both queries start from a checked linked program. The first erases types;
   -- the second observes the existing whole-program optimizer's result. No
   -- function-level optimization facts are replayed across unrelated programs.
@@ -232,12 +251,14 @@ module Bootstrap.CrateCodegen where {
   emitChecked directory requireIO checked =
     emitWithKey directory requireIO checked (LLVM.checkedInputKey requireIO checked);
   emitCrateChecked :: String -> Bool -> Checked.CheckedTerm -> IO (Either String CodegenResult);
-  emitCrateChecked directory requireIO checked =
-    emitWithKey directory requireIO checked (LLVM.crateInputKey requireIO checked);
+  emitCrateChecked = emitCrateCheckedUsing (ioBind getExecutablePath fileDigest);
+  emitCrateCheckedUsing compiler directory requireIO checked =
+    emitWithKeyUsing compiler directory requireIO checked (LLVM.crateInputKey requireIO checked);
   emitWithKey :: String ->
                  Bool ->
                  Checked.CheckedTerm -> Either String String -> IO (Either String CodegenResult);
-  emitWithKey directory requireIO checked key =
+  emitWithKey = emitWithKeyUsing (ioBind getExecutablePath fileDigest);
+  emitWithKeyUsing readCompiler directory requireIO checked key =
     case key of {
       Left error -> ioReturn (Left error);
       Right inputKey ->
@@ -254,8 +275,7 @@ module Bootstrap.CrateCodegen where {
                if any isLeft made
                then ioReturn (Left "cannot create code generation query cache")
                else do {
-                      executable <- getExecutablePath;
-                      compiler <- fileDigest executable;
+                      compiler <- readCompiler;
                       lock <- acquireFileLock (cache ++ "/.lock");
                       result <- emitLocked cache compiler requireIO checked inputKey;
                       releaseFileLock lock;

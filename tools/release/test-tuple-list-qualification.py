@@ -5,7 +5,11 @@ import os
 from pathlib import Path
 import shutil
 import subprocess
+import sys
 import tempfile
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'testing'))
+import events
 
 ROOT = Path(__file__).resolve().parents[2]
 CASES = ['pass', 'dirty-source', 'unauthenticated', 'build-failure', 'bad-build-report',
@@ -17,7 +21,7 @@ def executable(path, text):
     path.write_text(text)
     path.chmod(0o755)
 
-for case in CASES:
+def run_case(case):
     with tempfile.TemporaryDirectory(prefix='tuple-list-gate-') as temp:
         root = Path(temp)
         (root / 'tools/release').mkdir(parents=True)
@@ -74,3 +78,19 @@ exit 0
         else:
             assert run.returncode != 0 and receipt == {'complete': False}, (case, run.stdout, receipt)
         print('PASS orchestration control:', case)
+
+
+if __name__ == '__main__':
+    prefix = 'release/tuple-list-qualification/'
+    exact = os.environ.get('MLF_TEST_EXACT') if os.environ.get('MLF_TEST_SUITE') == 'release-tuple-list-qualification' else None
+    for case in CASES:
+        identity = prefix + case
+        if exact and identity != exact:
+            continue
+        events.start(identity)
+        try:
+            run_case(case)
+        except Exception as error:
+            events.result(identity, 'fail', detail=str(error))
+            raise
+        events.result(identity, 'pass')

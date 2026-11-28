@@ -2,7 +2,8 @@
 module Main where
 import Prelude
 import Control.Exception (SomeException, try, evaluate, displayException)
-import Control.Monad (forM_, unless)
+import Control.Monad (forM_, unless, when)
+import System.Environment (getArgs)
 import qualified MLF.Primitive as P
 import qualified MLF.Host.Base as B
 import qualified Bootstrap.Types as T
@@ -50,7 +51,7 @@ shared low high entries = P.runST $ do
   before <- C.newDensePermissions low high ns old es
   after <- C.raisedDensePermissions before low high ns old new es
   case before of
-    C.DensePermissions _ _ _ _ _ _ cache -> C.writeDense low cache low (T.Just T.Red)
+    C.DensePermissions _ _ _ _ _ _ cache -> C.writePermissionMemo cache 0 (T.Just T.Red)
   fmap permission (C.densePermission after low)
 
 generated seed low =
@@ -130,32 +131,36 @@ resultText (T.Left e) = "Left "++B.unpack e
 resultText (T.Right g) = "Right "++graphText g
 
 main = do
-  forM_ [0..239] $ \seed -> forM_ [-12,0,2^60] $ \low -> do
-    let entries=generated seed low;high=low+7
-        queries=[(side,low+i)|i<-reverse [0..7],side<-[True,False,True]]
-    check "complete permission values" (oldAnswers low high entries queries) (newAnswers low high entries queries)
-    check "sufficient edge equality"
-      (all (\(_,T.Node _ p f,q)->case f of T.Rigid->True; T.Flexible->F.equalMaybeInt p q) entries)
-      (admission low high entries)
-  putStrLn "PASS 720 permission views and admission decisions"
-  check "unchanged guard" True (admission 0 1 same)
-  check "changed guard" False (admission 0 1 changed)
-  check "rigid-only changes admitted" True (admission 0 1 rigidChanged)
-  check "admitted old memo shared" 'R' (shared 0 1 same)
-  check "changed old memo isolated" 'I' (shared 0 1 changed)
-  check "rigid-only change memo shared" 'R' (shared 0 1 rigidChanged)
-  putStrLn "PASS admitted cache sharing and fallback isolation"
-  forM_ demandCases $ \(label,expected,es,qs) -> do
-    a<-observe (oldAnswers 0 2 es qs);b<-observe (newAnswers 0 2 es qs)
-    check (label++" frozen demand") expected a
-    check (label++" candidate demand") a b
-  putStrLn "PASS 10 authored demand and exception-order cases"
-  forM_ [0..119] $ \seed -> do
-    let es=generated seed 0
-        closeTag (T.Node (T.GGen _) b f) = T.Node (T.GCon "D" []) b f
-        closeTag v = v
-        g=T.Graph (F.nodesFromList [(n,closeTag v)|(n,v,_)<-es]) IM.empty 8
-        pairs=[[],[(1,2)],[(1,2),(3,4)],[(2,1),(2,3)],[(1,1)]]
-    forM_ pairs $ \eqs -> check "exact public unify result" (resultText (F.unify eqs g)) (resultText (C.unify eqs g))
-    check "exact dense rebind" (resultText (F.rebind g g)) (resultText (C.rebind g g))
-  putStrLn "PASS 720 exact public graph and first-error results"
+  selected <- getArgs
+  let checkGroup label action = when (null selected || label `elem` selected) $ do
+        action
+        putStrLn ("PASS " ++ label)
+  checkGroup "720 permission views and admission decisions" $ do
+    forM_ [0..239] $ \seed -> forM_ [-12,0,2^60] $ \low -> do
+      let entries=generated seed low;high=low+7
+          queries=[(side,low+i)|i<-reverse [0..7],side<-[True,False,True]]
+      check "complete permission values" (oldAnswers low high entries queries) (newAnswers low high entries queries)
+      check "sufficient edge equality"
+        (all (\(_,T.Node _ p f,q)->case f of T.Rigid->True; T.Flexible->F.equalMaybeInt p q) entries)
+        (admission low high entries)
+  checkGroup "admitted cache sharing and fallback isolation" $ do
+    check "unchanged guard" True (admission 0 1 same)
+    check "changed guard" False (admission 0 1 changed)
+    check "rigid-only changes admitted" True (admission 0 1 rigidChanged)
+    check "admitted old memo shared" 'R' (shared 0 1 same)
+    check "changed old memo isolated" 'I' (shared 0 1 changed)
+    check "rigid-only change memo shared" 'R' (shared 0 1 rigidChanged)
+  checkGroup "10 authored demand and exception-order cases" $ do
+    forM_ demandCases $ \(label,expected,es,qs) -> do
+      a<-observe (oldAnswers 0 2 es qs);b<-observe (newAnswers 0 2 es qs)
+      check (label++" frozen demand") expected a
+      check (label++" candidate demand") a b
+  checkGroup "720 exact public graph and first-error results" $ do
+    forM_ [0..119] $ \seed -> do
+      let es=generated seed 0
+          closeTag (T.Node (T.GGen _) b f) = T.Node (T.GCon "D" []) b f
+          closeTag v = v
+          g=T.Graph (F.nodesFromList [(n,closeTag v)|(n,v,_)<-es]) IM.empty 8
+          pairs=[[],[(1,2)],[(1,2),(3,4)],[(2,1),(2,3)],[(1,1)]]
+      forM_ pairs $ \eqs -> check "exact public unify result" (resultText (F.unify eqs g)) (resultText (C.unify eqs g))
+      check "exact dense rebind" (resultText (F.rebind g g)) (resultText (C.rebind g g))

@@ -11,12 +11,15 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: macos-toolchain-${{ github.ref }}
+  # Label notifications outside this workflow’s policy must not cancel real checks.
+  group: macos-toolchain-${{ (!github.event.label || github.event.label.name == 'ci:skip') && github.ref || github.run_id }}
   cancel-in-progress: true
 jobs:
   provenance:
-    name: GHC and LLVM toolchain provenance (macos-26)
-    if: github.event_name != 'pull_request' || !contains(github.event.pull_request.labels.*.name, 'ci:skip')
+    name: GHC and LLVM toolchain provenance (macos-26)${{ github.event.label && github.event.label.name != 'ci:skip' && ' (unrelated label)' || '' }}
+    if: >-
+      (!github.event.label || github.event.label.name == 'ci:skip') &&
+      (github.event_name != 'pull_request' || !contains(github.event.pull_request.labels.*.name, 'ci:skip'))
     runs-on: macos-26
     timeout-minutes: 120
     steps:
@@ -49,14 +52,14 @@ jobs:
       - name: Exercise resolver and preparation rejection controls
         run: |
           set -euo pipefail
-          python3 -B tools/shared/test_darwin_toolchain.py 2>&1 | tee .mlf-build/macos-toolchain/resolver.log
-          python3 -O -B tools/shared/test_darwin_toolchain.py 2>&1 | tee .mlf-build/macos-toolchain/resolver-optimized.log
-          python3 -B tools/shared/test_prepare_async_ghc.py
-          python3 -O -B tools/shared/test_prepare_async_ghc.py
+          python3 -B tools/testing/run.py python-shared-darwin-toolchain 2>&1 | tee .mlf-build/macos-toolchain/resolver.log
+          python3 -B tools/testing/run.py python-shared-darwin-toolchain --python-optimization 2>&1 | tee .mlf-build/macos-toolchain/resolver-optimized.log
+          python3 -B tools/testing/run.py python-shared-prepare-async-ghc
+          python3 -B tools/testing/run.py python-shared-prepare-async-ghc --python-optimization
       - name: Build and authenticate actual GHC-origin async tools
         run: |
           set -euo pipefail
-          python3 -B tools/shared/prepare_async_ghc.py --build-dir .mlf-build/async-ghc --clang clang
+          python3 -B tools/shared/prepare_async_ghc.py --build-dir .mlf-build/async-ghc --clang clang --optimization 2
           jq -e '.complete == true and .producer_host == "GHC" and .typecheck_only == false and .optimization == "2"' .mlf-build/async-ghc/receipt.json
           jq -e '.toolchain.files | keys | any(test("/libclang-cpp(\\.[0-9]+)*\\.dylib$"))' .mlf-build/async-ghc/receipt.json
           jq -e '.complete == true and .producer_host == "GHC" and .runner_protocol_version == 1' .mlf-build/async-ghc/async-tools.json
@@ -67,6 +70,7 @@ jobs:
           include-hidden-files: true
           retention-days: 14
           path: |
+            .mlf-build/test-framework/
             .mlf-build/macos-toolchain/
             .mlf-build/async-ghc/async-tools.json
             .mlf-build/async-ghc/receipt.json

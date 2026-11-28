@@ -11,12 +11,16 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from pathlib import Path
 
 from build import DEMAND_FLAGS, EXHAUSTIVENESS_FLAGS, PACKAGES
 from test_direct import CommandRunner, authenticate_build, sha
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / 'tools/testing'))
+from receipt_selection import identity, select
+
 FIXTURE = ROOT / 'tools/shared/fixtures/item4/ParameterFieldGraph.hs'
 # Authored independently of fixture parsing and execution. Exact order, count,
 # wording and terminal banner are mandatory; a partial run is never a pass.
@@ -60,6 +64,28 @@ def verify_result(returncode, stdout, stderr):
 
 
 def self_test():
+    import sys
+
+    sys.path.insert(0, str(ROOT / 'tools/testing'))
+    import events
+
+    def check(label, action):
+        identity = 'release/parameter-field-controls/' + label.lower().replace(' ', '-')
+        events.start(identity)
+        try:
+            action()
+        except Exception as error:
+            events.result(identity, 'fail', detail=str(error))
+            raise
+        events.result(identity, 'pass')
+
+    def rejects(action, label):
+        try:
+            action()
+        except ValueError:
+            return
+        raise AssertionError('accepted ' + label)
+
     # Fixed independent wire oracle, not generated from EXPECTED_CHECKS or the
     # Haskell fixture. Mutating the gate's inventory must not redefine success.
     fixed = b"""PASS rigid root-local quantifier is eligible
@@ -82,7 +108,7 @@ PASS no-op case does not conceal malformed indexes
 PASS higher-kinded local variables preserve kind and identity sharing
 field projection graph: passed (18 authored checks)
 """
-    verify_result(0, fixed, b'')
+    check('complete output', lambda: verify_result(0, fixed, b''))
     lines = fixed.splitlines(keepends=True)
     mutations = [
         ('missing observation', b''.join(lines[:-2] + lines[-1:])),
@@ -98,30 +124,19 @@ field projection graph: passed (18 authored checks)
         ('missing terminal newline', fixed[:-1]),
     ]
     for label, changed in mutations:
+        check(label, lambda: rejects(lambda: verify_result(0, changed, b''), label))
+    for label, status, stderr in [('nonzero-exit', 1, b''), ('signal', -9, b''), ('stderr', 0, b'warning\n')]:
+        check(label, lambda: rejects(lambda: verify_result(status, fixed, stderr), label))
+
+    def rejects_altered_inventory():
+        original = EXPECTED_CHECKS[:]
         try:
-            verify_result(0, changed, b'')
-        except ValueError:
-            pass
-        else:
-            raise AssertionError('accepted ' + label)
-    for status, stderr in [(1, b''), (-9, b''), (0, b'warning\n')]:
-        try:
-            verify_result(status, fixed, stderr)
-        except ValueError:
-            pass
-        else:
-            raise AssertionError('accepted bad exit status or stderr')
-    original = EXPECTED_CHECKS[:]
-    try:
-        EXPECTED_CHECKS.reverse()
-        try:
-            verify_inventory(fixed)
-        except ValueError:
-            pass
-        else:
-            raise AssertionError('mutated gate changed its own oracle')
-    finally:
-        EXPECTED_CHECKS[:] = original
+            EXPECTED_CHECKS.reverse()
+            rejects(lambda: verify_inventory(fixed), 'altered oracle inventory')
+        finally:
+            EXPECTED_CHECKS[:] = original
+
+    check('different-oracle', rejects_altered_inventory)
     print('parameter field graph runner: passed (16 fixed-output controls)')
 
 
@@ -140,6 +155,7 @@ def main():
         return
     if args.build_receipt is None or args.output is None:
         parser.error('--build-receipt and --output are required unless --self-test is selected')
+    selected = select('parameter-field-graph/', EXPECTED_CHECKS)
     for name, maximum in [('build_timeout', 300), ('run_timeout', 300)]:
         if not 1 <= getattr(args, name) <= maximum:
             parser.error(name.replace('_', '-') + ' must be between 1 and ' + str(maximum))
@@ -156,6 +172,9 @@ def main():
         'native_or_llvm_campaign': False, 'compiler_modules_rebuilt': False,
         'strict_stderr': True, 'commands': [],
     }
+
+    if selected:
+        record.update(scope='focused', selected_ids=[identity('parameter-field-graph/', selected)])
 
     def save():
         temporary = output / 'receipt.json.new'
@@ -233,10 +252,15 @@ def main():
         record['artifacts'] = artifacts
         save()
         check_producer()
-        result = runner.run('field-projection-graph', [executable], timeout=args.run_timeout)
-        verify_result(result.returncode, result.stdout, result.stderr)
-        record.update(passing_checks=18, passing_inventory=EXPECTED_CHECKS,
-                      authored_expected_copy_graph=True, independent_index_reconstruction=True)
+        arguments = [executable, '--exact', selected] if selected else [executable]
+        expected = ('PASS ' + selected + '\n').encode() if selected else None
+        result = runner.run('field-projection-graph', arguments, expected=expected, timeout=args.run_timeout)
+        if selected:
+            record.update(passing_checks=1, passing_inventory=[selected])
+        else:
+            verify_result(result.returncode, result.stdout, result.stderr)
+            record.update(passing_checks=18, passing_inventory=EXPECTED_CHECKS,
+                          authored_expected_copy_graph=True, independent_index_reconstruction=True)
         check_producer()
         record.update(complete=True, status='passed')
     except BaseException as error:
@@ -270,7 +294,9 @@ def main():
         save()
         if integrity_error is not None and 'error' not in record:
             raise integrity_error
-    print(str(output / 'receipt.json') + ': passed (18 checks)')
+    count = record['passing_checks']
+    unit = 'check' if count == 1 else 'checks'
+    print(f"{output / 'receipt.json'}: passed ({count} {unit})")
 
 
 if __name__ == '__main__':

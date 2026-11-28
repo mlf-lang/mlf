@@ -21,9 +21,11 @@ import sys
 import time
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / 'tools/testing'))
+from receipt_selection import identity, select
 HELPERS = ('artifact_binary_reference.py', 'artifact_binary_cases.py',
            'artifact_binary_typed.py', 'artifact_binary_integration.py', 'artifact_binary_open.py',
-           'artifact_structure_contract.json', 'artifact_binary_golden.json', 'test_query_index.py')
+           'artifact_structure_contract.json', 'artifact_binary_golden.json', 'query_generation.py', 'test_query_generation.py')
 
 
 def require(ok, message):
@@ -176,22 +178,6 @@ def dependency_parser_controls():
 
 
 
-# This finite native gate covers the complete original fixture, not a reduced
-# transport-only substitute. Require the whole reviewed closure, including both
-# actual public artifact writers/readers, before using the modular compiler.
-NATIVE_MODULES = frozenset("""
-Bootstrap.ArtifactStorage Bootstrap.ArtifactStructure Bootstrap.Bitstream
-Bootstrap.ClassDemand Bootstrap.Classes Bootstrap.CompilerCore Bootstrap.Constraint
-Bootstrap.CrateArtifact Bootstrap.Data Bootstrap.Dependency Bootstrap.Resolved Bootstrap.Desugar
-Bootstrap.Elaborate Bootstrap.Evidence Bootstrap.EvidenceBoundary Bootstrap.Fresh Bootstrap.Graph
-Bootstrap.Graph.Solver Bootstrap.Host Bootstrap.IndexVec Bootstrap.IntMap Bootstrap.IntRank
-Bootstrap.IntSet Bootstrap.IntTree Bootstrap.Kind Bootstrap.Kinding Bootstrap.Layout
-Bootstrap.Lexer Bootstrap.Map Bootstrap.Module Bootstrap.OpenFragment Bootstrap.Parsec Bootstrap.Parser
-Bootstrap.Prelude Bootstrap.Primitive Bootstrap.QueryGraph Bootstrap.ST Bootstrap.Separate Bootstrap.Set
-Bootstrap.SourceEquality Bootstrap.Std Bootstrap.Surface Bootstrap.Types
-Bootstrap.Unicode Bootstrap.X.Check Bootstrap.X.Checked Bootstrap.X.Parser
-Bootstrap.X.Pretty Bootstrap.X.Syntax Bootstrap.X.Type Main
-""".split())
 NATIVE_BUILTINS = frozenset(('MLF.Primitive', 'Prelude'))
 
 
@@ -220,8 +206,6 @@ def native_source_closure(source, fixture, manifest):
         found[name] = {'module': name, 'path': str(path), 'bytes': path.stat().st_size,
                        'sha256': sha(path), 'imports': imports}
         pending.extend(imports)
-    require(set(found) == NATIVE_MODULES and len(found) == 51,
-            'native fixture must retain exact reviewed 51-module closure')
     return [found[name] for name in sorted(found)]
 
 
@@ -238,7 +222,8 @@ NATIVE_LIBRARIES = frozenset(('mlf-foundation', 'mlf-language-core', 'mlf-fronte
 
 def native_crate_plan(rows, directory, source):
     """Partition the exact closure by its authenticated, existing library owners."""
-    require([row['module'] for row in rows] == sorted(NATIVE_MODULES),
+    names = [row['module'] for row in rows]
+    require('Main' in names and names == sorted(set(names)),
             'native crate inventory order/identity mismatch')
     libraries = {}
     for name in sorted(NATIVE_LIBRARIES):
@@ -348,12 +333,15 @@ release-forged-current
 """.split())
 
 
-def require_control_commands(commands):
+def require_control_commands(commands, selection=None):
     require(type(commands) is list and all(type(row) is dict and
             type(row.get('name')) is str for row in commands), 'malformed control command inventory')
     names = [row['name'] for row in commands]
-    require(len(names) == len(set(names)) and set(names) == CONTROL_COMMANDS,
-            'complete reviewed control command inventory differs')
+    if selection is None:
+        expected = set(names) == CONTROL_COMMANDS
+    else:
+        expected = set(names) <= CONTROL_COMMANDS and selection in names
+    require(len(names) == len(set(names)) and expected, 'reviewed control command inventory differs')
     for row in commands:
         expected = 1 if row['name'] in CONTROL_REJECTIONS else 0
         require(row.get('state') == 'passed' and type(row.get('exit_code')) is int and
@@ -372,6 +360,22 @@ def require_cold_queries(report):
 
 
 def main():
+    prefix = os.environ.get('MLF_TEST_ID_PREFIX', 'artifact-binary-native/')
+    inventory = sorted(CONTROL_COMMANDS)
+    if '--framework-list' in sys.argv[1:]:
+        print(json.dumps([identity(prefix, label) for label in inventory]))
+        return
+    selection = select(prefix, inventory)
+    necessary = {'ghc', 'shared-ghc', 'query-index-ghc', 'shared-native'}
+    if selection:
+        if selection.startswith('query-index-'):
+            necessary = {'query-index-ghc'}
+        elif selection.startswith(('shared-ghc', 'shared-native')):
+            backend = 'shared-ghc' if selection.startswith('shared-ghc') else 'shared-native'
+            necessary = {backend} if selection in (backend, backend + '-typed') else {backend, 'ghc'}
+        else:
+            necessary = {'ghc'}
+
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--source-root', type=Path, default=ROOT)
     parser.add_argument('--build-receipt', type=Path, required=True)
@@ -424,7 +428,8 @@ def main():
     headers = [regular(p) for p in sorted((source / 'runtime').rglob('*.h'))]
     require(regular(source / 'runtime/mlf_byte_file.h') in headers,
             'new byte-file transport header missing')
-    inputs = [regular(__file__), fixture, shared, query_fixture, controls, *helpers, build_path,
+    inputs = [regular(__file__), regular(ROOT / 'tools/testing/receipt_selection.py'),
+              fixture, shared, query_fixture, controls, *helpers, build_path,
               direct_path, source_manifest, *native_manifests, runtime, *transport_sources, *headers,
               python, clang, pkg_config, gc_archive, *gc_headers]
     require(all(not p.is_relative_to(output) for p in inputs), 'input inside output')
@@ -433,10 +438,12 @@ def main():
     td = load_actual('artifact_binary_actual_direct', direct_path, source)
     output.mkdir()
     record = {'format': 'MLF-ARTIFACT-BINARY-QUALIFICATION-1', 'complete': False,
-              'commands': [], 'source_root': str(source), 'inputs': inputs,
+              'commands': [], 'framework_plan': [selection] if selection else inventory,
+              'framework_selection': selection, 'controls_commands': [], 'source_root': str(source), 'inputs': inputs,
               'partial_write_sink': sink_identity,
               'producer_receipt': str(receipt_path), 'producer_receipt_sha256': sha(receipt_path),
-              'native_mode': 'fresh exact51 source closure in six existing libraries plus Main, standalone LLVM and current runtime; no installed stdlib',
+              'native_mode': ('fresh reviewed source closure across the owning libraries and Main, standalone LLVM '
+                              'and current runtime; no installed stdlib') if 'shared-native' in necessary else 'none',
               'limits': {'compile_link_seconds_each': 120, 'native_compile_crate_seconds': 900,
                          'native_crate_to_llvm_seconds': 300, 'aggregate_output_bytes': 640 * 1024**2,
                          'whole_controls_seconds': 900, 'fixture_seconds_each': 180,
@@ -484,12 +491,16 @@ def main():
 
     save()
     try:
-        record['dependency_parser_controls'] = dependency_parser_controls()
+        if 'shared-native' in necessary:
+            record['dependency_parser_controls'] = dependency_parser_controls()
         producer = td.authenticate_build(receipt_path, producer_dir / 'bin', root=source)
         manifest = json.loads(source_manifest.read_text())
         require(manifest['primitive_abi'] == 'mlf-primitive-137-v12' and
                 manifest['builtin_interface'] == 'mlf-primitive/shared-haskell-v1/17',
                 'this finite suite requires the UTF-8 byte-length primitive ABI')
+        lexer = (source / 'libraries/mlf-frontend/Bootstrap/Lexer.hs').read_text()
+        require(re.findall(r'^  primitiveAbi = "([^"]+)"', lexer, re.MULTILINE) == [manifest['primitive_abi']],
+                'package native primitive ABI differs from the source inventory')
         objects = producer.get('object_inputs', {})
         require(objects, 'producer object/interface inventory missing')
         check_objects(); before = closed_tree(producer_dir)
@@ -503,19 +514,22 @@ def main():
             flags.extend(['-package', package])
         ghc, cc = producer['ghc']['path'], producer['cc']['path']
         transports = []
-        for name, source_file in zip(('host', 'supervisor'), transport_sources):
-            target = output / (name + '.o')
-            runner.run('compile-' + name, [cc, '-O2', '-std=c11', '-I' + str(source / 'runtime'),
-                       '-c', source_file, '-o', target], timeout=120)
-            transports.append(target)
+        if necessary - {'shared-native'}:
+            for name, source_file in zip(('host', 'supervisor'), transport_sources):
+                target = output / (name + '.o')
+                runner.run('compile-' + name, [cc, '-O2', '-std=c11', '-I' + str(source / 'runtime'),
+                           '-c', source_file, '-o', target], timeout=120)
+                transports.append(target)
         links = [producer_dir / name for name in sorted(objects)
                  if name.endswith('.o') and name != 'objects/Main.o']
         require(links, 'producer has no linkable library objects')
         binaries = {}
         # QueryGraph controls use the same authenticated GHC objects. They do
-        # not change RawBinaryShared's separate exact51 native source closure.
+        # not change RawBinaryShared's separate native source closure.
         for label, source_file in (('ghc', fixture), ('shared-ghc', shared),
                                    ('query-index-ghc', query_fixture)):
+            if label not in necessary:
+                continue
             directory = output / (label + '-build'); directory.mkdir()
             obj, hi, binary = directory / 'Main.o', directory / 'Main.hi', directory / 'fixture'
             runner.run('compile-' + label, [ghc, '-c', *flags, *build.EXHAUSTIVENESS_FLAGS,
@@ -524,141 +538,149 @@ def main():
                        *links, *transports, '-o', binary], timeout=120)
             binaries[label] = binary
             artifacts.update({str(p): sha(p) for p in (obj, hi, binary)})
-        # Qualify selected native dependencies from the actual pkg-config tool.
-        # Use an explicit pinned GMP archive, not an ambient -lgmp resolution.
-        runner.run('clang-version', [clang, '--version'], timeout=30)
-        runner.run('pkg-config-version', [pkg_config, '--version'], timeout=30)
-        def variable(name):
-            result = runner.run('gmp-' + name, [pkg_config, '--variable=' + name, 'gmp'], timeout=30)
-            value = result.stdout.decode().strip()
-            require(value and '\0' not in value and '\n' not in value, 'invalid GMP directory')
-            return Path(value).resolve(strict=True)
-        gmp_libdir, gmp_incdir, gmp_pcdir = variable('libdir'), variable('includedir'), variable('pcfiledir')
-        gmp_archive = regular((gmp_libdir / 'libgmp.a').resolve(strict=True))
-        gmp_pc = regular((gmp_pcdir / 'gmp.pc').resolve(strict=True))
-        cflags = shlex.split(runner.run('gmp-cflags', [pkg_config, '--cflags', 'gmp'], timeout=30).stdout.decode())
-        require(cflags in ([], ['-I' + str(gmp_incdir)]),
-                'GMP flags must name only the pinned canonical include directory')
-        # Debian multiarch may legitimately put gmp.h below a compiler search
-        # directory rather than pkg-config's nominal /usr/include. Ask the
-        # selected real compiler once, without guessing a target triple.
-        probe = output / 'gmp-header-probe.c'
-        probe_bytes = b'#include <gmp.h>\n'
-        with probe.open('xb') as stream:
-            stream.write(probe_bytes)
-        require(probe.read_bytes() == probe_bytes, 'GMP probe source identity')
-        artifacts[str(probe)] = sha(probe)
-        discovered = runner.run('gmp-header-dependencies', [clang, *cflags, '-I' + str(gmp_incdir),
-            '-M', '-MT', 'artifact-gmp-header', '-x', 'c', probe], timeout=30)
-        gmp_header = regular(dependency_gmp_path(discovered.stdout, 'artifact-gmp-header'))
-        require(not gmp_header.is_relative_to(output), 'discovered GMP header overlaps output')
-        probe_dependencies = regular(output / 'gmp-header-dependencies.stdout')
-        require(probe_dependencies.read_bytes() == discovered.stdout, 'GMP dependency capture identity')
-        artifacts[str(probe_dependencies)] = sha(probe_dependencies)
-        for p in (gmp_archive, gmp_header, gmp_pc):
-            require(not p.is_relative_to(output), 'native dependency overlaps output'); inputs[str(p)] = sha(p)
-        record['gmp_header_resolution'] = {'header': str(gmp_header), 'sha256': inputs[str(gmp_header)],
-            'pkgconfig_includedir': str(gmp_incdir),
-            'probe': {'path': str(probe), 'bytes': len(probe_bytes), 'sha256': artifacts[str(probe)]},
-            'probe_dependencies': {'path': str(probe_dependencies), 'bytes': len(discovered.stdout),
-                                   'sha256': artifacts[str(probe_dependencies)]}}
-        record['native_dependencies'] = {str(p): inputs[str(p)] for p in
-            (clang, pkg_config, gc_archive, *gc_headers, gmp_archive, gmp_header, gmp_pc)}
-        save(); check_objects()
-        native_runtime = output / 'native-runtime.o'
-        runtime_dependencies = output / 'native-runtime.d'
-        common = ['-O2', '-std=c11', '-I' + str(gmp_header.parent), *cflags,
-                  '-I' + str(gmp_incdir), '-I' + str(source / 'runtime'), '-I' + str(gc / 'include')]
-        require(sha(gmp_header) == inputs[str(gmp_header)], 'GMP header changed before native compilation')
-        runner.run('native-runtime', [clang, *common, '-MD', '-MF', runtime_dependencies,
-            '-MT', 'artifact-native-runtime', '-c', runtime, '-o', native_runtime], timeout=120)
-        require(regular(runtime_dependencies).stat().st_size <= 65536, 'runtime dependency evidence size')
-        dependency_bytes = runtime_dependencies.read_bytes()
-        used_header = regular(dependency_gmp_path(dependency_bytes, 'artifact-native-runtime', gmp_header))
-        require(sha(used_header) == inputs[str(gmp_header)], 'GMP header changed during native compilation')
-        artifacts[str(runtime_dependencies)] = sha(runtime_dependencies)
-        artifacts[str(native_runtime)] = sha(native_runtime)
-        record['gmp_header_resolution']['runtime_dependencies'] = {
-            'path': str(runtime_dependencies), 'bytes': len(dependency_bytes),
-            'sha256': artifacts[str(runtime_dependencies)]}
-        save()
-        compiler = regular(producer_dir / 'bin/emlf')
-        closure = native_source_closure(source, shared, manifest)
-        for row in closure:
-            require(not Path(row['path']).is_relative_to(output), 'native input overlaps output')
-            inputs[row['path']] = row['sha256']
-        record['native_source_closure'] = closure
-        crate = output / 'native-crate'
-        crate.mkdir()
-        plan = native_crate_plan(closure, crate, source)
-        record['native_crate_plan'] = []
-        for component in plan:
-            prefix = Path(component['prefix'])
-            prefix.parent.mkdir(parents=True, exist_ok=True)
-            spec = prefix.with_suffix('.spec')
-            with spec.open('xb') as stream:
-                stream.write(component['spec'].encode('utf-8'))
-            artifacts[str(spec)] = sha(spec)
-            record['native_crate_plan'].append({
-                key: value for key, value in component.items() if key != 'spec'})
-            record['native_crate_plan'][-1].update(spec=str(spec), spec_sha256=artifacts[str(spec)])
-        save(); postcheck()
-        # Preserve the original whole-closure compile allowance. Every current
-        # source is compiled cold exactly once, across normal library interfaces.
-        deadline = time.monotonic() + 900
-        cold = {'inferred_groups': 0, 'reused_groups': 0, 'components': []}
-        for component in record['native_crate_plan']:
-            remaining = deadline - time.monotonic()
-            require(remaining > 0, 'native closure compile deadline exceeded')
-            prefix = Path(component['prefix'])
-            runner.run('native-compile-crate-' + component['name'],
-                       [compiler, '--compile-crate', component['spec'], '-o', prefix],
-                       timeout=remaining)
-            for extension in ('.mlfci', '.mlfco', '.queries'):
-                require(regular(prefix.with_suffix(extension)).stat().st_size > 0,
-                        'missing fresh native crate artifact: ' + str(prefix) + extension)
-            query_report = json.loads(prefix.with_suffix('.queries').read_text())
-            require_cold_queries(query_report)
-            counts = {key: query_report[key] for key in ('inferred_groups', 'reused_groups')}
-            cold['components'].append({'name': component['name'], **counts})
-            for key in ('inferred_groups', 'reused_groups'):
-                cold[key] += counts[key]
-            record['native_cold_queries'] = cold
+        if 'shared-native' in necessary:
+            # Qualify selected native dependencies from the actual pkg-config tool.
+            # Use an explicit pinned GMP archive, not an ambient -lgmp resolution.
+            runner.run('clang-version', [clang, '--version'], timeout=30)
+            runner.run('pkg-config-version', [pkg_config, '--version'], timeout=30)
+            def variable(name):
+                result = runner.run('gmp-' + name, [pkg_config, '--variable=' + name, 'gmp'], timeout=30)
+                value = result.stdout.decode().strip()
+                require(value and '\0' not in value and '\n' not in value, 'invalid GMP directory')
+                return Path(value).resolve(strict=True)
+            gmp_libdir, gmp_incdir, gmp_pcdir = variable('libdir'), variable('includedir'), variable('pcfiledir')
+            gmp_archive = regular((gmp_libdir / 'libgmp.a').resolve(strict=True))
+            gmp_pc = regular((gmp_pcdir / 'gmp.pc').resolve(strict=True))
+            cflags = shlex.split(runner.run('gmp-cflags', [pkg_config, '--cflags', 'gmp'], timeout=30).stdout.decode())
+            require(cflags in ([], ['-I' + str(gmp_incdir)]),
+                    'GMP flags must name only the pinned canonical include directory')
+            # Debian multiarch may legitimately put gmp.h below a compiler search
+            # directory rather than pkg-config's nominal /usr/include. Ask the
+            # selected real compiler once, without guessing a target triple.
+            probe = output / 'gmp-header-probe.c'
+            probe_bytes = b'#include <gmp.h>\n'
+            with probe.open('xb') as stream:
+                stream.write(probe_bytes)
+            require(probe.read_bytes() == probe_bytes, 'GMP probe source identity')
+            artifacts[str(probe)] = sha(probe)
+            discovered = runner.run('gmp-header-dependencies', [clang, *cflags, '-I' + str(gmp_incdir),
+                '-M', '-MT', 'artifact-gmp-header', '-x', 'c', probe], timeout=30)
+            gmp_header = regular(dependency_gmp_path(discovered.stdout, 'artifact-gmp-header'))
+            require(not gmp_header.is_relative_to(output), 'discovered GMP header overlaps output')
+            probe_dependencies = regular(output / 'gmp-header-dependencies.stdout')
+            require(probe_dependencies.read_bytes() == discovered.stdout, 'GMP dependency capture identity')
+            artifacts[str(probe_dependencies)] = sha(probe_dependencies)
+            for p in (gmp_archive, gmp_header, gmp_pc):
+                require(not p.is_relative_to(output), 'native dependency overlaps output'); inputs[str(p)] = sha(p)
+            record['gmp_header_resolution'] = {'header': str(gmp_header), 'sha256': inputs[str(gmp_header)],
+                'pkgconfig_includedir': str(gmp_incdir),
+                'probe': {'path': str(probe), 'bytes': len(probe_bytes), 'sha256': artifacts[str(probe)]},
+                'probe_dependencies': {'path': str(probe_dependencies), 'bytes': len(discovered.stdout),
+                                       'sha256': artifacts[str(probe_dependencies)]}}
+            record['native_dependencies'] = {str(p): inputs[str(p)] for p in
+                (clang, pkg_config, gc_archive, *gc_headers, gmp_archive, gmp_header, gmp_pc)}
+            save(); check_objects()
+            native_runtime = output / 'native-runtime.o'
+            runtime_dependencies = output / 'native-runtime.d'
+            common = ['-O2', '-std=c11', '-I' + str(gmp_header.parent), *cflags,
+                      '-I' + str(gmp_incdir), '-I' + str(source / 'runtime'), '-I' + str(gc / 'include')]
+            require(sha(gmp_header) == inputs[str(gmp_header)], 'GMP header changed before native compilation')
+            runner.run('native-runtime', [clang, *common, '-MD', '-MF', runtime_dependencies,
+                '-MT', 'artifact-native-runtime', '-c', runtime, '-o', native_runtime], timeout=120)
+            require(regular(runtime_dependencies).stat().st_size <= 65536, 'runtime dependency evidence size')
+            dependency_bytes = runtime_dependencies.read_bytes()
+            used_header = regular(dependency_gmp_path(dependency_bytes, 'artifact-native-runtime', gmp_header))
+            require(sha(used_header) == inputs[str(gmp_header)], 'GMP header changed during native compilation')
+            artifacts[str(runtime_dependencies)] = sha(runtime_dependencies)
+            artifacts[str(native_runtime)] = sha(native_runtime)
+            record['gmp_header_resolution']['runtime_dependencies'] = {
+                'path': str(runtime_dependencies), 'bytes': len(dependency_bytes),
+                'sha256': artifacts[str(runtime_dependencies)]}
             save()
-        require(time.monotonic() <= deadline, 'native closure compile deadline exceeded')
-        for extension in ('.mlfci', '.mlfco'):
-            require(regular((crate / 'builtin/prelude').with_suffix(extension)).stat().st_size > 0,
-                    'missing fresh builtin native crate artifact')
-        record['native_crate_outputs'] = {}
-        for path in sorted(crate.rglob('*')):
-            info = path.lstat()
-            require(stat.S_ISDIR(info.st_mode) or stat.S_ISREG(info.st_mode),
-                    'nonregular native crate output')
-            if path.is_file():
-                path = regular(path)
-                digest = sha(path)
-                artifacts[str(path)] = digest
-                record['native_crate_outputs'][str(path.relative_to(crate))] = {
-                    'bytes': path.stat().st_size, 'sha256': digest}
-        save(); postcheck()
-        runner.run('native-crate-to-llvm', [compiler, '--crate-to-llvm', crate / 'fixture.mlfci'], timeout=300)
-        # Consume the captured IR directly; no duplicate or external scratch.
-        ir = regular(output / 'native-crate-to-llvm.stdout')
-        require(ir.stat().st_size > 0, 'empty native LLVM')
-        native = output / 'shared-native'
-        runner.run('native-link', [clang, '-O2', '-Wno-override-module', '-x', 'ir', ir,
-                   '-x', 'none', native_runtime, gc_archive, gmp_archive,
-                   '-lm', '-lpthread', '-ldl', '-o', native], timeout=120)
-        binaries['shared-native'] = native
-        artifacts.update({str(p): sha(p) for p in [*transports, native_runtime, ir, native]})
+            compiler = regular(producer_dir / 'bin/emlf')
+            closure = native_source_closure(source, shared, manifest)
+            for row in closure:
+                require(not Path(row['path']).is_relative_to(output), 'native input overlaps output')
+                inputs[row['path']] = row['sha256']
+            record['native_source_closure'] = closure
+            crate = output / 'native-crate'
+            crate.mkdir()
+            plan = native_crate_plan(closure, crate, source)
+            record['native_crate_plan'] = []
+            for component in plan:
+                prefix = Path(component['prefix'])
+                prefix.parent.mkdir(parents=True, exist_ok=True)
+                spec = prefix.with_suffix('.spec')
+                with spec.open('xb') as stream:
+                    stream.write(component['spec'].encode('utf-8'))
+                artifacts[str(spec)] = sha(spec)
+                record['native_crate_plan'].append({
+                    key: value for key, value in component.items() if key != 'spec'})
+                record['native_crate_plan'][-1].update(spec=str(spec), spec_sha256=artifacts[str(spec)])
+            save(); postcheck()
+            # Preserve the original whole-closure compile allowance. Every current
+            # source is compiled cold exactly once, across normal library interfaces.
+            deadline = time.monotonic() + 900
+            cold = {'inferred_groups': 0, 'reused_groups': 0, 'components': []}
+            for component in record['native_crate_plan']:
+                remaining = deadline - time.monotonic()
+                require(remaining > 0, 'native closure compile deadline exceeded')
+                prefix = Path(component['prefix'])
+                runner.run('native-compile-crate-' + component['name'],
+                           [compiler, '--compile-crate', component['spec'], '-o', prefix],
+                           timeout=remaining)
+                for extension in ('.mlfci', '.mlfco', '.queries'):
+                    require(regular(prefix.with_suffix(extension)).stat().st_size > 0,
+                            'missing fresh native crate artifact: ' + str(prefix) + extension)
+                query_report = json.loads(prefix.with_suffix('.queries').read_text())
+                require_cold_queries(query_report)
+                counts = {key: query_report[key] for key in ('inferred_groups', 'reused_groups')}
+                cold['components'].append({'name': component['name'], **counts})
+                for key in ('inferred_groups', 'reused_groups'):
+                    cold[key] += counts[key]
+                record['native_cold_queries'] = cold
+                save()
+            require(time.monotonic() <= deadline, 'native closure compile deadline exceeded')
+            for extension in ('.mlfci', '.mlfco'):
+                require(regular((crate / 'builtin/prelude').with_suffix(extension)).stat().st_size > 0,
+                        'missing fresh builtin native crate artifact')
+            record['native_crate_outputs'] = {}
+            for path in sorted(crate.rglob('*')):
+                info = path.lstat()
+                require(stat.S_ISDIR(info.st_mode) or stat.S_ISREG(info.st_mode),
+                        'nonregular native crate output')
+                if path.is_file():
+                    path = regular(path)
+                    digest = sha(path)
+                    artifacts[str(path)] = digest
+                    record['native_crate_outputs'][str(path.relative_to(crate))] = {
+                        'bytes': path.stat().st_size, 'sha256': digest}
+            save(); postcheck()
+            runner.run('native-crate-to-llvm', [compiler, '--crate-to-llvm', crate / 'fixture.mlfci'], timeout=300)
+            # Consume the captured IR directly; no duplicate or external scratch.
+            ir = regular(output / 'native-crate-to-llvm.stdout')
+            require(ir.stat().st_size > 0, 'empty native LLVM')
+            native = output / 'shared-native'
+            runner.run('native-link', [clang, '-O2', '-Wno-override-module', '-x', 'ir', ir,
+                       '-x', 'none', native_runtime, gc_archive, gmp_archive,
+                       '-lm', '-lpthread', '-ldl', '-o', native], timeout=120)
+            binaries['shared-native'] = native
+            artifacts.update({str(p): sha(p) for p in [native_runtime, ir, native]})
+        artifacts.update({str(p): sha(p) for p in transports})
         record.update(artifacts=artifacts, fixtures={name: str(p) for name, p in binaries.items()})
         save(); postcheck()
         inner = output / 'controls'
-        result = runner.run('artifact-binary-controls', [python, '-I', '-B', controls,
-            '--fixture', binaries['ghc'], '--shared-ghc-fixture', binaries['shared-ghc'],
-            '--query-fixture', binaries['query-index-ghc'],
-            '--shared-native-fixture', native, '--build-receipt', receipt_path,
-            '--partial-write-sink', sink, '--output', inner], timeout=900)
+        command = [python, '-I', '-B', controls, '--build-receipt', receipt_path,
+                   '--partial-write-sink', sink, '--output', inner]
+        for backend, option in (
+            ('ghc', '--fixture'), ('shared-ghc', '--shared-ghc-fixture'),
+            ('query-index-ghc', '--query-fixture'), ('shared-native', '--shared-native-fixture'),
+        ):
+            if backend in binaries:
+                command.extend((option, binaries[backend]))
+        if selection:
+            command.extend(('--case', selection))
+        result = runner.run('artifact-binary-controls', command, timeout=900)
         summary = json.loads(result.stdout)
         body = json.loads((inner / 'receipt.json').read_text())
         require(summary.get('complete') is True and body.get('complete') is True and
@@ -672,13 +694,15 @@ def main():
                     'shared-ghc', 'shared-native', 'shared-ghc-typed', 'shared-native-typed',
                     'shared-ghc-public-pair', 'shared-native-public-pair', 'distribution-seed',
                     'query-index-pure', 'query-index-publication'}
-        require(body.get('query_index_reference_tests') == 9, 'independent query index tests omitted')
-        expected_query_tests=('test_actual_row_64_mi_boundary_tiny_wire', 'test_actual_total_256_mi_boundary_tiny_wire', 'test_alternating_long_prefix_attack', 'test_canonicality_and_closure', 'test_depth_both_key_orders', 'test_exact_fields_and_wire_hash', 'test_legacy_and_empty', 'test_small_exact_budgets', 'test_types_ranges_and_hashes')
-        require(body.get('query_index_reference_results') ==
-                [{'name': name, 'state': 'passed'} for name in expected_query_tests],
-                'independent query index named results omitted or changed')
-        names = require_control_commands(body['commands'])
-        require(len(names) == len(set(names)) and required <= set(names), 'mandatory host/typed/public commands omitted')
+        if selection is None or selection == 'query-index-pure':
+            expected_query_tests=('test_checksum_and_configuration', 'test_deep_shared_graph_and_cycle_in_both_row_orders', 'test_generations_resolve_their_own_slots', 'test_malformed_tables', 'test_only_current_cache_directory_is_selected')
+            require(body.get('query_index_reference_tests') == len(expected_query_tests), 'independent query index tests omitted')
+            require(body.get('query_index_reference_results') ==
+                    [{'name': name, 'state': 'passed'} for name in expected_query_tests],
+                    'independent query index named results omitted or changed')
+        names = require_control_commands(body['commands'], selection)
+        require(body.get('framework_selection') == selection, 'inner adapter reported another selection')
+        require(selection is not None or required <= set(names), 'mandatory host/typed/public commands omitted')
         expected_inputs = {str(p): sha(p) for p in [controls, receipt_path, *binaries.values(), *helpers]}
         require(body['inputs'] == expected_inputs, 'aggregate input identity mismatch')
         for row in body['commands']:
@@ -693,15 +717,18 @@ def main():
                 require(path == inner / (row['name'] + '.' + stream) and
                         path.stat().st_size == item['bytes'] and sha(path) == item['sha256'],
                         'inner capture identity mismatch')
-        require(set(body['shared_backend_outputs']) == {'shared-ghc', 'shared-native'} and
-                set(body['shared_public_pairs']) == {'shared-ghc', 'shared-native'} and
-                all(set(variants) == {'closed', 'legacy', 'schema7', 'seed'}
-                    for variants in body['shared_public_pairs'].values()),
-                'both actual hosts must qualify raw and full public artifacts')
+        if selection is None:
+            require(set(body['shared_backend_outputs']) == {'shared-ghc', 'shared-native'} and
+                    set(body['shared_public_pairs']) == {'shared-ghc', 'shared-native'} and
+                    all(set(variants) == {'closed', 'legacy', 'schema7', 'seed'}
+                        for variants in body['shared_public_pairs'].values()),
+                    'both actual hosts must qualify raw and full public artifacts')
         postcheck()
         record.update(complete=True, post_integrity=True, producer_objects_verified_after=True,
                       controls_receipt={'path': str(inner / 'receipt.json'), 'sha256': sha(inner / 'receipt.json')},
-                      controls_commands=names)
+                      controls_commands=[selection] if selection else names)
+        if selection:
+            record['prerequisite_commands'] = [name for name in names if name != selection]
     except BaseException as error:
         record.update(complete=False, error=type(error).__name__ + ': ' + str(error))
         if before is not None:

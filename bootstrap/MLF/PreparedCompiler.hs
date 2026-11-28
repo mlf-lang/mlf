@@ -3,11 +3,11 @@
              KindSignatures, FlexibleContexts, FlexibleInstances,
              MultiParamTypeClasses, OverloadedStrings #-}
 module MLF.PreparedCompiler
-  (Compilation, compileFileWithPrelude, compileSourceWithImports, compileProgramWithPrelude,
-   checkedTerm, compiledTerm, sourceType, reused, dictionaryIdentities, verifyBuiltin, verifyBuiltinImages, installCompilerPrelude, cratePrelude, linkCrateFile, linkCrateFileProfiled, linkCompiledCrate,
+  (Source(..), readSource, Compilation, compileSource, compileSourceWithDecisions, compileSourceAndDecisions, compileFileWithPrelude, compileSourceWithImports,
+   checkedTerm, compiledTerm, sourceType, reused, dictionaryIdentities, verifyBuiltin, verifyBuiltinImages, installCompilerPrelude, cratePrelude, linkCrateFile, linkCrateFileProfiled, linkCompiledCrate, linkCompiledCrateRetaining,
    emitNativeFileChunks, emitNativeSourceChunks, nativeInstallInfo,
-   NativeCompilation, compileNativeFile, compileNativeSource,
-   nativeChunks, nativeManifest, nativeExportCount, nativeInlineCount, nativeFallback, nativeInputs,
+   NativeCompilation, compileNative, compileNativeWithDecisions, compileNativeFile, compileNativeSource,
+   NativeLink(..), nativeLink, nativeChunks, nativeManifest, nativeInstallation, nativeProviders, nativeFallback, nativeInputs, nativeDecisions,
    emitNativeLibraryChunks, nativeLibraryMetadata) where {
   import MLF.Primitive;
   import Bootstrap.Types;
@@ -21,18 +21,17 @@ module MLF.PreparedCompiler
   import qualified Bootstrap.Prelude as Prelude;
   import qualified Bootstrap.Classes as Classes;
   import qualified Bootstrap.Data as D;
-  import qualified Bootstrap.Compiler as Compiler;
+  import qualified Bootstrap.SourceFrontend as Compiler;
   import qualified Bootstrap.CompilerCore as Core;
   import qualified Bootstrap.CrateArtifact as Artifact;
   import qualified Bootstrap.Crate as Crate;
+  import qualified Bootstrap.CrateCodegen as CrateCodegen;
   import qualified Bootstrap.CrateSession as Session;
+  import qualified Bootstrap.SourceCrate as SourceCrate;
   import qualified Bootstrap.CrateQuery as Query;
   import qualified Bootstrap.ArtifactStorage as Storage;
   import qualified Bootstrap.Separate as Separate;
   import qualified Bootstrap.X.Checked as Checked;
-  import qualified Bootstrap.X.Type as T;
-  import qualified Bootstrap.ImportParameters as Parameters;
-  import qualified Bootstrap.ImportedRoot as Imported;
   import qualified Bootstrap.BuiltinPreludeContext as Context;
   import qualified Bootstrap.BuiltinPreludeLiteral as Literal;
   import qualified MLF.BuiltinPreludeData as Builtin;
@@ -40,64 +39,48 @@ module MLF.PreparedCompiler
   import qualified MLF.PreparedLibraryData as LibraryData;
   import qualified MLF.PreparedNativeData as NativeData;
   import qualified Bootstrap.LLVM as LLVM;
-  import qualified Bootstrap.LLVM.Library as NativeLLVM;
-  import qualified Bootstrap.Constraint as Constraint;
-  import qualified Bootstrap.X.Pretty as Pretty;
+  import qualified Bootstrap.NativeCrate as NativeCrate;
+  import qualified MLF.CrateNativeCommand as NativeCommand;
+  import qualified Package.NativeArtifact as NativeArtifact;
   import qualified Package.Json as Json;
+  import qualified Package.DependencyMode as Mode;
   import qualified Package.OS as OS;
 
-  -- The native installation is compiler-owned immutable expected metadata.
-  -- None of these checks accept a caller's manifest or its claimed digest.
-  nativeExportABI :: String;
-  nativeExportABI = "mlf-native-typed-tuple/2";
-  fixedNativeLibrary :: Either String Libraries.RawLibrary;
-  fixedNativeLibrary = case LibraryData.libraries of {
-    -- Preserve manifest/identity demand here. Actual object admission belongs
-    -- to the consumers: nativeLayout uses nativeLibraryDeclarations, emission
-    -- uses nativeLibrary, and root compilation uses compileNativeRootUsing.
-    [raw] -> Right raw;
-    _ -> Left "native installation requires exactly one fixed prepared library"
+  -- Installation is an authenticated provider store. Its libraries use the
+  -- same boxed crate contracts and factory emitter as package dependencies.
+  nativeLibraryObjects :: Libraries.RawLibrary -> [] Libraries.LibraryObject;
+  nativeLibraryObjects raw = filter (\entry -> not (eqString Artifact.builtinCrateIdentity
+    (Artifact.crateId (Libraries.libraryInterface entry)))) (Libraries.libraryObjects raw);
+  preparedNativeLibrary :: IO (Either String ((,) ([] String) NativeCrate.Contract));
+  preparedNativeLibrary = case LibraryData.libraries of {
+    [raw] -> do {
+      admitted <- Libraries.readLibraryObjects raw;
+      ioReturn (do {
+        objects <- admitted;
+        case nativeLibraryObjects raw of {
+          [recorded] -> do {
+            let { owner = Artifact.crateId (Libraries.libraryInterface recorded) };
+            object <- maybe (Left "prepared native crate is missing") Right
+              (find (\value -> eqString owner (Artifact.crateId (Artifact.objectInterface value))) objects);
+            result <- NativeCrate.emitLibrary (Libraries.objectHash recorded)
+              (map Artifact.objectInterface objects) object;
+            result
+          };
+          _ -> Left "native library emission requires one crate; use the installation producer for a provider set"
+        }
+      })
+    };
+    _ -> ioReturn (Left "native library emission requires one prepared source inventory")
   };
-  nativeLayout :: Libraries.RawLibrary -> Either String NativeLLVM.ExportLayout;
-  nativeLayout raw = do {
-    installed <- Libraries.nativeInstalledIds raw;
-    nativeLayoutFor raw installed
-  };
-  nativeLayoutFor raw bindings = do {
-    ensure (eqList Separate.sameSignature (map snd bindings) (Libraries.nativeExportSignatures raw))
-      "native declaration mapping differs from installed export keys or types";
-    declarations <- Libraries.nativeLibraryDeclarations raw;
-    base <- NativeLLVM.prepareLayoutIds (Libraries.inputIdentity raw)
-      (map (\((,) d ((,) key ty)) -> (,) d ((,,) key (Constraint.targetNameHint key) ty)) bindings) declarations;
-    NativeLLVM.withTypeNames base NativeData.reservedTypeNames
-  };
-  emitNativeLibraryChunks :: Either String ([] String);
+  emitNativeLibraryChunks :: IO (Either String ([] String));
   emitNativeLibraryChunks = do {
-    raw <- fixedNativeLibrary;
-    layout <- nativeLayout raw;
-    checked <- Libraries.nativeLibrary raw;
-    case checked of { (,,) spine _ _ -> NativeLLVM.emitLibrary layout spine }
+    result <- preparedNativeLibrary;
+    ioReturn (mapEither fst result)
   };
-  nativeLibraryMetadata :: Either String String;
+  nativeLibraryMetadata :: IO (Either String String);
   nativeLibraryMetadata = do {
-    raw <- fixedNativeLibrary;
-    layout <- nativeLayout raw;
-    let { exports = Libraries.nativeExportSignatures raw };
-    declarations <- Libraries.nativeLibraryDeclarations raw;
-    Right (Json.render (Json.object [
-      (,) "format" (Json.str "MLF-NATIVE-LIBRARY-1"),
-      (,) "identity" (Json.str (Libraries.inputIdentity raw)),
-      (,) "export_abi" (Json.str nativeExportABI),
-      (,) "reserved_type_names" (Json.stringArray (NativeLLVM.reservedTypeNames layout)),
-      (,) "exports" (Json.array (map (\((,) slot ((,) key ty)) -> Json.object [
-        (,) "key" (Json.str key), (,) "hint" (Json.str (Constraint.targetNameHint key)),
-        (,) "type" (Json.str (Pretty.prettyType ty)), (,) "slot" (Json.num slot)])
-        (zip (range 0 (length exports - 1)) exports))),
-      (,) "declarations" (Json.stringArray (map D.prettyDeclaration declarations)),
-      (,) "constructor_tags" (Json.array (map (\((,) name ((,) tag arity)) -> Json.object [
-        (,) "name" (Json.str name), (,) "tag" (Json.num tag), (,) "arity" (Json.num arity)])
-        (M.toList (NativeLLVM.constructorTags layout))))
-    ]))
+    result <- preparedNativeLibrary;
+    ioReturn (mapEither (compose Json.render (compose NativeCommand.nativeContract snd)) result)
   };
   checkNativeFile ((,) path expected) = do {
     present <- fileExists path;
@@ -113,8 +96,9 @@ module MLF.PreparedCompiler
       case result of { Left message -> ioReturn (Left message); Right () -> validateNativeFiles rest }
     }
   };
-  nativeLinkInputs :: Json.Json -> Either String ([] ((,) String String));
-  nativeLinkInputs manifest = do {
+  data NativeLink = NativeLink ([] ((,) String String)) ([] ((,) String String)) ([] String);
+  readNativeLink :: Json.Json -> Either String NativeLink;
+  readNativeLink manifest = do {
     arguments <- case Json.get "link_args" manifest of {
       Json.Array values -> traverseEither (\value -> case value of {
         Json.String argument -> do {
@@ -145,11 +129,55 @@ module MLF.PreparedCompiler
     ensure (length paths == length (nubBy eqString paths)) "duplicate installed native link input";
     ensure (eqList eqString (sortBy compareString paths) (sortBy compareString dependencies))
       "installed native link arguments differ from their authenticated input inventory";
-    Right files
+    Right (NativeLink NativeData.objectPaths files arguments)
   };
+  nativeFileRecord :: Json.Json -> Either String ((,) String String);
+  nativeFileRecord value = case (,) (Json.get "path" value) (Json.get "sha256" value) of {
+    (,) (Json.String path) (Json.String digest) -> do {
+      ensure (OS.absolute path && CrateCodegen.validDigest digest) "invalid installed native file record";
+      Right ((,) path digest)
+    };
+    _ -> Left "invalid installed native file record"
+  };
+  data InstalledNative = InstalledNative String Json.Json (Either String Libraries.RawLibrary)
+    NativeLink ([] NativeArtifact.Pinned);
+  installationManifest (InstalledNative text _ _ _ _) = text;
+  installationData (InstalledNative _ manifest _ _ _) = manifest;
+  installationLibrary (InstalledNative _ _ raw _ _) = raw;
+  installationPins (InstalledNative _ _ _ _ pins) = pins;
   nativeInstallInfo :: IO (Either String String);
-  nativeInstallInfo = if not NativeData.enabled then ioReturn (Left "native installation is disabled") else do {
-    files <- validateNativeFiles ((:) ((,) NativeData.manifestPath NativeData.manifestSHA) NativeData.objectPaths);
+  nativeInstallInfo = do {
+    installed <- loadNativeInstallation;
+    ioReturn (mapEither installationManifest installed)
+  };
+  installedProvider expected row = let {
+    saved = Json.get "contract" row;
+    owner = Json.getText "crate_id" "" saved;
+    identity = Json.getText "identity" "" saved;
+    checked = do {
+      entries <- expected;
+      ensure (any (\entry -> eqString owner
+        (Artifact.crateId (Libraries.libraryInterface entry)) &&
+        eqString identity (Libraries.objectHash entry)) entries)
+        "installed native provider differs from its checked crate";
+      ensure (eqString NativeData.exportABI NativeCrate.nativeABI) "installed native export ABI mismatch";
+      contract <- NativeArtifact.validateContract LLVM.runtimeAbi owner identity saved;
+      ensure (eqString (Json.getText "status" "" contract) "eligible")
+        (Json.getText "reason" "native provider is unavailable" contract);
+      file <- nativeFileRecord (Json.get "object" row);
+      Right ((,) contract file)
+    };
+    pinned result = NativeArtifact.Pinned owner identity Nothing result
+  } in case checked of {
+    Left reason -> ioReturn (pinned (Left reason));
+    Right ((,) contract file) -> do {
+      valid <- checkNativeFile file;
+      ioReturn (pinned (mapEither (\_ -> (,) contract file) valid))
+    }
+  };
+  loadNativeInstallation :: IO (Either String InstalledNative);
+  loadNativeInstallation = if not NativeData.enabled then ioReturn (Left "native installation is disabled") else do {
+    files <- checkNativeFile ((,) NativeData.manifestPath NativeData.manifestSHA);
     case files of {
       Left message -> ioReturn (Left message);
       Right () -> do {
@@ -157,97 +185,148 @@ module MLF.PreparedCompiler
         afterRead <- fileDigest NativeData.manifestPath;
         let { inspected = do {
           ensure (eqString afterRead NativeData.manifestSHA) "installed native manifest changed while reading";
-          raw <- fixedNativeLibrary;
-          ensure (eqString NativeData.identity (Libraries.inputIdentity raw)) "installed native library identity mismatch";
-          ensure (eqString NativeData.exportABI nativeExportABI) "installed native export ABI mismatch";
-          ensure (not (null NativeData.objectPaths)) "installed native object inventory is empty";
+          let { raw = case filter (\candidate -> eqString NativeData.identity (Libraries.inputIdentity candidate))
+                  LibraryData.libraries of {
+                  [candidate] -> Right candidate;
+                  _ -> Left "installed native library identity mismatch"
+                } };
           manifest <- Json.parse text;
           traverseEither (\((,) field expected) -> ensure
             (eqString (Json.getText field "" manifest) expected) ("installed native manifest mismatch: " ++ field))
-            [(,) "identity" NativeData.identity, (,) "target_triple" NativeData.targetTriple,
-             (,) "data_layout" NativeData.dataLayout, (,) "primitive_abi" NativeData.primitiveABI,
+            [(,) "format" "MLF-NATIVE-INSTALLATION-1", (,) "identity" NativeData.identity,
+             (,) "target_triple" NativeData.targetTriple, (,) "data_layout" NativeData.dataLayout,
+             (,) "primitive_abi" NativeData.primitiveABI, (,) "runtime_abi" LLVM.runtimeAbi,
              (,) "export_abi" NativeData.exportABI];
-          -- The compiled manifest hash binds the layout produced and checked
-          -- during independent installation regeneration. Reconstructing the
-          -- full export schema here repeats that proof on every invocation;
-          -- user wrappers still undergo their own checked layout validation.
-          ensure (eqString (Json.getText "format" "" manifest) "MLF-NATIVE-LIBRARY-1")
-            "installed native manifest format mismatch";
-          let { objectRows = Json.array (map (\((,) path digest) -> Json.object
-            [(,) "path" (Json.str path), (,) "sha256" (Json.str digest)]) NativeData.objectPaths) };
-          ensure (eqString (Json.render (Json.get "objects" manifest)) (Json.render objectRows))
+          rows <- case Json.get "providers" manifest of {
+            Json.Array values -> Right values;
+            _ -> Left "installed native provider inventory is missing"
+          };
+          runtime <- nativeFileRecord (Json.get "runtime" manifest);
+          native <- traverseEither (compose nativeFileRecord (Json.get "object"))
+            (filter (\row -> not (Json.equal (Json.get "object" row) Json.Null)) rows);
+          let { objects = snoc native runtime;
+                objectRows = Json.array (map (\((,) path digest) -> Json.object
+                  [(,) "path" (Json.str path), (,) "sha256" (Json.str digest)]) objects) };
+          ensure (eqList (eqPair eqString eqString) objects NativeData.objectPaths &&
+            Json.equal (Json.get "objects" manifest) objectRows)
             "installed native object inventory mismatch";
-          nativeLinkInputs manifest
+          ensure (length objects == length (nubBy (eqPair eqString eqString) objects))
+            "duplicate installed native object";
+          NativeLink _ inputs flags <- readNativeLink manifest;
+          Right ((,,,) raw manifest rows (NativeLink [runtime] inputs flags))
         } };
         case inspected of {
           Left message -> ioReturn (Left message);
-          Right linkInputs -> do {
-            valid <- validateNativeFiles linkInputs;
-            ioReturn (mapEither (\_ -> text) valid)
+          Right ((,,,) raw manifest rows link@(NativeLink runtime inputs _)) -> do {
+            valid <- validateNativeFiles (append runtime inputs);
+            case valid of {
+              Left message -> ioReturn (Left message);
+              Right () -> do {
+                let { expected = mapEither Libraries.libraryObjects raw };
+                pins <- mapM (installedProvider expected) rows;
+                ioReturn (Right (InstalledNative text manifest raw link pins))
+              }
+            }
           }
         }
       }
     }
   };
-  data NativeCompilation = NativeCompilation String ([] String) Int Int String ([] ((,) String String));
-  nativeManifest (NativeCompilation manifest _ _ _ _ _) = manifest;
-  nativeChunks (NativeCompilation _ chunks _ _ _ _) = chunks;
-  nativeExportCount (NativeCompilation _ _ count _ _ _) = count;
-  nativeInlineCount (NativeCompilation _ _ _ count _ _) = count;
-  nativeFallback (NativeCompilation _ _ _ _ reason _) = reason;
-  nativeInputs (NativeCompilation _ _ _ _ _ inputs) = inputs;
+  data NativeCompilation = NativeCompilation InstalledNative NativeCommand.Program String
+    ([] ((,) String String)) ([] Mode.Decision);
+  nativeLink (NativeCompilation (InstalledNative _ _ _ (NativeLink runtime inputs flags) _) program _ _ _) =
+    NativeLink (append (map (\row -> (,) (Json.getText "path" "" row) (Json.getText "sha256" "" row))
+      (NativeCommand.programObjects program)) runtime) inputs flags;
+  nativeManifest (NativeCompilation installed _ _ _ _) = installationManifest installed;
+  nativeInstallation (NativeCompilation installed _ _ _ _) = installationData installed;
+  nativeChunks (NativeCompilation _ program _ _ _) = NativeCommand.programChunks program;
+  nativeProviders (NativeCompilation _ program _ _ _) = NativeCommand.programObjects program;
+  nativeFallback (NativeCompilation _ _ reason _ _) = reason;
+  nativeInputs (NativeCompilation _ _ _ inputs _) = inputs;
+  nativeDecisions (NativeCompilation _ _ _ _ rows) = rows;
   compileNativeFile :: PreludeMode -> [] String -> String -> IO (Either CompileError NativeCompilation);
-  compileNativeFile mode paths file = do {
-    present <- fileExists file;
-    if not present then ioReturn (Left (CompileError ModuleResolution ("file does not exist: " ++ file))) else do {
-      input <- readFile file;
-      compileNativeSource mode paths file input
-    }
-  };
+  compileNativeFile mode paths file = compileNative mode paths (SourceFile file);
   compileNativeSource :: PreludeMode -> [] String -> String -> String -> IO (Either CompileError NativeCompilation);
-  compileNativeSource mode paths file input =
+  compileNativeSource mode paths file input = compileNative mode paths (SourceText file input);
+  compileNative :: PreludeMode -> [] String -> Source -> IO (Either CompileError NativeCompilation);
+  compileNative = compileNativeWithDecisions (\_ -> ioReturn ());
+  compileNativeWithDecisions :: (Mode.Decision -> IO ()) -> PreludeMode -> [] String -> Source -> IO (Either CompileError NativeCompilation);
+  compileNativeWithDecisions report mode paths source = withSource source (\input ->
     if not NativeData.enabled then ioReturn (Left (CompileError Verification
       "standard native installation is unavailable; build the compiler with tools/shared/build.py")) else do {
-    installed <- nativeInstallInfo;
-    case installed of {
-      Left message -> ioReturn (Left (CompileError Verification message));
-      Right manifest -> case Core.atPhase Parsing (Parser.parseModule file input) of {
-        Left error -> ioReturn (Left error);
-        Right root -> do {
-          let { defaults = case Json.parse manifest of {
-            Left _ -> [];
-            Right value -> Json.getStrings "source_roots" value
-          } };
-          loaded <- Modules.loadModuleFilesWithEvidenceUsingFallback LibraryData.parseLibrary paths defaults root input;
-          let { candidate = do {
-            graph <- Core.atPhase ModuleResolution loaded;
-            raw <- Core.atPhase Verification fixedNativeLibrary;
-            compiled <- Libraries.compileNativeRootUsing LibraryData.parseLibrary raw mode graph;
-            layout <- Core.atPhase Verification (nativeLayoutFor raw (Libraries.nativeLayoutIds compiled));
-            chunks <- Core.atPhase Verification (NativeLLVM.emitRootIds layout
-              (Libraries.nativeSelectedIds compiled) (Libraries.nativeCheckedWrapper compiled));
-            Right (NativeCompilation manifest chunks (length (M.keys (Libraries.nativeSignatures compiled)))
-              (Libraries.nativeBuiltinCount compiled) ""
-              (map (\entry -> (,) (Modules.sourcePath (Modules.loadedSource entry))
-                (Modules.loadedText entry)) (Modules.loadedEntries graph)))
-          } };
-          case candidate of {
-            Left error -> do {
-              putErr ("native library fallback: " ++ Core.prettyError error ++ "\n");
-              ioReturn (do {
-                graph <- Core.atPhase ModuleResolution loaded;
-                ordinary <- Libraries.compileLoaded LibraryData.libraries mode graph;
-                chunks <- Core.atPhase Verification (LLVM.emitCheckedChunks False (Libraries.checkedTerm ordinary));
-                Right (NativeCompilation manifest chunks 0 0 (Core.prettyError error)
-                  (map (\entry -> (,) (Modules.sourcePath (Modules.loadedSource entry))
-                    (Modules.loadedText entry)) (Modules.loadedEntries graph)))
-              })
+      installed <- loadNativeInstallation;
+      case installed of {
+        Left message -> ioReturn (Left (CompileError Verification message));
+        Right dependency -> do {
+          loaded <- loadSourceGraph paths (Just dependency) input;
+          case loaded of {
+            Left err@(CompileError ModuleResolution _) -> do {
+              reportNativeFallback err;
+              ioReturn (Left err)
             };
-            Right compiled -> ioReturn (Right compiled)
+            Left err -> ioReturn (Left err);
+            Right graph -> compileLoadedSource report source mode paths (Just dependency) graph (emitNativeRoot dependency graph)
           }
         }
       }
-    }
+    });
+  reportNativeFallback err = putErr ("native library fallback: " ++ Core.prettyError err ++ "\n");
+  emitNativeRoot installed graph (CompiledRoot root dependencies admission input interfaces) = let {
+    inputs = map (\entry -> (,) (Modules.sourcePath (Modules.loadedSource entry))
+      (Modules.loadedText entry)) (Modules.loadedEntries graph);
+    selected = do {
+      verified <- Core.atPhase Verification (installationLibrary installed);
+      raw <- admission;
+      Core.atPhase Verification (ensure (eqString (Libraries.inputIdentity verified) (Libraries.inputIdentity raw))
+        "selected checked library has no installed native provider");
+      Right (installationPins installed)
+    };
+    pins = either (\_ -> []) id selected;
+    sourceReason = either Core.prettyError (\_ -> "") selected;
+    checkedObject object = (,) (Artifact.crateId (Artifact.objectInterface object)) (Right object);
+    objects = case dependencies of {
+      CheckedObjects values -> map checkedObject values;
+      SourcePrelude object -> [checkedObject object];
+      FixedPrelude witness -> [(,) Artifact.builtinCrateIdentity
+        (Artifact.decodeObject (Context.interface witness) Builtin.builtinObject)];
+      LibraryDependencies _ -> []
+    };
+    byCrate = M.fromList compareString objects;
+    load ((,) owner why) = case dependencies of {
+      LibraryDependencies raw -> case find
+          (\entry -> eqString owner (Artifact.crateId (Libraries.libraryInterface entry)))
+          (Libraries.libraryObjects raw) of {
+        Nothing -> ioReturn (Left (owner ++ ": " ++ why ++ "; no checked implementation is available"));
+        Just recorded -> Libraries.readLibraryObject (map snd interfaces) recorded
+      };
+      _ -> ioReturn (case M.lookup compareString owner byCrate of {
+        Nothing -> Left (owner ++ ": " ++ why ++ "; no checked implementation is available");
+        Just object -> object
+      })
+    };
+    initial = Session.rootObject root;
+    headers = (:) (Artifact.objectInterface initial) (map snd interfaces);
+    reported row = case (,) dependencies row of {
+      (,) (SourcePrelude _) (Mode.Decision owner Mode.CheckedIR _) ->
+        if eqString owner Artifact.builtinCrateIdentity then Mode.Decision owner Mode.Source "compiled builtin Prelude" else row;
+      _ -> row
+    };
+    rejected choices = mapMaybe (\row -> case row of {
+      Mode.Decision owner Mode.CheckedIR why -> if any
+        (\pin -> eqString owner (NativeArtifact.pinnedCrate pin)) pins then Just why else Nothing;
+      _ -> Nothing
+    }) choices
+  } in do {
+    emitted <- NativeCommand.emitDependencies pins headers load initial;
+    ioReturn (do {
+      program <- Core.atPhase Verification emitted;
+      let { choices = map reported (NativeCommand.programDecisions program);
+            reasons = rejected choices;
+            fallback = if not (eqString sourceReason "") then sourceReason
+              else case reasons of { [] -> ""; (:) reason _ -> reason };
+            rows = append choices (sourceRows input sourceReason) };
+      Right ((,) (NativeCompilation installed program fallback inputs rows) rows)
+    })
   };
   emitNativeFileChunks :: PreludeMode -> [] String -> String -> IO (Either CompileError ([] String));
   emitNativeFileChunks mode paths file = do {
@@ -268,8 +347,6 @@ module MLF.PreparedCompiler
   sourceType (Compilation _ rendered _ _) = rendered;
   reused (Compilation _ _ value _) = value;
   dictionaryIdentities (Compilation _ _ _ values) = values;
-  ordinary compiled = Compilation (Core.checkedTerm compiled) (Core.sourceType compiled) False M.empty;
-  original mode program = mapEither ordinary (Compiler.compileProgramWithPrelude mode program);
   prepared = Context.checkCompilerPrelude Builtin.builtin;
   cratePrelude = case prepared of { Right witness -> Just ((,) witness Builtin.builtinObject); Left _ -> Nothing };
   verifyBuiltinImages = case Artifact.builtinPrelude of {
@@ -357,88 +434,32 @@ module MLF.PreparedCompiler
   -- disk hit must match every byte, as installation does. All other artifacts
   -- retain ordinary admission, including the envelope's cumulative bounds.
   linkCrateFile = linkCrateFileProfiled Nothing;
-  linkCrateFileProfiled profile path = do {
-    loaded <- Artifact.loadInterfacesProfiled profile [path];
-    case loaded of {
-      Left message -> ioReturn (Left message);
-      Right interfaces -> case interfaces of {
-        (:) ((,) metadata iface) rest ->
-          if not (eqString (Artifact.crateId iface) Artifact.builtinCrateIdentity)
-          then Artifact.linkCheckedFileProfiled profile path
-          else do {
-            witnessResult <- Host.phaseValue profile "prelude_check_ms" (Host.phaseEither (\w -> seq w ())) prepared;
-            case witnessResult of {
-            Left _ -> Artifact.linkCheckedFileProfiled profile path;
-            Right witness -> do {
-              images <- Host.phaseIO profile "image_decode_ms" compilerPreludeImages;
-              exact <- Host.phaseIO profile "validate_ms" (case images of {
-                Left _ -> ioReturn False;
-                Right ((,) header body) -> do {
-                  first <- exactImageProfiled profile metadata header;
-                  second <- if first then exactImageProfiled profile (Artifact.objectPath metadata) body else ioReturn False;
-                  ioReturn (first && second && Artifact.sameAdmittedInterface iface (Context.interface witness))
-                }
-              });
-              if not exact then Artifact.linkCheckedFileProfiled profile path else do {
-                admitted <- mapM (\((,) file expected) ->
-                  Artifact.readObjectWithInterfacesProfiled profile (map snd interfaces) (Artifact.objectPath file) expected) rest;
-                case sequenceEither admitted of {
-                  Left message -> ioReturn (Left message);
-                  Right objects -> if any Artifact.envelopeMarked objects then Artifact.linkCheckedFileProfiled profile path
-                    else case reverse interfaces of {
-                      [] -> ioReturn (Left "no root crate metadata");
-                      (:) ((,) _ root) _ ->
-                        Artifact.linkCheckedObjectsV1Profiled profile (Context.finishLinked witness) (Context.linked witness)
-                          [Context.interface witness] objects (Artifact.crateId root)
-                    }
-                }
-              }
-            }
-            }
-          };
-        [] -> Artifact.linkCheckedFileProfiled profile path
-      }
-    }
-  };
-  -- A retained root is already checked and published by this invocation.
-  -- Dependencies still acquire ordinary object snapshots and check them against
-  -- the metadata used for inference. No disk cache supplies the retained root.
-  linkCompiledCrate compiled = do {
-    let { root = Session.compiledObject compiled;
-          iface = Artifact.objectInterface root;
-          dependencies = Session.compiledInterfaces compiled;
-          available = (:) iface (map snd dependencies);
-          ordinary = \ignored -> do {
-            admitted <- mapM (\((,) file expected) ->
-              Artifact.readObjectWithInterfaces available (Artifact.objectPath file) expected) dependencies;
-            ioReturn (do { objects <- sequenceEither admitted;
-              Artifact.linkCheckedObjects (snoc objects root) (Artifact.crateId iface) })
-          } };
-    case (,) dependencies prepared of {
-      (,) ((:) ((,) metadata builtin) rest) (Right witness) ->
-        if not (eqString (Artifact.crateId builtin) Artifact.builtinCrateIdentity)
-        then ordinary () else do {
-          images <- compilerPreludeImages;
-          exact <- case images of {
-            Left _ -> ioReturn False;
-            Right ((,) header body) -> do {
-              first <- exactImage metadata header;
-              second <- if first then exactImage (Artifact.objectPath metadata) body else ioReturn False;
-              ioReturn (first && second && Artifact.sameAdmittedInterface builtin (Context.interface witness))
-            }
-          };
-          if not exact then ordinary () else do {
-            admitted <- mapM (\((,) file expected) ->
-              Artifact.readObjectWithInterfaces available (Artifact.objectPath file) expected) rest;
-            case sequenceEither admitted of {
-              Left message -> ioReturn (Left message);
-              Right objects -> if any Artifact.envelopeMarked ((:) root objects) then ordinary ()
-                else ioReturn (Artifact.linkCheckedObjectsV1Using (Context.finishLinked witness) (Context.linked witness)
-                  [Context.interface witness] (snoc objects root) (Artifact.crateId iface))
-            }
+  linkCrateFileProfiled profile = Artifact.linkCheckedFileUsing profile (admitLinkedPrelude profile);
+  linkCompiledCrate = linkCompiledCrateRetaining M.empty;
+  linkCompiledCrateRetaining :: Map String Artifact.CrateObject -> Session.CompiledCrate ->
+    IO (Either String Checked.CheckedTerm);
+  linkCompiledCrateRetaining retained compiled =
+    Artifact.linkCheckedClosure Nothing (admitLinkedPrelude Nothing) retained
+      (Session.compiledInterfaces compiled) (Just (Session.compiledObject compiled));
+  admitLinkedPrelude profile metadata iface = do {
+    checked <- Host.phaseValue profile "prelude_check_ms" (Host.phaseEither (\w -> seq w ())) prepared;
+    case checked of {
+      Left _ -> ioReturn Nothing;
+      Right witness -> do {
+        images <- Host.phaseIO profile "image_decode_ms" compilerPreludeImages;
+        exact <- Host.phaseIO profile "validate_ms" (case images of {
+          Left _ -> ioReturn False;
+          Right ((,) header body) -> do {
+            matches <- exactImageProfiled profile metadata header;
+            matchesBody <- if matches then exactImageProfiled profile (Artifact.objectPath metadata) body
+              else ioReturn False;
+            ioReturn (matchesBody && Artifact.sameAdmittedInterface iface (Context.interface witness))
           }
-        };
-      _ -> ordinary ()
+        });
+        ioReturn (if exact then Just (Artifact.linkCheckedObjectsV1Profiled profile
+          (Context.finishLinked witness) (Context.linked witness) [Context.interface witness])
+          else Nothing)
+      }
     }
   };
   rawNames = case Builtin.builtin of { Context.RawPrelude _ _ _ _ _ _ value _ _ _ _ _ -> value };
@@ -454,54 +475,243 @@ module MLF.PreparedCompiler
     ensure (eqString (Artifact.encodeObject object) Builtin.builtinObject)
       "prepared Prelude split object differs from fresh complete preparation"
   };
-  compileFileWithPrelude mode paths file = do {
-    present <- fileExists file;
-    if present then do {
-      input <- readFile file;
-      compileSourceWithImports mode paths file input
-    } else ioReturn (Left (CompileError ModuleResolution ("file does not exist: " ++ file)))
+  data Source = SourceFile String | SourceText String String | SourceStdin;
+  readSource :: Source -> IO (Either String ((,) String String));
+  readSource source = case source of {
+    SourceFile path -> do {
+      present <- fileExists path;
+      if present then do {
+        input <- readFile path;
+        ioReturn (Right ((,) path input))
+      } else ioReturn (Left ("file does not exist: " ++ path))
+    };
+    SourceText path input -> ioReturn (Right ((,) path input));
+    SourceStdin -> do {
+      input <- getContents;
+      ioReturn (Right ((,) "<stdin>" input))
+    }
   };
-  compileSourceWithImports mode paths file input =
+  withSource :: forall a. Source -> (((,) String String) -> IO (Either CompileError a)) ->
+    IO (Either CompileError a);
+  withSource source use = do {
+    result <- readSource source;
+    case result of {
+      Left message -> ioReturn (Left (CompileError ModuleResolution message));
+      Right input -> use input
+    }
+  };
+  -- Keep the exact source buffers used for admission and native build receipts.
+  loadSourceGraph :: [] String -> Maybe InstalledNative -> (,) String String ->
+    IO (Either CompileError Modules.LoadedModules);
+  loadSourceGraph paths installed ((,) file input) =
     case Core.atPhase Parsing (Parser.parseModule file input) of {
-      Left error -> ioReturn (Left error);
-      Right source -> if Compiler.standalone source then ioReturn (do {
-        program <- Core.atPhase Parsing (Parser.standaloneProgram source);
-        compileProgramWithPrelude mode program
-      }) else do {
-        loaded <- Modules.loadModuleFilesWithEvidenceUsing LibraryData.parseLibrary paths source input;
-        ioReturn (do {
-          modules <- Core.atPhase ModuleResolution loaded;
-          result <- Libraries.compileLoaded LibraryData.libraries mode modules;
-          Right (Compilation (Libraries.checkedTerm result) (Libraries.sourceType result)
-            (Libraries.reused result) M.empty)
-        })
+      Left err -> ioReturn (Left err);
+      Right root -> do {
+        loaded <- case installed of {
+          Nothing -> Modules.loadModuleFilesWithEvidenceUsing LibraryData.parseLibrary paths root input;
+          Just dependency -> Modules.loadModuleFilesWithEvidenceUsingFallback LibraryData.parseLibrary
+            paths (Json.getStrings "source_roots" (installationData dependency)) root input
+        };
+        ioReturn (Core.atPhase ModuleResolution loaded)
       }
     };
-  compileProgramWithPrelude mode program = case mode of {
-    NoImplicitPrelude -> original mode program;
-    ImplicitPrelude ->
-      if collides rawProtected program then original mode program else
-      case Standalone.rewriteRootWithNames mode rawNames rawEnvironment program of {
-        -- Cheap admission uses fixed raw metadata only. Its rejection must not
-        -- manufacture a user error before the current context is checked.
-        Left _ -> original mode program;
-        Right root -> if not (Standalone.rewrittenNeeded root) || ownSupportCollision rawProtected root
-          then original mode program else do {
-            context <- Core.atPhase Verification prepared;
-            compilePrepared context root program
-          }
+  data RootSource = ModuleSources ([] SourceModule) | PreparedScript SourceModule Context.PreparedPrelude;
+  data CheckedDependencies = CheckedObjects ([] Artifact.CrateObject) | FixedPrelude Context.PreparedPrelude | SourcePrelude Artifact.CrateObject | LibraryDependencies Libraries.RawLibrary;
+  data RootPlan = RootPlan RootSource ([] ((,) String Artifact.CrateInterface))
+    CheckedDependencies (Either CompileError Libraries.RawLibrary);
+  data CompiledRoot = CompiledRoot Session.SourceRoot CheckedDependencies (Either CompileError Libraries.RawLibrary)
+    RootSource ([] ((,) String Artifact.CrateInterface));
+  builtinMetadata :: Artifact.CrateInterface -> [] ((,) String Artifact.CrateInterface);
+  builtinMetadata iface = [(,) "/mlf/implicit-dependencies/builtin.mlfci" iface];
+  closeSourceRoot :: CheckedDependencies -> Session.SourceRoot -> IO (Either CompileError SourceCrate.Compilation);
+  closeSourceRoot dependencies root = case dependencies of {
+    CheckedObjects objects -> ioReturn (SourceCrate.close objects root);
+    SourcePrelude object -> ioReturn (SourceCrate.close [object] root);
+    LibraryDependencies raw -> do {
+      loaded <- Libraries.readLibraryObjects raw;
+      ioReturn (bindEither (Core.atPhase Verification loaded) (\objects -> SourceCrate.close objects root))
+    };
+    FixedPrelude witness -> ioReturn (let { object = Session.rootObject root;
+      iface = Artifact.objectInterface object } in if null (Artifact.crateDependencies iface)
+      then SourceCrate.close [] root else do {
+        checked <- Core.atPhase Verification (Artifact.linkCheckedObjectsV1Using
+          (Context.finishLinked witness) (Context.linked witness) [Context.interface witness]
+          [object] (Artifact.crateId iface));
+        Right (SourceCrate.finish root checked)
+      })
+  };
+  sourcePlan mode graph candidate = let {
+    sources = Modules.loadedSources graph;
+    ordinary err = if not (SourceCrate.needsBuiltin mode sources)
+      then Right (RootPlan (ModuleSources sources) [] (CheckedObjects []) (Left err)) else case prepared of {
+        Right witness -> Right (RootPlan (ModuleSources sources) (builtinMetadata (Context.interface witness))
+          (FixedPrelude witness) (Left err));
+        Left _ -> do {
+          object <- Core.atPhase Verification Artifact.builtinPrelude;
+          Right (RootPlan (ModuleSources sources) (builtinMetadata (Artifact.objectInterface object))
+            (SourcePrelude object) (Left err))
+        }
+      };
+    select selection = case selection of {
+      Left err -> ordinary err;
+      Right raw -> do {
+        (,) own interfaces <- Libraries.nativeCrateInputsUsing LibraryData.parseLibrary raw mode graph;
+        Right (RootPlan (ModuleSources own) interfaces
+          (LibraryDependencies raw) (Right raw))
       }
+    }
+  } in do {
+    plan <- select candidate;
+    case plan of {
+      RootPlan (ModuleSources [source]) interfaces _ admission ->
+        if not (Compiler.standalone source) then Right plan else do {
+          program <- Core.atPhase Parsing (Parser.standaloneProgram source);
+          let { lexical = RootPlan (ModuleSources [source]) [] (CheckedObjects []) admission };
+          case preparedScriptRoot mode program of {
+            Nothing -> Right lexical;
+            Just _ -> case prepared of {
+              Left _ -> Right lexical;
+              Right witness -> let { iface = Context.interface witness;
+                compatible = case admission of {
+                  Left _ -> True;
+                  Right _ -> any (compose (Artifact.sameAdmittedInterface iface) snd) interfaces
+                } } in if compatible then Right (RootPlan (PreparedScript source witness)
+                  (builtinMetadata iface) (FixedPrelude witness) admission) else Right lexical
+            }
+          }
+        };
+      _ -> Right plan
+    }
+  };
+  sourceStorage source mode paths defaults interfaces = case source of {
+    SourceFile file -> do {
+      path <- canonicalPath file;
+      cwd <- canonicalPath ".";
+      override <- getEnv "MLF_SOURCE_CACHE_DIR";
+      let { prelude = case mode of { ImplicitPrelude -> "implicit"; NoImplicitPrelude -> "explicit" };
+            dependencies = map (\((,) label iface) -> Separate.pack
+              [label, Artifact.crateId iface, Artifact.semanticFingerprint iface]) interfaces };
+      scope <- Query.sourceInputHash (Separate.pack [cwd, path, file, prelude,
+        Separate.pack paths, Separate.pack defaults, Separate.pack dependencies]);
+      let { useDefault = eqString override "";
+            base = if useDefault then ".mlf-build/cache/source-roots" else override;
+            directory = OS.join (OS.join cwd base) scope };
+      ioReturn (if useDefault then Session.DefaultFileQueries directory else Session.FileQueries directory)
+    };
+    _ -> ioReturn Session.MemoryQueries
+  };
+  rootSources input = case input of { ModuleSources sources -> sources; PreparedScript script _ -> [script] };
+  sourceRows input rejected = let { sources = rootSources input; root = Modules.moduleIdentity (last sources) } in
+    map (\item -> let { name = Modules.moduleIdentity item } in Mode.Decision name Mode.Source
+      (if eqString name root then "root input" else if eqString rejected "" then "local source input" else rejected)) sources;
+  dependencyModes graph (CompiledRoot root dependencies admission input interfaces) nativeKeys reason = let {
+    sourceReason = case admission of {
+      Left (CompileError Verification "no installed checked library") -> "no admitted dependency artifact";
+      Left err -> Core.prettyError err;
+      Right _ -> "no admitted dependency artifact"
+    };
+    loaded = S.fromList compareString (map Modules.moduleIdentity (Modules.loadedSources graph));
+    direct = map Artifact.dependencyId (Artifact.crateDependencies (Artifact.objectInterface (Session.rootObject root)));
+    choose ((,) _ iface) = let {
+      name = Artifact.crateId iface;
+      native = any (\binding -> M.member compareString (fst binding) nativeKeys) (Artifact.crateBindings iface);
+      present = any (\value -> S.member compareString value loaded) (Artifact.crateModules iface);
+      irReason = if eqString reason "" then "checked dependency" else reason
+    } in if native then [Mode.Decision name Mode.Native "linked exports"]
+      else if elem eqString name direct && (present || eqString name Artifact.builtinCrateIdentity)
+        then case dependencies of {
+          SourcePrelude _ -> [Mode.Decision name Mode.Source "compiled builtin Prelude"];
+          _ -> [Mode.Decision name Mode.CheckedIR irReason]
+        } else []
+  } in append (concatMap choose interfaces) (sourceRows input sourceReason);
+  compileLoadedSource :: forall a. (Mode.Decision -> IO ()) -> Source -> PreludeMode -> [] String -> Maybe InstalledNative -> Modules.LoadedModules ->
+    (CompiledRoot -> IO (Either CompileError ((,) a ([] Mode.Decision)))) -> IO (Either CompileError a);
+  compileLoadedSource report source mode paths installed graph use = let {
+    loaded = S.fromList compareString (map Modules.moduleIdentity (Modules.loadedSources graph));
+    relevant raw = any (\entry -> S.member compareString (Libraries.sourceName entry) loaded)
+      (Libraries.librarySources raw);
+    preferred raw = case installed of {
+      Nothing -> False;
+      Just _ -> eqString (Libraries.inputIdentity raw) NativeData.identity
+    };
+    sorted = sortBy (\a b -> compareInt (length (Libraries.librarySources b))
+      (length (Libraries.librarySources a))) LibraryData.libraries;
+    candidates = append (filter preferred sorted) (filter (\raw -> not (preferred raw) && relevant raw) sorted);
+    defaults = case installed of {
+      Nothing -> [];
+      Just dependency -> Json.getStrings "source_roots" (installationData dependency)
+    };
+    attempt remaining reason = let {
+      selection = case remaining of { [] -> Left reason; (:) raw _ -> Right raw };
+      next err = case remaining of { [] -> ioReturn (Left err); (:) _ rest -> attempt rest err }
+    } in case sourcePlan mode graph selection of {
+      Left err -> next err;
+      Right (RootPlan input interfaces dependencies admission) -> do {
+        storage <- sourceStorage source mode paths defaults interfaces;
+        compiled <- case input of {
+          ModuleSources sources -> SourceCrate.compile storage mode sources interfaces;
+          PreparedScript script witness -> SourceCrate.compileScriptWith storage script interfaces
+            (lowerPreparedScript mode witness)
+        };
+        case compiled of {
+          Left err -> case (,) err remaining of {
+            (,) (CompileError Verification _) ((:) _ _) -> next err;
+            _ -> do { mapM_ report (sourceRows input "no admitted dependency artifact"); ioReturn (Left err) }
+          };
+          Right root -> do {
+            used <- use (CompiledRoot root dependencies admission input interfaces);
+            case used of {
+              Left err -> next err;
+              Right ((,) result rows) -> do { mapM_ report rows; ioReturn (Right result) }
+            }
+          }
+        }
+      }
+    }
+  } in attempt candidates (CompileError Verification "no installed checked library");
+  compileFileWithPrelude mode paths file = compileSource mode paths (SourceFile file);
+  compileSourceWithImports mode paths file input = compileSource mode paths (SourceText file input);
+  compileSource :: PreludeMode -> [] String -> Source -> IO (Either CompileError Compilation);
+  compileSource = compileSourceWithDecisions (\_ -> ioReturn ());
+  compileSourceWithDecisions :: (Mode.Decision -> IO ()) -> PreludeMode -> [] String -> Source -> IO (Either CompileError Compilation);
+  compileSourceWithDecisions report = compileSourceResult report (\value _ -> value);
+  compileSourceAndDecisions :: PreludeMode -> [] String -> Source -> IO (Either CompileError ((,) Compilation ([] Mode.Decision)));
+  compileSourceAndDecisions = compileSourceResult (\_ -> ioReturn ()) (,);
+  compileSourceResult report result mode paths source = withSource source (\input -> do {
+    loaded <- loadSourceGraph paths Nothing input;
+    case loaded of {
+      Left err -> ioReturn (Left err);
+      Right graph -> compileLoadedSource report source mode paths Nothing graph
+        (\compiled@(CompiledRoot root dependencies _ _ _) -> do {
+          linked <- closeSourceRoot dependencies root;
+          ioReturn (do {
+            closed <- linked;
+            let { usesDependencies = not (null (Artifact.crateDependencies
+                    (Artifact.objectInterface (Session.rootObject root)))) };
+            let { value = Compilation (SourceCrate.checkedTerm closed) (SourceCrate.sourceType closed)
+                    usesDependencies (SourceCrate.dictionaryIdentities closed);
+                  decisions = dependencyModes graph compiled M.empty "" };
+            Right ((,) (result value decisions) decisions)
+          })
+        })
+    }
+  });
+  preparedScriptRoot mode program = case mode of {
+    NoImplicitPrelude -> Nothing;
+    ImplicitPrelude -> if collides rawProtected program then Nothing else
+      case Standalone.rewriteRootWithNames mode rawNames rawEnvironment program of {
+        Right root -> if Standalone.rewrittenNeeded root && not (ownSupportCollision rawProtected root)
+          then Just root else Nothing;
+        Left _ -> Nothing
+      }
+  };
+  lowerPreparedScript mode witness program = do {
+    root <- Core.atPhase ModuleResolution (Standalone.rewriteRootWithNames mode rawNames rawEnvironment program);
+    (,) headers lowered <- lowerPrepared witness root program;
+    Right ((,,) (Standalone.rewrittenDisplay root) (Just headers) lowered)
   };
   sourcePhase phase root result = Core.atPhase phase
     (mapLeft (Modules.displayNames (Standalone.rewrittenDisplay root)) result);
-  finishImported root signatures lowered = let {
-    display = Modules.displayNames (Standalone.rewrittenDisplay root);
-    diagnosticNames = M.union compareString (M.map display (snd lowered))
-      (Standalone.rewrittenDisplay root)
-  } in case Imported.finishSelected signatures lowered of {
-    Left (CompileError phase message) -> Left (CompileError phase (Modules.displayNames diagnosticNames message));
-    Right compiled -> Right compiled
-  };
   -- Conservative namespace admission. Intrinsic tuple/list syntax does not
   -- declare a replaceable imported value. Other canonical-name occurrences
   -- may conservatively fall back, never count as installed-root successes.
@@ -526,12 +736,8 @@ module MLF.PreparedCompiler
     case Modules.chooseName used "installedUserInstance" index of {
       (,) name next -> (,) (snoc names name) next
     }) ((,) [] 0) instances);
-  compilePrepared context root program = do {
+  lowerPrepared context root program = do {
     let { iface = Context.interface context;
-          linked = Context.linked context;
-          sourceValues = Context.sourceValues context;
-          protected = Context.protectedNames context };
-        let {
           parts = Prelude.programParts (Standalone.rewrittenProgram root);
           ds = case parts of { (,,,) value _ _ _ -> value };
           cs = case parts of { (,,,) _ value _ _ -> value };
@@ -540,40 +746,16 @@ module MLF.PreparedCompiler
           builtinData = Artifact.crateData iface;
           builtinClasses = Artifact.crateClasses iface;
           builtinInstances = Artifact.crateInstances iface;
-          signatures = M.fromList compareString (Artifact.crateBindings iface);
-          externals = Context.sourceExternals iface sourceValues;
-          used = S.union compareString protected (S.fromList compareString (Standalone.programNames program));
+          externals = Context.sourceExternals iface (Context.sourceValues context);
+          used = S.union compareString (Context.protectedNames context)
+            (S.fromList compareString (Standalone.programNames program));
           instanceNames = append (map fst builtinInstances) (userInstanceNames used instances)
         };
-        -- Imported checked declarations are ABI CONTEXT, never rewrite input.
-        ownData <- sourcePhase Inference root (D.canonicalSourceDeclarations builtinData ds);
-        ownClasses <- sourcePhase Inference root (Classes.canonicalSourceClasses S.empty
-          (append builtinData ownData) builtinClasses cs);
-        fullLowered <- sourcePhase Inference root (Classes.lowerSeparateClasses externals instanceNames
-          (SClassProgram (append builtinData ownData) (append builtinClasses ownClasses)
-            (append (map snd builtinInstances) instances) body));
-        selected <- Core.atPhase Verification
-          (Parameters.selectNamed (Parameters.namedImports signatures) fullLowered);
-        let { lowered = fst selected; selectedSignatures = Parameters.project (snd selected) };
-        compiled <- finishImported root (snd selected) lowered;
-        let {
-          fresh = snd (Separate.freshObject (Artifact.fragmentSerial linked) (Checked.term (Imported.checkedWrapper compiled)));
-          rootData = case fresh of { XWithData declarations _ -> declarations; _ -> [] }
-        };
-        actualRoot <- Core.atPhase Verification
-          (Imported.remove selectedSignatures (Artifact.fragmentBindings linked) fresh);
-        declarations <- Core.atPhase Verification
-          (foldEither Separate.mergeDeclaration rootData (Artifact.fragmentData linked));
-        Core.atPhase Verification (ensure (length declarations == length rootData)
-          "prepared Prelude added an unowned datatype layout");
-        grafted <- Core.atPhase Verification
-          (foldEither (\rootBody declarationSpine -> Separate.graft declarationSpine rootBody)
-            actualRoot (Artifact.fragmentBodies linked));
-        checked <- Core.atPhase Verification (Checked.check (XWithData declarations grafted));
-        Core.atPhase Verification (ensure (T.alphaEq (Checked.typeOf checked) (Imported.inferredType compiled))
-          "installed Prelude graft changed actual root type");
-        Right (Compilation checked (Modules.displayNames (Standalone.rewrittenDisplay root)
-          (Imported.sourceType compiled)) True
-          (M.map (Modules.displayNames (Standalone.rewrittenDisplay root)) (snd lowered)))
+    (,) ownData ownClasses <- sourcePhase Inference root
+      (Classes.canonicalSourceHeaders S.empty builtinData builtinClasses ds cs);
+    lowered <- sourcePhase Inference root (Classes.lowerSeparateClasses externals instanceNames
+      (SClassProgram (append builtinData ownData) (append builtinClasses ownClasses)
+        (append (map snd builtinInstances) instances) body));
+    Right ((,) ((,) ownData ownClasses) lowered)
   }
 }

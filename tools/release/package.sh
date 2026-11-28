@@ -105,7 +105,7 @@ for group in $groups; do
     ($v.drivers | keys) == (if $group == "port" then ["LLVMDriver"] else ["LLVMDriver","RuntimeDriver"] end) and
     all($v.drivers | to_entries[];
       .key as $name | .value as $driver |
-      $driver.frontend == "source" and
+      $driver.frontend == "crate" and
       ($driver.sha256 | digest) and ($driver.llvm_sha256 | digest) and
       ($driver.artifacts | keys) ==
         (if $name == "RuntimeDriver" then ["linked","llvm","object","runtime","trace"] else ["linked","llvm","object","runtime"] end) and
@@ -116,7 +116,7 @@ for group in $groups; do
         ($receipt.cached | type == "boolean") and
         $receipt.directory == ($b.cache_directory + "/" + $receipt.key) and
         $receipt.kind ==
-          (if $stage == "llvm" then "source " + $name + " LLVM" elif $stage == "object" then "LLVM object" elif $stage == "linked" then "test driver native link" else "test driver C object" end) and
+          (if $stage == "llvm" then $driver.frontend + " " + $name + " LLVM" elif $stage == "object" then "LLVM object" elif $stage == "linked" then "test native link" else "test driver C object" end) and
         any($b.builds[]; . == ($receipt | {kind,key,cached})) and
         ($receipt.files | keys) ==
           [if $stage == "llvm" then "program.ll" elif $stage == "object" then "program.o" elif $stage == "linked" then "program" else "object.o" end] and
@@ -241,7 +241,13 @@ README
 # CHECKSUMS is explicitly excluded from the input list.
 # shellcheck disable=SC2094
 (cd "$bundle" && find . -type f ! -name CHECKSUMS | LC_ALL=C sort | while IFS= read -r file; do sha256 "$file"; done > CHECKSUMS)
-tools/release/smoke.sh "$bundle" | tee "$output/smoke.log"
+# Recovery can package older sources. Use the selected revision's own
+# smoke entry point if that revision predates the registry.
+if [ -f tools/testing/run.py ]; then
+  python3 -B tools/testing/run.py sdk-smoke-posix --report "$output/smoke-framework.json" -- "$bundle" | tee "$output/smoke.log"
+else
+  tools/release/smoke.sh "$bundle" | tee "$output/smoke.log"
+fi
 COPYFILE_DISABLE=1 tar -czf "$output/$name.tar.gz" -C "$output" "$name"
 (cd "$output" && sha256 "$name.tar.gz" > SHA256SUMS)
 printf 'Release package: %s/%s.tar.gz\n' "$output" "$name"

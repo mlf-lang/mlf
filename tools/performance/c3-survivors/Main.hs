@@ -1,7 +1,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Main where
 import Prelude
-import Control.Monad(forM_,unless)
+import Control.Monad(forM_,unless,when)
+import System.Environment (getArgs)
 import Control.Exception(evaluate)
 import System.Mem.StableName(makeStableName,eqStableName)
 import qualified Data.Map.Lazy as M
@@ -65,4 +66,9 @@ nodeReuseControls=do
  assert "merge never inspects opaque Node payloads"(keys==[1,5,7])
  putStrLn "PASS exact unchanged/changed Node reuse and opaque delta payloads"
 
-main=R.main>>modelControls>>nodeReuseControls
+main=do
+ selected <- getArgs
+ let wanted label = null selected || label `elem` selected
+ R.main
+ when (wanted "29160 independent sparse/wide signed fresh-delta models") modelControls
+ when (wanted "exact unchanged/changed Node reuse and opaque delta payloads") nodeReuseControls

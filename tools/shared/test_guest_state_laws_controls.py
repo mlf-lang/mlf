@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 """Python-only state-law runner fault controls; no compiler/runtime invocation."""
-import copy
 import json
 from pathlib import Path
 import subprocess
@@ -54,64 +53,6 @@ class StateLawControls(unittest.TestCase):
         self.assertEqual(gate.CASES[0][3],('libraries/mlf-foundation','libraries/mlf-language-core','libraries/mlf-inference','tests'))
         self.assertEqual(gate.CASES[1][3],('libraries/mlf-foundation','tests'))
         self.assertEqual(set(gate.FLAGS),{case[2] for case in gate.CASES})
-    def test_mutation_addition_deletion_and_fixed_tool(self):
-        with tempfile.TemporaryDirectory() as temporary:
-            root=Path(temporary)
-            for relative in ['libraries','tests','tools/shared/fixtures']:(root/relative).mkdir(parents=True)
-            source=root/'tests/M.emlf';source.write_text('original')
-            tool=root/'tool.py';tool.write_text('fixed')
-            before=gate.capture_inputs(root,[tool])
-            gate.unchanged(before,gate.capture_inputs(root,[tool]))
-            source.write_text('changed')
-            with self.assertRaises(ValueError):gate.unchanged(before,gate.capture_inputs(root,[tool]))
-            source.write_text('original');added=root/'libraries/Other.hs';added.write_text('new')
-            with self.assertRaises(ValueError):gate.unchanged(before,gate.capture_inputs(root,[tool]))
-            added.unlink();source.unlink()
-            with self.assertRaises(ValueError):gate.unchanged(before,gate.capture_inputs(root,[tool]))
-            source.write_text('original');tool.write_text('changed')
-            with self.assertRaises(ValueError):gate.unchanged(before,gate.capture_inputs(root,[tool]))
-    def test_directory_alias_retarget_addition_and_cycle(self):
-        with tempfile.TemporaryDirectory() as temporary:
-            root=Path(temporary).resolve()
-            for relative in ['libraries','tests','tools/shared/fixtures','actual/One','actual/Two']:
-                (root/relative).mkdir(parents=True)
-            (root/'actual/One/M.emlf').write_text('first')
-            (root/'actual/Two/M.emlf').write_text('first')
-            alias=root/'tests/Tests';alias.symlink_to(root/'actual/One',target_is_directory=True)
-            before=gate.capture_inputs(root,[])
-            self.assertIn(str(alias),before)
-            self.assertIn(str(root/'actual/One/M.emlf'),before)
-            self.assertEqual(before[str(alias)]['kind'],'directory-symlink')
-            (root/'actual/One/M.emlf').write_text('changed')
-            with self.assertRaises(ValueError):gate.unchanged(before,gate.capture_inputs(root,[]))
-            (root/'actual/One/M.emlf').write_text('first')
-            alias.unlink();alias.symlink_to(root/'actual/Two',target_is_directory=True)
-            with self.assertRaises(ValueError):gate.unchanged(before,gate.capture_inputs(root,[]))
-            alias.unlink();alias.symlink_to(root/'actual/One',target_is_directory=True)
-            (root/'tests/shared-host').mkdir()
-            extra=root/'tests/shared-host/invalid-target-link';extra.symlink_to(root/'actual/One',target_is_directory=True)
-            with self.assertRaises(ValueError):gate.unchanged(before,gate.capture_inputs(root,[]))
-            # A link to an ancestor is recorded, then resolved-dir dedup stops recursion.
-            loop=root/'actual/One/Again';loop.symlink_to(root/'actual/One',target_is_directory=True)
-            captured=gate.capture_inputs(root,[])
-            self.assertTrue(any(row.get('target')==str(root/'actual/One') for row in captured.values()))
-            files=[row for row in captured.values() if row.get('kind')=='file']
-            self.assertEqual(len(files),1)
-            self.assertIn(str(extra),captured)
-    def test_directory_alias_escape_rejected(self):
-        with tempfile.TemporaryDirectory() as temporary, tempfile.TemporaryDirectory() as outside:
-            root=Path(temporary)
-            for relative in ['libraries','tests','tools/shared/fixtures']:(root/relative).mkdir(parents=True)
-            (root/'tests/Tests').symlink_to(outside,target_is_directory=True)
-            with self.assertRaises(ValueError):gate.capture_inputs(root,[])
-    def test_broken_and_self_referential_links_rejected(self):
-        with tempfile.TemporaryDirectory() as temporary:
-            root=Path(temporary)
-            for relative in ['libraries','tests','tools/shared/fixtures']:(root/relative).mkdir(parents=True)
-            alias=root/'tests/Tests';alias.symlink_to(root/'missing',target_is_directory=True)
-            with self.assertRaises(FileNotFoundError):gate.capture_inputs(root,[])
-            alias.unlink();alias.symlink_to(alias,target_is_directory=True)
-            with self.assertRaises((RuntimeError,OSError)):gate.capture_inputs(root,[])
     @unittest.skipUnless(sys.platform == 'linux', 'the live resource watchdog uses Linux procfs and ionice')
     def test_watchdog_default_and_stricter_disk_floor(self):
         for options, expected in [([],768),(['--disk-free-mib','3072'],3072)]:

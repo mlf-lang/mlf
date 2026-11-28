@@ -23,37 +23,45 @@ permissions:
   contents: read
   actions: read
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
+  # Label notifications outside this workflow’s policy must not cancel real checks.
+  group: ci-${{ github.workflow }}-${{ (!github.event.label || github.event.label.name == 'ci:skip' || github.event.label.name == 'ci:async-parity') && github.ref || github.run_id }}
   cancel-in-progress: true
 jobs:
   metadata:
-    name: Release metadata
-    if: github.event_name != 'pull_request' || !contains(github.event.pull_request.labels.*.name, 'ci:skip')
+    name: Release metadata${{ github.event.label && github.event.label.name != 'ci:skip' && github.event.label.name != 'ci:async-parity' && ' (unrelated label)' || '' }}
+    if: >-
+      (!github.event.label || github.event.label.name == 'ci:skip' || github.event.label.name == 'ci:async-parity') &&
+      (github.event_name != 'pull_request' || !contains(github.event.pull_request.labels.*.name, 'ci:skip'))
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
-          fetch-depth: 0
-      - name: Prepare reviewed historical source objects
-        run: python3 -B tools/testing/prepare_history_refs.py
+          fetch-depth: 0 # Compare the submitted PR with its current merge base.
+      - name: Install workflow test parser
+        run: |
+          python3 -m venv "$RUNNER_TEMP/workflow-tests"
+          "$RUNNER_TEMP/workflow-tests/bin/python" -m pip install --disable-pip-version-check -r tools/testing/requirements.txt
+          echo "$RUNNER_TEMP/workflow-tests/bin" >> "$GITHUB_PATH"
       - run: tools/release/check.sh
       - name: Test pinned GHC install-input cleanup guards
         run: |
-          python3 -B tools/release/test-ghc-install-cleanup.py
-          python3 -O -B tools/release/test-ghc-install-cleanup.py
+          python3 -B tools/testing/run.py python-release-ghc-install-cleanup
+          python3 -B tools/testing/run.py python-release-ghc-install-cleanup --python-optimization
+      - name: Test backend driver cache verification and recovery
+        run: python3 -B tools/testing/run.py python-testing-driver-cache
       - name: Test builtin generation evidence boundaries
         run: |
-          python3 -B tools/shared/test_generate_builtin_evidence.py
-          python3 -O -B tools/shared/test_generate_builtin_evidence.py
+          python3 -B tools/testing/run.py python-shared-generate-builtin-evidence
+          python3 -B tools/testing/run.py python-shared-generate-builtin-evidence --python-optimization
       - name: Test query graph verifier versions and attack fixtures
         run: |
-          python3 -B tools/shared/test_query_index.py
-          python3 -O -B tools/shared/test_query_index.py
-          python3 -B tools/shared/test_query_generation.py
-          python3 -O -B tools/shared/test_query_generation.py
-          python3 -B tools/performance/crate-query-graph/test_verify.py
-          python3 -O -B tools/performance/crate-query-graph/test_verify.py
+          python3 -B tools/testing/run.py python-shared-query-index
+          python3 -B tools/testing/run.py python-shared-query-index --python-optimization
+          python3 -B tools/testing/run.py python-shared-query-generation
+          python3 -B tools/testing/run.py python-shared-query-generation --python-optimization
+          python3 -B tools/testing/run.py python-crate-query-graph-verify
+          python3 -B tools/testing/run.py python-crate-query-graph-verify --python-optimization
       - name: Verify unit evidence with jq 1.8.2
         run: |
           set -euo pipefail
@@ -63,263 +71,289 @@ jobs:
           printf '%s  %s\n' b1c22172dd303f3be49e935aa56aa48a8b7a46e0bc838b4997d3bb451495870f "$RUNNER_TEMP/jq-1.8.2/jq" | sha256sum -c -
           chmod +x "$RUNNER_TEMP/jq-1.8.2/jq"
           test "$("$RUNNER_TEMP/jq-1.8.2/jq" --version)" = jq-1.8.2
-          PATH="$RUNNER_TEMP/jq-1.8.2:$PATH" tools/release/test-unit-evidence.sh
+          PATH="$RUNNER_TEMP/jq-1.8.2:$PATH" python3 -B tools/testing/run.py release-unit-evidence
       - name: Validate GitHub Actions workflows
         run: |
           set -euo pipefail
           curl -fsSL https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz -o "$RUNNER_TEMP/actionlint.tar.gz"
           printf '%s  %s\n' 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8 "$RUNNER_TEMP/actionlint.tar.gz" | sha256sum -c -
           tar -xzf "$RUNNER_TEMP/actionlint.tar.gz" -C "$RUNNER_TEMP" actionlint
-          "$RUNNER_TEMP/actionlint" -shellcheck= -pyflakes=
+          mkdir -p .mlf-build/actionlint
+          cp "$RUNNER_TEMP/actionlint" .mlf-build/actionlint/actionlint
+          python3 -B tools/testing/run.py workflow-lint
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        if: always()
+        with:
+          name: release-metadata-test-results
+          path: .mlf-build/test-framework/
   native:
     # Preserve the required-check job ID, but label the producer honestly.
-    name: Shared compiler source smoke (GHC O${{ matrix.optimization }}, ${{ matrix.suite }})
+    name: Shared compiler source smoke (GHC O${{ matrix.optimization }}, ${{ matrix.suite }})${{ github.event.label && github.event.label.name != 'ci:skip' && github.event.label.name != 'ci:async-parity' && ' (unrelated label)' || '' }}
     if: >-
+      (!github.event.label || github.event.label.name == 'ci:skip' || github.event.label.name == 'ci:async-parity') &&
       (github.event_name != 'pull_request' || !contains(github.event.pull_request.labels.*.name, 'ci:skip')) &&
       (github.event_name != 'workflow_dispatch' || !inputs.windows_runtime_only)
     runs-on: ubuntu-24.04
-    timeout-minutes: 120
+    timeout-minutes: 360
     strategy:
       fail-fast: false
       matrix:
-        # Keep the same O0 assertions, but bound the direct/default/framework
-        # work independently. O2 retains the original complete sequence.
         include:
+          - optimization: '0'
+            suite: routine
           - optimization: '2'
-            suite: all
-          - optimization: '0'
-            suite: direct
-          - optimization: '0'
-            suite: default
-          - optimization: '0'
-            suite: framework
+            suite: optimizer
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
-          fetch-depth: 0 # The framework oracle reads frozen Git fixtures.
-      - name: Prepare reviewed historical source objects
-        run: python3 -B tools/testing/prepare_history_refs.py
+          fetch-depth: 2 # Keep the first parent for current compiler comparisons.
+      - name: Check modular artifact source inputs before compiling
+        if: matrix.optimization == '2'
+        run: |
+          python3 -B tools/testing/run.py python-shared-artifact-binary-modular
+          python3 -B tools/testing/run.py python-shared-artifact-binary-modular --python-optimization
+      - uses: ./.github/actions/linux-ghc-bindist
       - name: Install pinned direct-host GHC 9.14.1
         run: |
           set -euo pipefail
           sudo apt-get update
           sudo apt-get install -y build-essential clang libgc-dev libgmp-dev libnuma-dev libncurses-dev pkg-config xz-utils
           archive="$RUNNER_TEMP/ghc-9.14.1.tar.xz"
-          curl -fsSL https://downloads.haskell.org/~ghc/9.14.1/ghc-9.14.1-x86_64-deb12-linux.tar.xz -o "$archive"
-          printf '%s  %s\n' 60f7ab75f28df892729fbaff3a54f58ee3ad7e731929f1b2f3eb0208f73de841 "$archive" | sha256sum -c -
           tar -xJf "$archive" -C "$RUNNER_TEMP"
           (cd "$RUNNER_TEMP/ghc-9.14.1-x86_64-unknown-linux" && ./configure --prefix="$RUNNER_TEMP/ghc" && make install)
           test "$("$RUNNER_TEMP/ghc/bin/ghc" --numeric-version)" = 9.14.1
           python3 -B tools/release/cleanup-ghc-install.py --receipt .mlf-build/ghc-install-cleanup.json
           echo "$RUNNER_TEMP/ghc/bin" >> "$GITHUB_PATH"
-      # Each shard intentionally pays for its own toolchain and producer build.
-      # Authentication binds absolute toolchain, host, object, and command-log
-      # paths; copying/rebasing receipts would weaken that provenance contract.
+      # Share each authenticated producer across its selected checks.
       - name: Build exact committed shared sources and direct test runners
         id: shared_build
         run: |
           python3 tools/shared/build.py --bootstrap-only --optimization '${{ matrix.optimization }}' --build-dir .mlf-build/shared-ghc
           jq -e '.complete == true and .producer_host == "GHC" and .typecheck_only == false' .mlf-build/shared-ghc/receipt.json
       - name: Preserve actual builtin generation after freshness failure
-        if: failure() && steps.shared_build.outcome == 'failure' && ((matrix.optimization == '0' && matrix.suite == 'default') || (matrix.optimization == '2' && matrix.suite == 'all'))
+        if: failure() && steps.shared_build.outcome == 'failure' && (matrix.suite == 'routine' || matrix.suite == 'optimizer')
         timeout-minutes: 16
         run: |
           python3 -B tools/shared/resource_watchdog.py --seconds 900 --address-space-mib 6144 --rss-mib 5120 --max-output-mib 16 --disk-free-mib 4096 .mlf-build/builtin-generation-guard python3 -B tools/shared/generate_builtin_evidence.py --root "$PWD" --build-receipt .mlf-build/shared-ghc/receipt.json --output .mlf-build/builtin-generation-guard/results --timeout 600
-      - name: Check typed dependency graphs across the host, interpreter and LLVM
-        if: matrix.optimization == '2'
-        run: |
-          python3 -B tests/indexvec/run.py --compiler .mlf-build/shared-ghc/bin/emlf --output .mlf-build/indexvec-controls
       # The CLI writes query graphs; retained legacy .mlfq API controls remain below.
       - name: Check query graph fingerprints and publication recovery
         if: matrix.optimization == '2'
         run: |
-          python3 -B tools/shared/resource_watchdog.py --seconds 600 --address-space-mib 6144 --rss-mib 5120 --max-output-mib 100 --disk-free-mib 4096 .mlf-build/source-ich-guard python3 -B tools/performance/crate-query-graph/verify.py .mlf-build/shared-ghc/bin/emlf .mlf-build/source-ich-guard/results
+          python3 -B tools/shared/resource_watchdog.py --seconds 600 --address-space-mib 6144 --rss-mib 5120 --max-output-mib 100 --disk-free-mib 4096 .mlf-build/source-ich-guard python3 -B tools/testing/run.py --inherit-process-group query-graph-acceptance -- .mlf-build/shared-ghc/bin/emlf .mlf-build/source-ich-guard/results
       - name: Check source query graph and lowered fallback
         if: matrix.optimization == '2'
         run: |
-          python3 -B tools/shared/resource_watchdog.py --seconds 600 --address-space-mib 6144 --rss-mib 5120 --max-output-mib 100 --disk-free-mib 4096 .mlf-build/source-graph-guard python3 -B tools/performance/crate-query-graph/source_checks.py .mlf-build/shared-ghc/receipt.json .mlf-build/source-graph-guard/results
-      - name: Check retained legacy query API contexts and codecs
+          python3 -B tools/shared/resource_watchdog.py --seconds 600 --address-space-mib 6144 --rss-mib 5120 --max-output-mib 100 --disk-free-mib 4096 .mlf-build/source-graph-guard python3 -B tools/testing/run.py --inherit-process-group source-query-api -- .mlf-build/shared-ghc/receipt.json .mlf-build/source-graph-guard/results
+      - name: Check source cache reuse, invalidation and recovery
         if: matrix.optimization == '2'
         run: |
-          python3 -B tools/shared/resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --max-output-mib 100 --disk-free-mib 4096 .mlf-build/source-context-cache-guard python3 -B tools/shared/test_source_context_cache.py --legacy-query-only --build-receipt .mlf-build/shared-ghc/receipt.json --output .mlf-build/source-context-cache-guard/results
-      - name: Check compiler shape benchmark contract
-        if: matrix.suite == 'all' && matrix.optimization == '2'
-        run: python3 -B tools/dev.py check-tools
-      - name: Compile thirteen shapes at size 8 (GHC vs MLF, 156 timed builds)
-        if: matrix.suite == 'all' && matrix.optimization == '2'
+          python3 -B tools/shared/resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --max-output-mib 100 --disk-free-mib 4096 .mlf-build/source-context-cache-guard python3 -B tools/testing/run.py --inherit-process-group source-context-cache -- --build-receipt .mlf-build/shared-ghc/receipt.json --output .mlf-build/source-context-cache-guard/results
+      - name: Qualify optimized host demand and framework CLI contracts
+        if: matrix.suite == 'optimizer'
         run: |
-          python3 -B tools/performance/compiler-shapes/bench.py all \
+          python3 -B tools/testing/run.py framework-direct -- --build-receipt .mlf-build/shared-ghc/receipt.json --output .mlf-build/framework-direct --suite controls
+      - name: Check recursive managed evidence and source-group contracts
+        if: matrix.optimization == '2'
+        run: python3 -B tools/testing/run.py recursive-managed -- --build-receipt .mlf-build/shared-ghc/receipt.json --output .mlf-build/recursive-managed
+      - name: Check known parameter-field projection graph invariants
+        if: matrix.optimization == '2'
+        run: python3 -B tools/testing/run.py parameter-field-graph -- --build-receipt .mlf-build/shared-ghc/receipt.json --output .mlf-build/parameter-field-graph
+      - name: Check source field normalization and exact imported layouts
+        if: matrix.optimization == '2'
+        run: python3 -B tools/testing/run.py source-field-layouts -- --build-receipt .mlf-build/shared-ghc/receipt.json --output .mlf-build/source-field-layouts
+      - name: Check shared-value specialization admission and lazy semantics
+        if: matrix.optimization == '2'
+        run: python3 -B tools/testing/run.py common-calls -- --build-receipt .mlf-build/shared-ghc/receipt.json --output .mlf-build/common-calls
+      - name: Check callback code sharing and capture identity boundaries
+        if: matrix.optimization == '2'
+        run: python3 -B tools/testing/run.py callback-sharing -- --build-receipt .mlf-build/shared-ghc/receipt.json --output .mlf-build/callback-sharing
+      - name: Check compiler shape benchmark contract
+        if: matrix.suite == 'optimizer'
+        run: python3 -B tools/dev.py check-tools
+      - name: Compile thirteen shapes at size 8 against GHC and the Git baseline
+        if: matrix.suite == 'optimizer'
+        run: |
+          python3 -B tools/testing/run.py compiler-shapes --report .mlf-build/test-framework/compiler-shapes-smoke.json -- all \
             --workdir .mlf-build/compiler-shapes-smoke --cohort pr-size-8 \
-            --producer .mlf-build/shared-ghc --build-builtin --size 8 --repeats 6 --interleave-pairs \
+            --producer .mlf-build/shared-ghc --build-builtin --size 8 --interleave-pairs \
             --family flat_functions --family recursive_ring --family wide_case \
             --family class_instances --family dependency_diamonds --family state_updates \
             --family captured_closures --family wide_product --family rank2_arguments \
             --family irregular_literal_table --family nested_poly_types --family rank2_callbacks --family decoder_pipeline
+          cat .mlf-build/compiler-shapes-smoke/results/pr-size-8/summary.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Check inferred constructor writers with both compilers
+        if: matrix.suite == 'optimizer'
+        run: |
+          python3 -B tools/testing/run.py compiler-shapes-correctness --exact compiler-shapes/correctness/inferred_constructor_writers-8 -- \
+            --setup .mlf-build/compiler-shapes-smoke/setup/setup.json --output .mlf-build/compiler-shapes-writer-smoke \
+            --family inferred_constructor_writers --size 8
       - name: Check Int64 arithmetic and Patricia boundaries
         if: matrix.optimization == '2'
         run: |
           set -euo pipefail
-          python3 -B tools/performance/patricia/test_adapters.py
-          python3 -O -B tools/performance/patricia/test_adapters.py
-          python3 -B tools/performance/patricia/test_fingerprint_core.py
-          python3 -O -B tools/performance/patricia/test_fingerprint_core.py
-          python3 -B tools/performance/patricia/test_native_batches.py
-          python3 -O -B tools/performance/patricia/test_native_batches.py
-          python3 -B tools/performance/patricia/test_design_controls.py
-          python3 -O -B tools/performance/patricia/test_design_controls.py
-          python3 -B tools/performance/artifact-binary/test_adapter_successor.py
-          python3 -O -B tools/performance/artifact-binary/test_adapter_successor.py
-          python3 -B tools/shared/resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --disk-free-mib 4096 .mlf-build/patricia-focused-guard python3 -B tools/performance/patricia/run_controls.py --reference-source "$PWD" --reference-producer .mlf-build/shared-ghc --output .mlf-build/patricia-focused
-          python3 -B tools/shared/resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --disk-free-mib 4096 .mlf-build/patricia-design-guard python3 -B tools/performance/patricia/run_design_controls.py --reference-source "$PWD" --reference-producer .mlf-build/shared-ghc --output .mlf-build/patricia-design
-          python3 -B tools/shared/resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --disk-free-mib 4096 .mlf-build/patricia-native-guard python3 -B tools/performance/patricia/run_native.py --producer .mlf-build/shared-ghc --output .mlf-build/patricia-native --mode standalone
-          python3 -B tools/shared/resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --disk-free-mib 4096 .mlf-build/llp64-guard python3 -B tools/performance/int64/run_llp64.py --producer .mlf-build/shared-ghc --output .mlf-build/llp64-controls
+          python3 -B tools/testing/run.py python-patricia-adapters
+          python3 -B tools/testing/run.py python-patricia-adapters --python-optimization
+          python3 -B tools/testing/run.py python-patricia-fingerprint-core
+          python3 -B tools/testing/run.py python-patricia-fingerprint-core --python-optimization
+          python3 -B tools/testing/run.py python-patricia-native-batches
+          python3 -B tools/testing/run.py python-patricia-native-batches --python-optimization
+          python3 -B tools/testing/run.py python-patricia-design-controls
+          python3 -B tools/testing/run.py python-patricia-design-controls --python-optimization
+          python3 -B tools/shared/resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --disk-free-mib 4096 .mlf-build/patricia-focused-guard python3 -B tools/testing/run.py --inherit-process-group patricia-focused -- --reference-source "$PWD" --reference-producer .mlf-build/shared-ghc --output .mlf-build/patricia-focused
+          python3 -B tools/shared/resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --disk-free-mib 4096 .mlf-build/patricia-design-guard python3 -B tools/testing/run.py --inherit-process-group patricia-design -- --reference-source "$PWD" --reference-producer .mlf-build/shared-ghc --output .mlf-build/patricia-design
+          python3 -B tools/shared/resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --disk-free-mib 4096 .mlf-build/patricia-native-guard python3 -B tools/testing/run.py --inherit-process-group patricia-native -- --producer .mlf-build/shared-ghc --output .mlf-build/patricia-native --mode standalone
+          python3 -B tools/shared/resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --disk-free-mib 4096 .mlf-build/llp64-guard python3 -B tools/testing/run.py --inherit-process-group llp64-controls -- --producer .mlf-build/shared-ghc --output .mlf-build/llp64-controls
           for suite in host native legacy; do
-            python3 -B tools/shared/resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --disk-free-mib 4096 ".mlf-build/int64-$suite-guard" python3 -B tools/performance/int64/run_controls.py --suite "$suite" --producer .mlf-build/shared-ghc --output ".mlf-build/int64-$suite" --gc-prefix /usr --gmp-prefix /usr --gc-library "$(pkg-config --variable=libdir bdw-gc)/libgc.a"
+            python3 -B tools/shared/resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --disk-free-mib 4096 ".mlf-build/int64-$suite-guard" python3 -B tools/testing/run.py --inherit-process-group int64-controls -- --suite "$suite" --producer .mlf-build/shared-ghc --output ".mlf-build/int64-$suite" --gc-prefix /usr --gmp-prefix /usr --gc-library "$(pkg-config --variable=libdir bdw-gc)/libgc.a"
           done
       - name: Check complete datatype context reuse against frozen encoder
         if: matrix.optimization == '2'
         run: |
-          python3 -B tools/shared/resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --disk-free-mib 4096 .mlf-build/datatype-context-guard python3 -B tools/performance/datatype-context/run_controls.py --producer .mlf-build/shared-ghc --output .mlf-build/datatype-context
+          python3 -B tools/testing/run.py python-frozen-query
+          python3 -B tools/shared/resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --disk-free-mib 4096 .mlf-build/datatype-context-guard python3 -B tools/testing/run.py --inherit-process-group datatype-context -- --producer .mlf-build/shared-ghc --output .mlf-build/datatype-context
       - name: Check contract encoding reuse against frozen encoder
         if: matrix.optimization == '2'
         run: |
-          python3 -B tools/shared/resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --disk-free-mib 4096 .mlf-build/contract-context-guard python3 -B tools/performance/contract-context/run_controls.py --producer .mlf-build/shared-ghc --output .mlf-build/contract-context
+          python3 -B tools/shared/resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --disk-free-mib 4096 .mlf-build/contract-context-guard python3 -B tools/testing/run.py --inherit-process-group contract-context -- --producer .mlf-build/shared-ghc --output .mlf-build/contract-context
       - name: Check owned source views and reservations against frozen paths
         if: matrix.optimization == '2'
         run: |
-          python3 -B tools/shared/resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --disk-free-mib 5120 .mlf-build/owned-source-context-guard python3 -B tools/performance/sparse-contracts/run_controls.py --producer .mlf-build/shared-ghc --output .mlf-build/owned-source-context
-      - name: Check explicit P2 writer migration adapters
-        if: matrix.optimization == '2'
-        run: |
-          set -euo pipefail
-          python3 -B tools/performance/artifact-binary/test_p2_writer_bridge.py
-          python3 -O -B tools/performance/artifact-binary/test_p2_writer_bridge.py
+          python3 -B tools/shared/resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --disk-free-mib 5120 .mlf-build/owned-source-context-guard python3 -B tools/testing/run.py --inherit-process-group owned-source-context -- --producer .mlf-build/shared-ghc --output .mlf-build/owned-source-context
       - name: Check finite P1-P3, A1 and F1 correctness
         if: matrix.optimization == '2'
         run: |
           set -euo pipefail
-          python3 -B tools/shared/resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --disk-free-mib 4096 .mlf-build/crate-optimization-guard python3 -B tools/performance/patricia/run_integrated.py --suite p123 --producer .mlf-build/shared-ghc --output .mlf-build/crate-optimization-controls
-          python3 -B tools/shared/resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --disk-free-mib 4096 .mlf-build/a1-integrated-guard python3 -B tools/performance/patricia/run_integrated.py --suite graph --producer .mlf-build/shared-ghc --output .mlf-build/a1-integrated-controls
-          python3 -B tools/shared/resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --disk-free-mib 4096 .mlf-build/f1-integrated-guard python3 -B tools/performance/patricia/run_fingerprint.py --producer .mlf-build/shared-ghc --output .mlf-build/f1-integrated-controls
+          python3 -B tools/shared/resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --disk-free-mib 4096 .mlf-build/crate-optimization-guard python3 -B tools/testing/run.py --inherit-process-group patricia-integrated -- --suite p123 --producer .mlf-build/shared-ghc --output .mlf-build/crate-optimization-controls
+          python3 -B tools/shared/resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --disk-free-mib 4096 .mlf-build/a1-integrated-guard python3 -B tools/testing/run.py --inherit-process-group patricia-integrated -- --suite graph --producer .mlf-build/shared-ghc --output .mlf-build/a1-integrated-controls
+          python3 -B tools/shared/resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --disk-free-mib 4096 .mlf-build/f1-integrated-guard python3 -B tools/testing/run.py --inherit-process-group patricia-fingerprint -- --producer .mlf-build/shared-ghc --output .mlf-build/f1-integrated-controls
       - name: Check Map balance tree and demand semantics
         if: matrix.optimization == '2'
         run: |
           set -euo pipefail
-          MAP_POLICY_SOURCE="$PWD" python3 -B tools/performance/map-policy/test_prepare_map_policy.py
-          MAP_POLICY_SOURCE="$PWD" python3 -O -B tools/performance/map-policy/test_prepare_map_policy.py
-          python3 -B tools/shared/resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --disk-free-mib 4096 .mlf-build/map-balance-guard python3 -B tools/performance/map-policy/run_controls.py --source "$PWD" --producer .mlf-build/shared-ghc --output .mlf-build/map-balance-controls
+          MAP_POLICY_SOURCE="$PWD" python3 -B tools/testing/run.py python-map-policy-prepare-map-policy
+          MAP_POLICY_SOURCE="$PWD" python3 -B tools/testing/run.py python-map-policy-prepare-map-policy --python-optimization
+          python3 -B tools/shared/resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --disk-free-mib 4096 .mlf-build/map-balance-guard python3 -B tools/testing/run.py --inherit-process-group map-policy -- --source "$PWD" --producer .mlf-build/shared-ghc --output .mlf-build/map-balance-controls
       - name: Check generated graph validation boundary
         if: matrix.optimization == '2'
         run: |
           set -euo pipefail
-          python3 -B -m unittest discover -s tools/performance/validation-reuse -p 'test_*.py'
-          python3 -B -O -m unittest discover -s tools/performance/validation-reuse -p 'test_*.py'
-          python3 -B tools/shared/resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --disk-free-mib 4096 .mlf-build/validation-reuse-guard python3 -B tools/performance/patricia/run_integrated.py --suite validation --producer .mlf-build/shared-ghc --output .mlf-build/validation-reuse-controls
+          python3 -B tools/shared/resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --disk-free-mib 4096 .mlf-build/validation-reuse-guard python3 -B tools/testing/run.py --inherit-process-group patricia-integrated -- --suite validation --producer .mlf-build/shared-ghc --output .mlf-build/validation-reuse-controls
       - name: Check canonical builtin and retained file cases
         if: matrix.optimization == '2'
         run: |
           set -euo pipefail
-          python3 -B tools/performance/patricia/test_open_file_comparison.py
-          python3 -O -B tools/performance/patricia/test_open_file_comparison.py
-          python3 -B tools/performance/patricia/test_open_file_controls.py
-          python3 -O -B tools/performance/patricia/test_open_file_controls.py
-          python3 -B tools/shared/resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --disk-free-mib 4096 .mlf-build/patricia-builtin-guard python3 -B tools/performance/patricia/run_integrated.py --suite builtin --producer .mlf-build/shared-ghc --output .mlf-build/patricia-builtin-controls
-          python3 -B tools/shared/resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --disk-free-mib 4096 .mlf-build/patricia-files-guard python3 -B tools/performance/patricia/run_file_controls.py --reference-source "$PWD" --reference-producer .mlf-build/shared-ghc --producer .mlf-build/shared-ghc --builtin-prefix .mlf-build/patricia-builtin-controls/builtin --output .mlf-build/patricia-file-controls
+          python3 -B tools/testing/run.py python-patricia-open-file-comparison
+          python3 -B tools/testing/run.py python-patricia-open-file-comparison --python-optimization
+          python3 -B tools/testing/run.py python-patricia-open-file-controls
+          python3 -B tools/testing/run.py python-patricia-open-file-controls --python-optimization
+          python3 -B tools/testing/run.py python-patricia-file-cases
+          python3 -B tools/testing/run.py python-patricia-file-cases --python-optimization
+          python3 -B tools/shared/resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --disk-free-mib 4096 .mlf-build/patricia-builtin-guard python3 -B tools/testing/run.py --inherit-process-group patricia-integrated -- --suite builtin --producer .mlf-build/shared-ghc --output .mlf-build/patricia-builtin-controls
+          python3 -B tools/shared/resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --disk-free-mib 4096 .mlf-build/patricia-files-guard python3 -B tools/testing/run.py --inherit-process-group patricia-file-controls -- --reference-source "$PWD" --reference-producer .mlf-build/shared-ghc --producer .mlf-build/shared-ghc --builtin-prefix .mlf-build/patricia-builtin-controls/builtin --output .mlf-build/patricia-file-controls
       - name: Execute the actual shared suite-receipt helpers
-        if: matrix.suite == 'all' || matrix.suite == 'direct'
+        if: matrix.suite == 'routine'
         run: |
-          python3 tools/release/test-suite-build-receipts.py --executable .mlf-build/shared-ghc/bin/build-receipts --output .mlf-build/suite-receipt-regression
+          python3 -B tools/testing/run.py release-build-receipts -- --executable .mlf-build/shared-ghc/bin/build-receipts --output .mlf-build/suite-receipt-regression
       - name: Execute source-bound shared smoke runner
-        if: matrix.suite == 'all' || matrix.suite == 'direct'
+        if: matrix.suite == 'routine'
         env:
           MLF_SOURCE_SMOKE_RUNNER: .mlf-build/shared-ghc/bin/source-smoke
           MLF_SOURCE_SMOKE_RECEIPT: .mlf-build/shared-ghc/receipt.json
-        run: tools/release/source-smoke.sh
+        run: python3 -B tools/testing/run.py source-smoke
       - name: Qualify authenticated direct async and frontend execution
-        if: matrix.suite == 'all' || matrix.suite == 'direct'
+        if: matrix.suite == 'routine'
         run: |
           set -euo pipefail
-          python3 -B tools/shared/test_crc_successor_entry.py
-          python3 -O -B tools/shared/test_crc_successor_entry.py
-          MLF_CRC_TEST_EVIDENCE=.mlf-build/crc-supervisor-controls/normal python3 -B tools/shared/test_crc_process_supervisor.py
-          MLF_CRC_TEST_EVIDENCE=.mlf-build/crc-supervisor-controls/optimized python3 -O -B tools/shared/test_crc_process_supervisor.py
-          python3 -B tools/shared/test_utf8_batch_contract.py
-          python3 -O -B tools/shared/test_utf8_batch_contract.py
-          python3 -B tools/shared/test_utf8_batch_worker.py
-          python3 -O -B tools/shared/test_utf8_batch_worker.py
-          MLF_UTF8_TEST_EVIDENCE=.mlf-build/utf8-supervisor-controls/normal python3 -B tools/shared/test_direct_bounded_entry.py
-          MLF_UTF8_TEST_EVIDENCE=.mlf-build/utf8-supervisor-controls/optimized python3 -O -B tools/shared/test_direct_bounded_entry.py
-          python3 -B tools/shared/test_candidate_batch_contract.py
-          python3 -O -B tools/shared/test_candidate_batch_contract.py
-          python3 -B tools/shared/test_candidate_batch_worker.py
-          python3 -O -B tools/shared/test_candidate_batch_worker.py
-          MLF_CANDIDATE_TEST_EVIDENCE=.mlf-build/candidate-supervisor-controls/normal python3 -B tools/shared/test_direct_candidate_entry.py
-          MLF_CANDIDATE_TEST_EVIDENCE=.mlf-build/candidate-supervisor-controls/optimized python3 -O -B tools/shared/test_direct_candidate_entry.py
-          python3 -B tools/shared/test_direct_candidate_successor.py --bin-dir .mlf-build/shared-ghc/bin \
+          MLF_CRC_TEST_EVIDENCE=.mlf-build/crc-supervisor-controls/normal python3 -B tools/testing/run.py python-shared-crc-process-supervisor
+          MLF_CRC_TEST_EVIDENCE=.mlf-build/crc-supervisor-controls/optimized python3 -B tools/testing/run.py python-shared-crc-process-supervisor --python-optimization
+          python3 -B tools/testing/run.py python-shared-utf8-batch-contract
+          python3 -B tools/testing/run.py python-shared-utf8-batch-contract --python-optimization
+          python3 -B tools/testing/run.py python-shared-utf8-batch-worker
+          python3 -B tools/testing/run.py python-shared-utf8-batch-worker --python-optimization
+          python3 -B tools/testing/run.py python-shared-candidate-batch-contract
+          python3 -B tools/testing/run.py python-shared-candidate-batch-contract --python-optimization
+          python3 -B tools/testing/run.py python-shared-candidate-batch-worker
+          python3 -B tools/testing/run.py python-shared-candidate-batch-worker --python-optimization
+          MLF_DIRECT_TEST_EVIDENCE=.mlf-build/direct-supervisor-controls/normal python3 -B tools/testing/run.py python-shared-direct-managed
+          MLF_DIRECT_TEST_EVIDENCE=.mlf-build/direct-supervisor-controls/optimized python3 -B tools/testing/run.py python-shared-direct-managed --python-optimization
+          python3 -B tools/testing/run.py direct-candidate -- --bin-dir .mlf-build/shared-ghc/bin \
             --build-receipt .mlf-build/shared-ghc/receipt.json --output .mlf-build/direct-host-tests
-          # The default/all framework gate executes this same no-argument
-          # TupleList binary with its exact 305-observation completion oracle.
-      - name: Qualify authenticated TupleList default and framework semantics
-        if: matrix.suite != 'direct'
+      - name: Qualify hosted TupleList and framework contracts
+        if: matrix.suite == 'routine'
         run: |
-          # CI164 framework used 4455.57s; CI167 default reached 302/305 at4500s.
-          # Both O0 suites use the existing bounded override; O2 stays unchanged.
-          suite_args=()
-          if [ '${{ matrix.optimization }}:${{ matrix.suite }}' = '0:framework' ] || [ '${{ matrix.optimization }}:${{ matrix.suite }}' = '0:default' ]; then
-            suite_args=(--suite-timeout 5400)
-          fi
-          python3 tools/shared/test_framework_direct.py --build-receipt .mlf-build/shared-ghc/receipt.json --output .mlf-build/framework-direct --suite '${{ matrix.suite }}' ${suite_args[@]+"${suite_args[@]}"}
+          python3 -B tools/testing/run.py framework-direct -- --build-receipt .mlf-build/shared-ghc/receipt.json --output .mlf-build/framework-direct --suite all --suite-timeout 5400
+      - name: Build shared hosted campaign tools
+        id: hosted_campaign_tools
+        if: ${{ !cancelled() && steps.shared_build.outcome == 'success' && matrix.suite == 'routine' }}
+        run: |
+          clang -O2 -std=c11 -Wall -Wextra -Werror runtime/mlf_build_runner.c -o .mlf-build/shared-ghc/bin/mlf-build-runner
+      - name: Qualify hosted tuple and list interpreter and LLVM parity
+        if: matrix.suite == 'routine'
+        run: python3 -B tools/testing/run.py tuple-list-native -- "$PWD/.mlf-build/shared-ghc/bin/emlf" .mlf-build/tuple-list-runtime
       - name: Qualify exact maintained Figure12 fixtures
-        if: matrix.suite == 'all' || matrix.suite == 'direct'
+        if: matrix.suite == 'routine'
         run: |
-          python3 tools/shared/test_figure12_direct.py --build-receipt .mlf-build/shared-ghc/receipt.json --output .mlf-build/figure12-direct
-      - name: Check recursive managed evidence and source-group contracts
-        if: matrix.optimization == '2'
-        run: python3 tools/shared/test_recursive_managed.py --build-receipt .mlf-build/shared-ghc/receipt.json --output .mlf-build/recursive-managed
-      - name: Check known parameter-field projection graph invariants
-        if: matrix.optimization == '2'
-        run: python3 tools/shared/test_parameter_field_graph.py --build-receipt .mlf-build/shared-ghc/receipt.json --output .mlf-build/parameter-field-graph
-      - name: Check source field normalization and exact imported layouts
-        if: matrix.optimization == '2'
-        run: python3 tools/shared/test_source_field_layouts.py --build-receipt .mlf-build/shared-ghc/receipt.json --output .mlf-build/source-field-layouts
+          python3 -B tools/testing/run.py figure12-direct -- --build-receipt .mlf-build/shared-ghc/receipt.json --output .mlf-build/figure12-direct
+      - name: Exercise hosted parity corpus
+        if: ${{ !cancelled() && steps.hosted_campaign_tools.outcome == 'success' && matrix.suite == 'routine' }}
+        run: |
+          set -euo pipefail
+          toolset="$PWD/.mlf-build/shared-ghc/bin"
+          export MLF_BUILD_RUNNER="$toolset/mlf-build-runner"
+          "$toolset/compiler-tests" parity --manager "$toolset/mlfpkg" --compiler "$toolset/emlf" \
+            --build-dir "$PWD/.mlf-build/compiler-tests/parity" --cache-dir "$PWD/.mlf-build/cache" \
+            --compiler-receipt "$PWD/.mlf-build/shared-ghc/receipt.json"
+      - name: Run native lifecycle contracts with hosted tools
+        id: native_lifecycle
+        if: ${{ !cancelled() && steps.shared_build.outcome == 'success' && steps.hosted_campaign_tools.outcome == 'success' && matrix.suite == 'routine' }}
+        run: |
+          set -euo pipefail
+          toolset="$PWD/.mlf-build/shared-ghc/bin"
+          MLF_PACKAGE_MANAGER="$toolset/mlfpkg" MLF_BUILD_RUNNER="$toolset/mlf-build-runner" "$toolset/mlfpkg" \
+            --manifest testing/tools/mlf-package.json --compiler "$toolset/emlf" --runtime "$PWD/runtime/mlf_runtime.c" \
+            --build-dir "$PWD/.mlf-build/compiler-tests/lifecycle" --cache-dir "$PWD/.mlf-build/cache" --locked test --target lifecycle
+      - name: Prepare and cache verified hosted backend drivers
+        if: ${{ !cancelled() && steps.native_lifecycle.outcome == 'success' && matrix.suite == 'routine' }}
+        uses: ./.github/actions/prepare-backend-drivers
+      - name: Exercise hosted backend matrix
+        if: ${{ !cancelled() && steps.native_lifecycle.outcome == 'success' && matrix.suite == 'routine' }}
+        run: |
+          set -euo pipefail
+          . tools/release/native-environment.sh
+          toolset="$PWD/.mlf-build/shared-ghc/bin"
+          export MLF_BUILD_RUNNER="$toolset/mlf-build-runner"
+          "$toolset/compiler-tests" backends --manager "$toolset/mlfpkg" --compiler "$toolset/emlf" \
+            --build-dir "$PWD/.mlf-build/compiler-tests/backends" --cache-dir "$PWD/.mlf-build/cache"
       - name: Check batched inlining against frozen optimizer
         if: matrix.optimization == '2'
         run: |
-          python3 -B tools/shared/resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --disk-free-mib 5120 .mlf-build/batch-replacement-guard python3 -B tools/performance/batch-replacement/run.py --producer .mlf-build/shared-ghc --output .mlf-build/batch-replacement-20261101/ci-controls
+          python3 -B tools/shared/resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --disk-free-mib 5120 .mlf-build/batch-replacement-guard python3 -B tools/testing/run.py --inherit-process-group batch-replacement -- --producer .mlf-build/shared-ghc --output .mlf-build/batch-replacement-20261101/ci-controls
       - name: Check permission-view reuse against frozen graph
         if: matrix.optimization == '2'
         run: |
-          python3 -B tools/shared/resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --disk-free-mib 5120 .mlf-build/permission-view-guard python3 -B tools/performance/permission-view/run_controls.py --producer .mlf-build/shared-ghc --producer-source "$PWD" --optimization 2 --output .mlf-build/permission-view-20261101/ci-controls
+          python3 -B tools/shared/resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --disk-free-mib 5120 .mlf-build/permission-view-guard python3 -B tools/testing/run.py --inherit-process-group permission-view -- --producer .mlf-build/shared-ghc --producer-source "$PWD" --optimization 2 --output .mlf-build/permission-view-20261101/ci-controls
       - name: Check private-owner header adapters
         if: matrix.optimization == '2'
         run: |
-          python3 -B tools/performance/c3-delayed-index/test_private_owner_headers.py
-          python3 -O -B tools/performance/c3-delayed-index/test_private_owner_headers.py
+          python3 -B tools/testing/run.py python-c3-delayed-index-private-owner-headers
+          python3 -B tools/testing/run.py python-c3-delayed-index-private-owner-headers --python-optimization
       - name: Check delayed fresh indexes against frozen private session
         if: matrix.optimization == '2'
         run: |
-          python3 -B tools/shared/resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --disk-free-mib 5120 .mlf-build/c3-delayed-index-guard python3 -B tools/performance/c3-delayed-index/run_controls.py --producer .mlf-build/shared-ghc --producer-source "$PWD" --optimization 2 --output .mlf-build/c3-delayed-index-20261101/ci-controls
+          python3 -B tools/shared/resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --disk-free-mib 5120 .mlf-build/c3-delayed-index-guard python3 -B tools/testing/run.py --inherit-process-group delayed-index -- --producer .mlf-build/shared-ghc --producer-source "$PWD" --optimization 2 --output .mlf-build/c3-delayed-index-20261101/ci-controls
       - name: Check fresh survivor merge against frozen C3 and independent model
         if: matrix.optimization == '2'
         run: |
-          python3 -B tools/shared/resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --disk-free-mib 5120 .mlf-build/c3-survivors-guard python3 -B tools/performance/c3-survivors/run_controls.py --producer .mlf-build/shared-ghc --producer-source "$PWD" --optimization 2 --output .mlf-build/c3-survivors-20261101/ci-controls
+          python3 -B tools/shared/resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --disk-free-mib 5120 .mlf-build/c3-survivors-guard python3 -B tools/testing/run.py --inherit-process-group fresh-survivors -- --producer .mlf-build/shared-ghc --producer-source "$PWD" --optimization 2 --output .mlf-build/c3-survivors-20261101/ci-controls
       - name: Check private projection views against frozen session and independent model
         if: matrix.optimization == '2'
         run: |
-          python3 -B tools/performance/full-compiler/test_contract.py
-          python3 -B tools/shared/resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --disk-free-mib 5120 .mlf-build/full-compiler-guard python3 -B tools/performance/full-compiler/run_controls.py --producer .mlf-build/shared-ghc --producer-source "$PWD" --optimization 2 --output .mlf-build/full-compiler-20261101/ci-controls
+          python3 -B tools/testing/run.py python-full-compiler-contract
+          python3 -B tools/shared/resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --disk-free-mib 5120 .mlf-build/full-compiler-guard python3 -B tools/testing/run.py --inherit-process-group private-projection-views -- --producer .mlf-build/shared-ghc --producer-source "$PWD" --optimization 2 --output .mlf-build/full-compiler-20261101/ci-controls
       - name: Check compact Unicode indexing against frozen host and independent scalar oracle
         if: matrix.optimization == '2'
         run: |
-          python3 -B tools/performance/llvm-memory/test_contract.py
-          python3 -O -B tools/performance/llvm-memory/test_contract.py
-          python3 -B tools/shared/resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --disk-free-mib 5120 .mlf-build/llvm-memory-guard python3 -B tools/performance/llvm-memory/run_controls.py --producer .mlf-build/shared-ghc --optimization 2 --output .mlf-build/llvm-memory-20261102/ci-controls
-      - name: Check shared-value specialization admission and lazy semantics
-        if: matrix.optimization == '2'
-        run: python3 tools/shared/test_common_calls.py --build-receipt .mlf-build/shared-ghc/receipt.json --output .mlf-build/common-calls
-      - name: Check callback code sharing and capture identity boundaries
-        if: matrix.optimization == '2'
-        run: python3 tools/shared/test_callback_sharing.py --build-receipt .mlf-build/shared-ghc/receipt.json --output .mlf-build/callback-sharing
+          python3 -B tools/shared/resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --disk-free-mib 5120 .mlf-build/llvm-memory-guard python3 -B tools/testing/run.py --inherit-process-group llvm-unicode-memory -- --producer .mlf-build/shared-ghc --optimization 2 --output .mlf-build/llvm-memory-20261102/ci-controls
       - name: Check lazy IO action specialization with native execution
         if: matrix.optimization == '2'
         run: |
@@ -333,43 +367,43 @@ jobs:
           test -f "$archive"
           cp "$archive" "$prefix/lib/libgc.a"
           dpkg-query -W libgc-dev > "$prefix/dependency-version.txt"
-          python3 tools/shared/test_io_action_sharing.py --build-receipt .mlf-build/shared-ghc/receipt.json --output .mlf-build/io-action-sharing --clang clang --gc-prefix "$prefix"
+          python3 -B tools/testing/run.py io-action-sharing -- --build-receipt .mlf-build/shared-ghc/receipt.json --output .mlf-build/io-action-sharing --clang clang --gc-prefix "$prefix"
       - name: Check binary artifact codecs and real native storage
         if: matrix.optimization == '2'
         run: |
           set -euo pipefail
           test -f "$PWD/.mlf-build/io-action-gc/lib/libgc.a"
-          python3 -B tools/shared/test_artifact_binary_modular.py
-          python3 -O -B tools/shared/test_artifact_binary_modular.py
-          python3 -B tools/shared/resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --max-output-mib 640 --disk-free-mib 4096 .mlf-build/artifact-binary-guard python3 -B tools/shared/test_artifact_binary.py --source-root "$PWD" --build-receipt .mlf-build/shared-ghc/receipt.json --clang clang --gc-prefix "$PWD/.mlf-build/io-action-gc" --partial-write-sink /dev/full --output .mlf-build/artifact-binary-guard/results
+          python3 -B tools/shared/resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --max-output-mib 640 --disk-free-mib 4096 .mlf-build/artifact-binary-guard python3 -B tools/testing/run.py --inherit-process-group artifact-binary-native -- --source-root "$PWD" --build-receipt .mlf-build/shared-ghc/receipt.json --clang clang --gc-prefix "$PWD/.mlf-build/io-action-gc" --partial-write-sink /dev/full --output .mlf-build/artifact-binary-guard/results
       - name: Check fixed native library boundaries and lazy exports
         if: matrix.optimization == '2'
         run: |
           set -euo pipefail
-          mkdir .mlf-build/header-adapter-controls
-          git --no-replace-objects cat-file blob dd5b4630a80803c19afdb219dba2dc4bffc3ea1b > .mlf-build/header-adapter-controls/history.hs
-          export HEADER_FIXTURE="$PWD/tools/shared/fixtures/native/HeaderValidationTests.hs"
-          export HEADER_ORACLE="$PWD/tools/shared/fixtures/native/HeaderNamingOracle.hs"
-          export HEADER_HISTORY_SOURCE="$PWD/.mlf-build/header-adapter-controls/history.hs"
-          python3 -B tools/shared/test_header_validation_adapter.py
-          python3 -O -B tools/shared/test_header_validation_adapter.py
-          python3 tools/shared/test_native_library.py --build-receipt .mlf-build/shared-ghc/receipt.json --output .mlf-build/native-library --clang clang --gc-prefix .mlf-build/io-action-gc
+          python3 -B tools/testing/run.py python-shared-header-validation-adapter
+          python3 -B tools/testing/run.py python-shared-header-validation-adapter --python-optimization
+          python3 -B tools/testing/run.py native-library -- --build-receipt .mlf-build/shared-ghc/receipt.json --output .mlf-build/native-library --clang clang --gc-prefix .mlf-build/io-action-gc
       - name: Build and check the default installed standard library
-        if: matrix.optimization == '2' && matrix.suite == 'all'
+        if: matrix.suite == 'optimizer'
         run: |
           set -euo pipefail
           sudo apt-get install -y pkg-config
           PYTHONDONTWRITEBYTECODE=1 python3 -B tools/shared/build.py --optimization 2 --build-dir .mlf-build/stdlib-default
-          PYTHONDONTWRITEBYTECODE=1 python3 -B .mlf-build/stdlib-default/sources/tools/shared/test_native_library.py \
+          PYTHONDONTWRITEBYTECODE=1 python3 -B tools/testing/run.py installed-native-library -- \
             --build-receipt .mlf-build/stdlib-default/receipt.json \
             --output .mlf-build/stdlib-default-controls --clang clang --gc-prefix .mlf-build/io-action-gc \
             --frontend-source-root .mlf-build/stdlib-default/sources/libraries/mlf-foundation
+          # The prior suite has exited before this owned installation is mutated.
+          PYTHONDONTWRITEBYTECODE=1 python3 -B tools/testing/run.py native-install-verification
       - name: Check actual MLF mixed-framework source acceptance
         if: matrix.optimization == '2'
-        run: python3 tools/shared/test_guest_framework.py --build-receipt .mlf-build/shared-ghc/receipt.json --output .mlf-build/guest-framework-source
+        run: python3 -B tools/testing/run.py guest-framework -- --build-receipt .mlf-build/shared-ghc/receipt.json --output .mlf-build/guest-framework-source
       - name: Check actual-import guest Graph and Oracle laws
         if: matrix.optimization == '2'
-        run: python3 tools/shared/test_guest_state_laws.py --build-receipt .mlf-build/shared-ghc/receipt.json --output .mlf-build/guest-state-laws
+        run: python3 -B tools/testing/run.py guest-state-laws -- --build-receipt .mlf-build/shared-ghc/receipt.json --output .mlf-build/guest-state-laws
+      # Retain the codec failure without blocking independent hosted checks.
+      - name: Check typed dependency graphs across the host, interpreter and LLVM
+        if: ${{ !cancelled() && steps.shared_build.outcome == 'success' && matrix.optimization == '2' }}
+        run: |
+          python3 -B tools/testing/run.py indexvec -- --compiler .mlf-build/shared-ghc/bin/emlf --output .mlf-build/indexvec-controls
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         if: always()
         with:
@@ -386,6 +420,14 @@ jobs:
             .mlf-build/stdlib-default-controls/header-validation/
             .mlf-build/stdlib-default-controls/*.stdout
             .mlf-build/stdlib-default-controls/*.stderr
+            .mlf-build/test-framework/
+            .mlf-build/tuple-list-runtime/
+            .mlf-build/compiler-tests/**/*.json*
+            .mlf-build/compiler-tests/**/*.stderr
+            .mlf-build/compiler-tests/parity/parity/*.interpreter.out
+            .mlf-build/compiler-tests/parity/parity/*.interpreter.err
+            .mlf-build/compiler-tests/parity/parity/*.llvm.out
+            .mlf-build/compiler-tests/parity/parity/*.llvm.err
             .mlf-build/shared-ghc/receipt.json
             .mlf-build/shared-ghc/*.log
             .mlf-build/shared-ghc/packages.txt
@@ -413,7 +455,6 @@ jobs:
             .mlf-build/source-context-cache-guard/results/**/*.json
             .mlf-build/source-context-cache-guard/results/**/*.stdout
             .mlf-build/source-context-cache-guard/results/**/*.stderr
-            .mlf-build/source-context-cache-guard/results/**/*.legacy-bytes
             .mlf-build/contract-context-guard/bounded-receipt.json
             .mlf-build/contract-context-guard/build.log
             .mlf-build/contract-context/receipt.json
@@ -425,6 +466,7 @@ jobs:
             .mlf-build/owned-source-context/**/stdout
             .mlf-build/owned-source-context/**/stderr
             .mlf-build/owned-source-context/**/*.hs
+            .mlf-build/compiler-shapes-writer-smoke/receipt.json
             .mlf-build/compiler-shapes-smoke/setup/setup.json
             .mlf-build/compiler-shapes-smoke/setup/*.json
             .mlf-build/compiler-shapes-smoke/cohorts/**/*.json
@@ -434,6 +476,11 @@ jobs:
             .mlf-build/compiler-shapes-smoke/cohorts/**/stdout
             .mlf-build/compiler-shapes-smoke/cohorts/**/stderr
             .mlf-build/compiler-shapes-smoke/results/
+            .mlf-build/datatype-context/receipt.json
+            .mlf-build/datatype-context/*-build/stdout
+            .mlf-build/datatype-context/*-build/stderr
+            .mlf-build/datatype-context-guard/bounded-receipt.json
+            .mlf-build/datatype-context-guard/build.log
             .mlf-build/crate-optimization-guard/
             .mlf-build/crate-optimization-controls/**/*.json
             .mlf-build/crate-optimization-controls/**/*.stdout
@@ -504,9 +551,7 @@ jobs:
             .mlf-build/direct-host-tests/utf8-length/**/stderr
             .mlf-build/direct-host-tests/utf8-length-supervisor.json
             .mlf-build/crc-supervisor-controls/
-            .mlf-build/utf8-supervisor-controls/
-            .mlf-build/candidate-supervisor-controls/
-            .mlf-build/header-adapter-controls/
+            .mlf-build/direct-supervisor-controls/
             .mlf-build/direct-host-tests/candidate-selection/
             .mlf-build/framework-direct/*.json*
             .mlf-build/framework-direct/*.stdout
@@ -572,8 +617,9 @@ jobs:
             .mlf-build/guest-state-laws/**/*.stdout
             .mlf-build/guest-state-laws/**/*.stderr
   build-runner:
-    name: Native build runner (${{ matrix.os }})
+    name: Native build runner (${{ matrix.os }})${{ github.event.label && github.event.label.name != 'ci:skip' && github.event.label.name != 'ci:async-parity' && ' (unrelated label)' || '' }}
     if: >-
+      (!github.event.label || github.event.label.name == 'ci:skip' || github.event.label.name == 'ci:async-parity') &&
       (github.event_name != 'pull_request' || !contains(github.event.pull_request.labels.*.name, 'ci:skip')) &&
       (github.event_name != 'workflow_dispatch' || !inputs.windows_runtime_only)
     strategy:
@@ -585,37 +631,25 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
-      - name: Compile the native scheduler and lifecycle fixtures
-        shell: bash
-        run: |
-          set -euo pipefail
-          output="$PWD/.mlf-build/build-runner-ci"
-          mkdir -p "$output"
-          clang -O2 -std=c11 -Wall -Wextra -Werror runtime/mlf_build_runner.c -o "$output/mlf-build-runner"
-          clang -O2 -std=c11 -Wall -Wextra -Werror tests/native/build_runner_fixture.c -o "$output/build-runner-fixture"
-          clang -O2 -std=c11 -Wall -Wextra -Werror tests/native/build_runner_tests.c -o "$output/build-runner-tests"
-          clang -O2 -std=c11 -Wall -Wextra -Werror tests/native/process_supervisor_tests.c runtime/mlf_process_supervisor.c -o "$output/process-supervisor-tests"
       - name: Exercise bounded scheduling, protocols, and descendant cleanup
         shell: bash
-        run: |
-          set -euo pipefail
-          output="$PWD/.mlf-build/build-runner-ci"
-          "$output/build-runner-tests" "$output/mlf-build-runner" "$output/build-runner-fixture" "$output/evidence" 2>&1 | tee "$output/build-runner.log"
-          grep -q '22 native build runner tests passed' "$output/build-runner.log"
-          "$output/process-supervisor-tests" "$output/build-runner-fixture" "$output/process-evidence" 2>&1 | tee "$output/process-supervisor.log"
-          grep -q 'native process supervisor tests passed' "$output/process-supervisor.log"
+        run: python3 -B tools/testing/run.py native-build-tools --report .mlf-build/test-framework/native-build-tools.json -- "$PWD/.mlf-build/build-runner-ci"
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         if: always()
         with:
           name: build-runner-evidence-${{ matrix.os }}
           include-hidden-files: true
           path: |
+            .mlf-build/test-framework/
             .mlf-build/build-runner-ci/*.log
+            .mlf-build/build-runner-ci/binaries.sha256
+            .mlf-build/build-runner-ci/process-evidence/
             .mlf-build/build-runner-ci/evidence/**/*.plan
             .mlf-build/build-runner-ci/evidence/**/*.result
   async-runtime:
-    name: Native async completions (${{ matrix.os }})
+    name: Native async completions (${{ matrix.os }})${{ github.event.label && github.event.label.name != 'ci:skip' && github.event.label.name != 'ci:async-parity' && ' (unrelated label)' || '' }}
     if: >-
+      (!github.event.label || github.event.label.name == 'ci:skip' || github.event.label.name == 'ci:async-parity') &&
       (github.event_name != 'pull_request' || !contains(github.event.pull_request.labels.*.name, 'ci:skip')) &&
       (github.event_name != 'workflow_dispatch' || !inputs.windows_runtime_only)
     strategy:
@@ -638,27 +672,20 @@ jobs:
           fi
       - name: Exercise traced completions, primitive dispatch, and timers
         shell: bash
-        run: |
-          set -euo pipefail
-          output="$PWD/.mlf-build/async-native-ci"
-          mkdir -p "$output"
-          read -r -a cflags <<< "$(pkg-config --cflags bdw-gc gmp)"
-          read -r -a libs <<< "$(pkg-config --libs bdw-gc gmp)"
-          for test in completion_cell_tests async_completion_primitives; do
-            clang -O2 -std=c11 -Wall -Wextra -Werror "${cflags[@]}" "tests/native/$test.c" runtime/mlf_runtime.c "${libs[@]}" -lm -o "$output/$test"
-            "$output/$test" 2>&1 | tee "$output/$test.log"
-          done
-          grep -q 'Native completion representation: .* checks, .* callbacks passed' "$output/completion_cell_tests.log"
-          grep -q 'Native completion primitives: .* checks, .* callbacks passed' "$output/async_completion_primitives.log"
+        run: python3 -B tools/testing/run.py native-async-runtime --report .mlf-build/test-framework/native-async-runtime.json -- "$PWD/.mlf-build/async-native-ci"
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         if: always()
         with:
           name: async-native-evidence-${{ matrix.os }}
           include-hidden-files: true
-          path: .mlf-build/async-native-ci/*.log
+          path: |
+            .mlf-build/async-native-ci/*.log
+            .mlf-build/async-native-ci/binaries.sha256
+            .mlf-build/test-framework/
   async-language:
-    name: Async interpreter and native parity (${{ matrix.os }})
+    name: Async interpreter and native parity (${{ matrix.os }})${{ github.event.label && github.event.label.name != 'ci:skip' && github.event.label.name != 'ci:async-parity' && ' (unrelated label)' || '' }}
     if: >-
+      (!github.event.label || github.event.label.name == 'ci:skip' || github.event.label.name == 'ci:async-parity') &&
       (github.event_name != 'pull_request' || !contains(github.event.pull_request.labels.*.name, 'ci:skip')) &&
       (github.event_name != 'workflow_dispatch' || !inputs.windows_runtime_only)
     strategy:
@@ -669,8 +696,6 @@ jobs:
     timeout-minutes: 360
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
-        with:
-          fetch-depth: 0
       - name: Decide whether expensive async parity was explicitly requested
         id: scope
         run: python3 tools/release/async-change-scope.py --output .mlf-build/async-change-scope/decision.json
@@ -687,23 +712,22 @@ jobs:
             echo "MLF_GC_PREFIX=$(brew --prefix bdw-gc)" >> "$GITHUB_ENV"
           fi
           echo 'GC_FREE_SPACE_DIVISOR=8' >> "$GITHUB_ENV"
+      - uses: ./.github/actions/linux-ghc-bindist
+        if: steps.scope.outputs.required != 'false' && runner.os == 'Linux'
       - name: Install pinned GHC 9.14.1 for ordinary async parity
         if: steps.scope.outputs.required != 'false'
         run: |
           set -euo pipefail
           archive="$RUNNER_TEMP/ghc-9.14.1.tar.xz"
           if [ "$RUNNER_OS" = Linux ]; then
-            distribution=ghc-9.14.1-x86_64-deb12-linux
             staging=ghc-9.14.1-x86_64-unknown-linux
-            digest=60f7ab75f28df892729fbaff3a54f58ee3ad7e731929f1b2f3eb0208f73de841
           else
             test "$(uname -m)" = arm64
             distribution=ghc-9.14.1-aarch64-apple-darwin
             staging=$distribution
-            digest=841591f152085be605616682779341847d24fd56bd6d22ca61bb37ee32b50681
+            curl -fsSL "https://downloads.haskell.org/~ghc/9.14.1/$distribution.tar.xz" -o "$archive"
+            printf '%s  %s\n' 841591f152085be605616682779341847d24fd56bd6d22ca61bb37ee32b50681 "$archive" | shasum -a 256 -c -
           fi
-          curl -fsSL "https://downloads.haskell.org/~ghc/9.14.1/$distribution.tar.xz" -o "$archive"
-          printf '%s  %s\n' "$digest" "$archive" | shasum -a 256 -c -
           tar -xJf "$archive" -C "$RUNNER_TEMP"
           (cd "$RUNNER_TEMP/$staging" && ./configure --prefix="$RUNNER_TEMP/ghc" && make install)
           test "$("$RUNNER_TEMP/ghc/bin/ghc" --numeric-version)" = 9.14.1
@@ -714,8 +738,8 @@ jobs:
       - name: Test GHC async preparation controls
         if: steps.scope.outputs.required != 'false'
         run: |
-          python3 -B tools/shared/test_prepare_async_ghc.py
-          python3 -B -O tools/shared/test_prepare_async_ghc.py
+          python3 -B tools/testing/run.py python-shared-prepare-async-ghc
+          python3 -B tools/testing/run.py python-shared-prepare-async-ghc --python-optimization
       - name: Build and authenticate GHC-origin async tools
         if: steps.scope.outputs.required != 'false'
         run: python3 -B tools/shared/prepare_async_ghc.py --build-dir .mlf-build/async-ghc --clang clang
@@ -724,9 +748,10 @@ jobs:
         run: |
           set -euo pipefail
           compiler="$PWD/.mlf-build/async-ghc/bin/emlf"
-          EMLF="$compiler" tests/fixtures/async-completion/check.sh
-          tools/release/test-async-process.sh "$compiler" .mlf-build/async-process-parity
-          tools/release/test-async-task.sh "$compiler" .mlf-build/async-task-parity
+          EMLF="$compiler" python3 -B tools/testing/run.py async-completion
+          # Local arm64 GHC O0 source times were 1452s for Process and 1842s for Task Processes.
+          MLF_ASYNC_SOURCE_COMPILE_TIMEOUT=1800 python3 -B tools/testing/run.py async-process -- "$compiler" .mlf-build/async-process-parity
+          MLF_ASYNC_SOURCE_COMPILE_TIMEOUT=2100 python3 -B tools/testing/run.py async-task -- "$compiler" .mlf-build/async-task-parity
           jq -e '.complete == true and .backends == ["source-interpreter", "target-interpreter", "llvm"]' .mlf-build/async-completion-gate/result.json
           for suite in async-process-parity async-task-parity; do
             jq -e '.complete == true and .backends == ["interpreter", "llvm"]' ".mlf-build/$suite/result.json"
@@ -737,7 +762,7 @@ jobs:
           set -euo pipefail
           compiler="$PWD/.mlf-build/async-ghc/bin/emlf"
           manager="$PWD/.mlf-build/async-ghc/bin/mlfpkg"
-          tools/release/test-async-package.sh "$compiler" "$manager" .mlf-build/async-package-parity
+          python3 -B tools/testing/run.py async-package -- "$compiler" "$manager" .mlf-build/async-package-parity
           jq -e '.complete == true and .backend == "llvm" and .cache_replay == true and .opaque_rejections == 6 and .type_rejections == 1' \
             .mlf-build/async-package-parity/result.json
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
@@ -747,6 +772,7 @@ jobs:
           include-hidden-files: true
           retention-days: 14
           path: |
+            .mlf-build/test-framework/
             .mlf-build/async-change-scope/decision.json
             .mlf-build/async-ghc-install-cleanup.json
             .mlf-build/async-ghc/async-tools.json
@@ -777,8 +803,10 @@ jobs:
             .mlf-build/async-package-parity/**/*.status
             .mlf-build/async-package-parity/**/*.timed-out
   windows-runtime:
-    name: Native Windows runtime
-    if: github.event_name != 'pull_request' || !contains(github.event.pull_request.labels.*.name, 'ci:skip')
+    name: Native Windows runtime${{ github.event.label && github.event.label.name != 'ci:skip' && github.event.label.name != 'ci:async-parity' && ' (unrelated label)' || '' }}
+    if: >-
+      (!github.event.label || github.event.label.name == 'ci:skip' || github.event.label.name == 'ci:async-parity') &&
+      (github.event_name != 'pull_request' || !contains(github.event.pull_request.labels.*.name, 'ci:skip'))
     runs-on: windows-2025
     timeout-minutes: 20
     defaults:
@@ -789,55 +817,25 @@ jobs:
       - name: Install pinned native Windows dependencies
         run: tools/release/setup-windows.ps1 -Output .mlf-build/windows-dependencies
       - name: Test native runtime, filesystem, and build runner lifecycles
-        run: tools/release/test-windows-runtime.ps1 -NativePrefix $env:MLF_NATIVE_PREFIX -Clang $env:MLF_CLANG -Output .mlf-build/windows-runtime
+        run: python -B tools/testing/run.py windows-runtime -- -NativePrefix $env:MLF_NATIVE_PREFIX -Clang $env:MLF_CLANG -Output .mlf-build/windows-runtime
       - name: Require long-path regression to reject the pre-fix runner
-        run: |
-          $ErrorActionPreference = 'Stop'
-          . ./tools/release/windows-common.ps1
-          # Original e7da00f201bfb66bf6e26d59e56184dd37a83abd, mapped after reviewed history cleanup.
-          $baseline = 'bf38dc538598a0389a3310fe26c16f6609c912fc'
-          git fetch --no-tags --depth=1 origin $baseline
-          Assert-Release ($LASTEXITCODE -eq 0) 'Cannot fetch the immutable pre-fix runner'
-          $source = git show "${baseline}:runtime/mlf_build_runner.c"
-          Assert-Release ($LASTEXITCODE -eq 0) 'Cannot read the immutable pre-fix runner'
-          $output = [IO.Path]::GetFullPath('.mlf-build/windows-runtime')
-          $oldSource = "$output/pre-fix-build-runner.c"
-          [IO.File]::WriteAllText($oldSource, ($source -join "`n") + "`n", [Text.UTF8Encoding]::new($false))
-          $expectedOldSource = 'fce82f0710edd910557956a2225f211f195f10b69e95c3676d86bb01fd2f6abd'
-          Assert-Release ((Get-FileHash -Algorithm SHA256 $oldSource).Hash.ToLowerInvariant() -eq $expectedOldSource) 'Pre-fix runner differs from the independently pinned source'
-          $oldRunner = "$output/pre-fix-build-runner.exe"
-          $flags = @('-O2','-std=c11','-Wall','-Wextra','-Werror','-municode',"-I$PWD/runtime",$oldSource,'-lpsapi','-o',$oldRunner)
-          $null = Invoke-ReleaseCommand $env:MLF_CLANG $flags "$output/pre-fix-build-runner-build.log" $PWD.Path
-          $negative = "$output/build-runner/negative-control"
-          Assert-Release (!(Test-Path -LiteralPath $negative)) 'Negative control needs a fresh directory'
-          $rejected = $false
-          try {
-            $null = Invoke-ReleaseCommand "$output/build-runner-tests.exe" @($oldRunner,"$output/build-runner-fixture.exe",$negative) "$output/long-path-negative.log" $PWD.Path
-          } catch { $rejected = $true }
-          Assert-Release $rejected 'Regression unexpectedly accepted the pre-fix runner'
-          $results = @(Get-ChildItem -Path "$negative/build-runner-*/long-redirections.result" -File)
-          Assert-Release ($results.Count -eq 1) 'Missing unique long-path negative result'
-          $result = Read-ReleaseJson $results[0].FullName
-          Assert-Release ($result.complete -eq $true -and $result.exit_code -eq 126) 'Negative control did not reach the expected launch failure'
-          $task = @($result.tasks | Where-Object { $_.id -eq 'absolute' })
-          Assert-Release ($task.Count -eq 1 -and $task[0].state -eq 'failed' -and $task[0].exit_code -eq 126 -and $task[0].pid -eq 0) 'Negative control failed for a different reason'
-          Write-ReleaseJson "$output/long-path-negative.json" @{passed=$true;baseline=$baseline;pre_fix_runner_sha256=(Get-ReleaseHash $oldRunner);result=$result}
-          Write-Output 'Pre-fix runner rejected long stream paths with exit 126 and PID 0'
+        run: python -B tools/testing/run.py windows-long-path -- -Clang $env:MLF_CLANG -Output .mlf-build/windows-runtime
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         if: always()
         with:
           name: windows-runtime-evidence
           include-hidden-files: true
           path: |
+            .mlf-build/test-framework/
             .mlf-build/windows-runtime/*.json
             .mlf-build/windows-runtime/*.log
             .mlf-build/windows-runtime/build-runner/**/*.plan
             .mlf-build/windows-runtime/build-runner/**/*.result
   pr-gate:
     # A skipped manual job must not satisfy the required check on the same SHA.
-    name: ${{ github.event_name == 'workflow_dispatch' && 'Manual CI summary' || 'PR gate' }}
-    if: always() && github.event_name != 'workflow_dispatch'
-    # The native dependency covers every matrix leg, including all three O0 shards.
+    name: ${{ github.event_name == 'workflow_dispatch' && 'Manual CI summary' || (github.event.label && github.event.label.name != 'ci:skip' && github.event.label.name != 'ci:async-parity') && 'Unrelated PR label' || 'PR gate' }}
+    if: always() && github.event_name != 'workflow_dispatch' && (!github.event.label || github.event.label.name == 'ci:skip' || github.event.label.name == 'ci:async-parity')
+    # The native dependency covers the hosted routine and optimizer profiles.
     needs: [metadata, native, windows-runtime, build-runner, async-runtime, async-language]
     runs-on: ubuntu-24.04
     timeout-minutes: 5

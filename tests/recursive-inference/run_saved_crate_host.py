@@ -7,11 +7,26 @@ Its evidence is separate from the ordinary shared compiler build receipts.
 import argparse
 import hashlib
 import json
+import os
 from pathlib import Path
 import subprocess
+import sys
 import time
 
 ROOT = Path(__file__).resolve().parents[2]
+
+sys.path.insert(0, str(ROOT / 'tools/testing'))
+from receipt_selection import identity as case_identity, select
+
+PREFIX = 'recursive-saved-crate/'
+LABELS = (
+    'cyclic empty imports carry defining-module instances',
+    'instance not visible in imported signed definition',
+    'instance not visible in another instance',
+    'downstream orphan cannot leak into an import cycle',
+    'cross-module recursion infers unsigned cycle',
+    'cross-module qualified recursion generalizes shared exports',
+)
 
 
 def digest(path):
@@ -25,9 +40,17 @@ def identity(path):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--compiler-build", type=Path, required=True)
+    parser.add_argument("--compiler-build", type=Path)
+    parser.add_argument("--framework-list", action="store_true")
     parser.add_argument("--build-dir", type=Path, default=Path(".mlf-build/qualified-host-crate"))
     args = parser.parse_args()
+    focused = select(PREFIX, LABELS)
+    selected = [focused] if focused is not None else list(LABELS)
+    if args.framework_list:
+        print(json.dumps([case_identity(PREFIX, label) for label in selected]))
+        return
+    if args.compiler_build is None:
+        parser.error('--compiler-build is required')
     compiler = args.compiler_build.resolve()
     directory = args.build_dir.resolve()
     directory.mkdir(parents=True, exist_ok=True)
@@ -55,8 +78,10 @@ def main():
                "-i" + str(ROOT / "tests/recursive-inference"), "-rtsopts=ignoreAll",
                str(wrapper), *map(str, linked), "-o", str(directory / "check")]
     own_inputs = [Path(__file__), ROOT / "tests/recursive-inference/QualifiedCrateHost.hs",
-                  ROOT / "tests/Tests/Modules.emlf", ROOT / "tests/Tests/Separate.emlf", wrapper]
-    evidence = {"format": 1, "scope": "six exact saved-crate fixtures; GHC host; no target evaluation",
+                  ROOT / "tests/Tests/Modules.emlf", ROOT / "tests/Tests/Separate.emlf",
+                  ROOT / "tools/testing/receipt_selection.py", wrapper]
+    evidence = {"format": 1, "scope": "six exact saved-crate fixtures; GHC host; no target evaluation" if focused is None else "focused exact saved-crate fixture; GHC host",
+                "selected_cases": selected,
                 "compiler_receipt": identity(receipt_path), "ghc": ghc,
                 "validated_compiler_input_inventory": inputs,
                 "harness_inputs": [identity(path) for path in own_inputs],
@@ -70,13 +95,20 @@ def main():
     if built.returncode == 0:
         evidence["binary"] = identity(directory / "check")
         with (directory / "run.log").open("w") as output:
-            ran = subprocess.run([str(directory / "check")], cwd=ROOT,
+            environment = dict(os.environ, MLF_RECURSIVE_SAVED_CRATE_LABEL=focused or '',
+                               MLF_RECURSIVE_SAVED_CRATE_WORK=str(directory / 'work'))
+            ran = subprocess.run([str(directory / "check")], cwd=ROOT, env=environment,
                                  stdout=output, stderr=subprocess.STDOUT)
         evidence["run_exit"] = ran.returncode
         evidence["run_log"] = identity(directory / "run.log")
         print((directory / "run.log").read_text(), end="")
     evidence["elapsed_seconds"] = time.monotonic() - started
     evidence["complete"] = evidence.get("run_exit") == 0
+    if evidence["complete"]:
+        prefix = 'PASS exact saved-crate fixture: '
+        actual = [line.removeprefix(prefix) for line in (directory / 'run.log').read_text().splitlines()
+                  if line.startswith(prefix)]
+        evidence['complete'] = actual == selected
     evidence["build_log"] = identity(directory / "build.log")
     # Guard against editing source while this focused build/run was active.
     for item in evidence["harness_inputs"]:

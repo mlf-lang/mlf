@@ -5,7 +5,7 @@ The working tree based on cb16a87fcceb9d0d4c1a37aaffb322beb809e780 passed all si
 a complete report with matching source and tool hashes. The compiler is unchanged
 byte for byte (4d7f426223f2c840fe8ab66b21a231f761d7def80f4c9ddfeb43a11dc7ce2d36); the manager is 3893bcf3a41e702efd7190f46bb96bd8fd39c0349aed4e116a7e1ee44799d2f1.
 These changes are uncommitted and have not been published as a new release.
-The [machine record](shared-test-artifacts.json) binds the 3203-file immutable
+The [machine record](https://github.com/mlf-lang/mlf/blob/0704d216b8cf6d887d3737efa30a2eae3c152f0a/docs/shared-test-artifacts.json) binds the 3203-file immutable
 snapshot, source inventories, logs, reports, cache controls and preservation checks.
 
 | Root group | Previous seconds | Current seconds | Observed change |
@@ -28,7 +28,7 @@ command; all earlier compiler/test jobs and diagnostics had ended. This is one o
 on the same 10-core M1 Max / 32 GiB host. The final run explicitly reused genuine
 verified build artifacts from earlier work; it is not an empty-cache comparison.
 
-The [individual execution timings](shared-test-execution-times.json) contain
+The [individual execution timings](https://github.com/mlf-lang/mlf/blob/0704d216b8cf6d887d3737efa30a2eae3c152f0a/docs/shared-test-execution-times.json) contain
 all **2400 checked backend paths** across 575 backend rows and 25 port rows,
 each on two backends and two layouts. There are 2364 measured child executions;
 36 LLVM target-rejection paths stop before native execution and retain their

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify actual candidate selection and its exact portable implementation."""
+"""Check the current Classes API and an independent portable selector fixture."""
 from pathlib import Path
 import argparse
 import json
@@ -11,6 +11,7 @@ from test_direct import CommandRunner, authenticate_build, sha
 ROOT = Path(__file__).resolve().parents[2]
 SOURCE = ROOT / 'libraries/mlf-inference/Bootstrap/Classes.hs'
 HOST = ROOT / 'tools/shared/fixtures/CandidateSelectionControls.hs'
+FIXTURE = ROOT / 'tools/shared/fixtures/CandidateSelection.hs'
 
 
 def expected(n, period, indices):
@@ -33,30 +34,30 @@ def vectors():
     return result
 
 
-def main():
+def main(argv=None, *, runner_factory=CommandRunner, authenticate=authenticate_build):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--build-receipt', type=Path, required=True)
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--clang', default='clang')
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     receipt = args.build_receipt.resolve(strict=True)
     build, output = receipt.parent, args.output.resolve()
     if output == ROOT or ROOT.is_relative_to(output) or output.is_relative_to(build):
         parser.error('independent output directory required')
     output.mkdir(parents=True, exist_ok=False)
     record = {'complete': False, 'commands': [], 'inputs': {}, 'artifacts': {},
-              'scope': 'actual host Classes API; exact source bodies isolated for portable backend controls',
+              'scope': 'current host Classes API; independent portable selector reference on interpreter and native backends',
               'native_self_bootstrap_qualified': False}
 
     def save():
         (output / 'receipt.json').write_text(json.dumps(record, indent=2) + '\n')
 
-    runner = CommandRunner(ROOT, output, record, save)
+    runner = runner_factory(ROOT, output, record, save)
     try:
-        producer = authenticate_build(receipt, build / 'bin')
+        producer = authenticate(receipt, build / 'bin')
         native = configuration(args.clang)
         record['native_configuration'] = native
-        inputs = [receipt, SOURCE, HOST, Path(__file__).resolve(),
+        inputs = [receipt, SOURCE, HOST, FIXTURE, Path(__file__).resolve(),
                   ROOT / 'tools/shared/test_direct.py', ROOT / 'tools/shared/default_stdlib.py',
                   ROOT / 'runtime/mlf_runtime.c', *sorted((ROOT / 'runtime').glob('*.h')),
                   Path(native['clang']), Path(sys.executable).resolve(), build / 'host.o', build / 'supervisor.o']
@@ -73,41 +74,7 @@ def main():
         runner.run('host-link', [producer['ghc']['path'], *flags, '-rtsopts=ignoreAll', output / 'Main.o',
                    *objects, build / 'host.o', build / 'supervisor.o', '-o', host])
         runner.run('host-controls', [host], expected=b'PASS candidate selection: 8254 cases and 2 demand checks\nPASS candidate IDs: 12369 cases and 5 demand checks\n', timeout=180)
-        source = SOURCE.read_text()
-        body = source[source.index('  selectCandidates ::'):source.index('  methodBindings ::')]
-        if body.count('  selectCandidateOrdinals ordinal names indices supers =') != 1:
-            raise ValueError('selector extraction boundary changed')
-        fixture = output / 'CandidateSelection.hs'
-        fixture.write_text('''-- mlf:syntax shared-haskell-v1
-{-# LANGUAGE NoImplicitPrelude, NoMonomorphismRestriction, RankNTypes,
-             KindSignatures, FlexibleContexts, FlexibleInstances,
-             MultiParamTypeClasses, OverloadedStrings #-}
-module Main where {
-  import MLF.Primitive;
-  import Bootstrap.Types;
-  import Bootstrap.Std;
-  import qualified Bootstrap.Std as S;
-  import qualified Bootstrap.IntSet as I;
-''' + body + '''
-  readIndices position count = if count == 0 then ioReturn [] else do {
-    value <- getArg position; rest <- readIndices (position + 1) (count - 1);
-    ioReturn ((:) (readInt value) rest)
-  };
-  role value = case value of { InstanceEvidence -> "i"; SuperclassEvidence -> "s"; GivenEvidence -> "g" };
-  main = do {
-    selector <- getArg 0;
-    size <- getArg 1; modulus <- getArg 2; count <- getArg 3;
-    indices <- readIndices 4 (readInt count);
-    let { period = readInt modulus;
-      names = S.map (\\i -> "n" ++ showInt (if period == 0 then i else i % period)) (S.range 0 (readInt size - 1));
-      supers = [(,) SuperclassEvidence "super", (,) GivenEvidence "given", (,) InstanceEvidence "n0", (,) InstanceEvidence "n0"] };
-    putStrLn (S.concatMapString (\\((,) r n) -> role r ++ ":" ++ n ++ ";")
-      ((if eqString selector "ids"
-        then selectCandidateValues (S.map ((,) InstanceEvidence) names) supers
-        else selectCandidates names supers) (I.fromList indices)))
-  }
-}
-''')
+        fixture = FIXTURE
         emitted = runner.run('emit-native', [build / 'bin/emlf', '-i', ROOT / 'libraries/mlf-foundation',
                              '--emit-llvm-gc', fixture], timeout=240)
         llvm = output / 'program.ll'; llvm.write_bytes(emitted.stdout)
@@ -136,7 +103,7 @@ module Main where {
         for path, digest in record['inputs'].items():
             if sha(path) != digest:
                 raise ValueError('input changed: ' + path)
-        authenticate_build(receipt, build / 'bin')
+        authenticate(receipt, build / 'bin')
         record['complete'] = True
         print('PASS candidate selection: ' + json.dumps(record['vector_counts'], sort_keys=True))
     except BaseException as error:

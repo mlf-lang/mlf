@@ -41,9 +41,10 @@ ordinary source roots. There are no include overlays. Its generator:
    `Parser.parseModule`, which supplies package `main`.
 2. Selects and validates the actual requested dependency closure using
    `Module.loadGraphBy`, carrying the exact parser read in `LoadedModule`.
-3. Generates the fresh builtin object, then calls `Crate.compileSources` on
+3. Generates the fresh builtin object, then calls `CrateSession.compileSources` on
    manually ordinary-parsed and hygienically cleaned library sources, with a
-   declaration-only crate entry and the fresh builtin dependency.
+   declaration-only crate entry and the fresh builtin dependency. This is the
+   same checked open-group producer used by package specification builds.
 4. Reopens `.mlfci`/`.mlfco`, computes their SHA256 using native `fileDigest`, and
    calls `PreparedLibraries.prepareFresh`. This is registry admission; it does
    not infer a user program or create unchecked `CheckedTerm` evidence.

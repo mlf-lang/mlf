@@ -3,7 +3,7 @@
 -- parser, interpreter, optimizer and LLVM emitter; no copied implementation.
 module Main where
 
-import Control.Monad (forM_, unless)
+import Control.Monad (forM_, unless, when)
 import System.Environment (getArgs)
 import System.IO (BufferMode(LineBuffering), hSetBuffering, stdout)
 import qualified Bootstrap.Compiler as C
@@ -61,54 +61,57 @@ shape label expected term = do
   ensure (keeps (name 0) (pass term) == expected) label
   putStrLn ("PASS shape: " ++ label)
 
-shapeChecks :: IO ()
-shapeChecks = do
+shapeChecks :: Maybe String -> IO ()
+shapeChecks selection = do
   let with body = T.XELet (name 0) readCell body
       used = bind (v 0) 1 (ret unit)
-  shape "exact bind action exposes single use" False (with used)
-  shape "exact bind continuation exposes single use" False
+      checkShape label wanted term = when (maybe True (== label) selection) $ shape label wanted term
+      additional label condition diagnostic = when (maybe True (== label) selection) $ do
+        ensure condition diagnostic
+        putStrLn ("PASS shape: " ++ label)
+  checkShape "exact bind action exposes single use" False (with used)
+  checkShape "exact bind continuation exposes single use" False
     (with (bind (ret unit) 1 (v 0)))
-  shape "two-use action remains shared" True
+  checkShape "two-use action remains shared" True
     (with (bind (v 0) 1 (bind (v 0) 2 (ret unit))))
-  shape "partial bind remains opaque" True (with (p T.PIOBind [v 0]))
-  shape "non-lambda bind continuation remains opaque" True
+  checkShape "partial bind remains opaque" True (with (p T.PIOBind [v 0]))
+  checkShape "non-lambda bind continuation remains opaque" True
     (with (p T.PIOBind [v 0, v 8]))
-  shape "unrelated bind does not license substitution" True
+  checkShape "unrelated bind does not license substitution" True
     (with (p T.PSeq [bind (ret unit) 1 (ret unit), v 0]))
-  shape "ordinary lambda remains a sharing boundary" True
+  checkShape "ordinary lambda remains a sharing boundary" True
     (with (T.XEAbs (name 2) used))
-  shape "recursive group remains a sharing boundary" True
+  checkShape "recursive group remains a sharing boundary" True
     (with (T.XELetRec [(name 2, T.XEApp (v 2) used)] (v 2)))
-  shape "unknown call remains a sharing boundary" True
+  checkShape "unknown call remains a sharing boundary" True
     (with (T.XEApp (v 8) used))
-  shape "computed call remains a sharing boundary" True
+  checkShape "computed call remains a sharing boundary" True
     (with (T.XEApp (p T.PIfThenElse [v 9, v 8, v 7]) used))
-  shape "partial seq remains opaque" True (with (p T.PSeq [used]))
-  shape "two-use pure construction remains shared" True
+  checkShape "partial seq remains opaque" True (with (p T.PSeq [used]))
+  checkShape "two-use pure construction remains shared" True
     (T.XELet (name 0) (p T.PAddInt [T.XEInt 19, T.XEInt 23])
       (bind (ret (v 0)) 1 (ret (v 0))))
-  shape "pure construction under ordinary lambda remains shared" True
+  checkShape "pure construction under ordinary lambda remains shared" True
     (T.XELet (name 0) (p T.PAddInt [T.XEInt 19, T.XEInt 23])
       (T.XEAbs (name 2) (bind (ret unit) 1 (ret (v 0)))))
-  shape "scalar under write remains shared" True
+  checkShape "scalar under write remains shared" True
     (T.XELet (name 0) (p T.PAddInt [T.XEInt 19, T.XEInt 23])
       (bind (ret unit) 1 (p T.PWriteIntArray [v 7, zero, v 0])))
-  shape "scalar under return remains shared" True
+  checkShape "scalar under return remains shared" True
     (T.XELet (name 0) (p T.PAddInt [T.XEInt 19, T.XEInt 23])
       (bind (ret unit) 1 (ret (v 0))))
-  shape "unused bottom is eliminated without demand" False
+  checkShape "unused bottom is eliminated without demand" False
     (T.XELet (name 0) (p T.PPanic [T.XEString "unused"]) (ret unit))
-  ensure (A.sameNames (S.toList (O.free (with used)))
-                     (S.toList (O.free (pass (with used)))))
+  additional "substitution preserves same-hint captured identities"
+    (A.sameNames (S.toList (O.free (with used))) (S.toList (O.free (pass (with used)))))
     "substitution changed same-hint captured identities"
-  putStrLn "PASS shape: substitution preserves same-hint captured identities"
   let eligible body = K.eligible M.empty S.empty body
-  ensure (not (eligible (with used)) && eligible (pass (with used)))
+  additional "single-use action restores kernel eligibility"
+    (not (eligible (with used)) && eligible (pass (with used)))
     "bind action substitution must restore kernel eligibility"
-  putStrLn "PASS shape: single-use action restores kernel eligibility"
-  ensure (not (eligible (p T.PIOReturn [p T.PQuotInt [T.XEInt 1, zero]])))
+  additional "unsafe divisor remains ineligible"
+    (not (eligible (p T.PIOReturn [p T.PQuotInt [T.XEInt 1, zero]])))
     "unsafe quotient unexpectedly became scalar"
-  putStrLn "PASS shape: unsafe divisor remains ineligible"
 
 source :: String -> B.String
 source body = B.literal $ unlines
@@ -222,7 +225,7 @@ observe label declarations term expected = do
 
 runCase :: FilePath -> Case -> IO ()
 runCase destination (Case label body expected wantKernel) = do
-  compiled <- case C.compile (B.literal (label ++ ".hs")) (source body) of
+  compiled <- C.compile (B.literal (label ++ ".hs")) (source body) >>= \outcome -> case outcome of
     T.Left err -> fail (label ++ ": " ++ B.unpack (C.prettyError err))
     T.Right result -> pure (C.compiledTerm result)
   checkTarget compiled
@@ -255,7 +258,12 @@ main = do
   arguments <- getArgs
   case arguments of
     [destination] -> do
-      shapeChecks
+      shapeChecks Nothing
       forM_ cases (runCase destination)
       putStrLn "IO action sharing: passed (19 shape checks, 18 source cases, 3 execution forms)"
-    _ -> fail "usage: io-action-sharing OUTPUT_DIRECTORY"
+    [_, "--shape", label] -> shapeChecks (Just label)
+    [destination, "--case", label] ->
+      case [entry | entry@(Case name _ _ _) <- cases, name == label] of
+        [entry] -> runCase destination entry
+        _ -> fail "unknown IO action sharing case"
+    _ -> fail "usage: io-action-sharing OUTPUT_DIRECTORY [--shape LABEL | --case LABEL]"

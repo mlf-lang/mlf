@@ -12,6 +12,10 @@ import qualified Tests.BenchmarkSuite as Bench
 import qualified Tests.RegexRedux as RegexRedux
 import qualified Tests.TestSourceCache as SourceCache
 import qualified Tests.TestDriverCache as DriverCache
+import qualified Tests.TestCompilationCache as CompilationCache
+import qualified Test.Assert as Assert
+import qualified Test.Case as Case
+import qualified Test.Runner as Runner
 waitFor : String -> Int -> IO ()
 waitFor path attempts = do
  present <- fileExists path
@@ -107,38 +111,68 @@ mockBuild args = if S.any (\flag -> S.elem eqString flag args) (O.words "--emit-
 -- The registry contains deferred original actions. Listing IDs does not load
 -- fixture files, start tools, or execute any assertion.
 caseIdentity label = "harness/" ++ O.replace "_" "-" (if O.starts "test_" label then O.drop 5 label else label)
-families : J.Json -> J.Json -> [] ((,) String (IO ()))
-families manifest evidence = S.concat
- ((:) ((:) ((,) "harness/matrix-evidence" Boot.matrixChecks)
-  ((:) ((,) "harness/corpus-evidence" Boot.parityChecks) []))
- ((:) ((:) ((,) "harness/source-dependency-cache" (do { SourceCache.main; Coverage.passed "harness" "test_source_dependency_cache_controls" }))
-  ((:) ((,) "harness/native-driver-cache" (do { DriverCache.main; Coverage.passed "harness" "test_checked_native_driver_cache" })) []))
- ((:) ((:) ((,) "harness/release-evidence" (Release.evidenceChecks evidence manifest))
-  ((:) ((,) "harness/release-steps" Release.stepChecks)
-  ((:) ((,) "harness/release-installation" (Release.installationChecks evidence manifest)) [])))
- ((:) (S.map (\((,) label action) -> (,) (caseIdentity label) action) (Bench.cases manifest))
- ((:) ((:) ((,) "harness/regex-redux-execution" RegexRedux.main) []) [])))))
+familyTags = (:) "group:test-infrastructure" []
+family identity action = Case.test identity identity familyTags action
+ioFamily identity action = family identity (Assert.liftIO action)
+registry : J.Json -> J.Json -> [] Case.Case
+registry manifest evidence = S.concat
+ ((:) ((:) (family "harness/matrix-evidence" Boot.matrixChecks)
+  ((:) (family "harness/corpus-evidence" Boot.parityChecks) []))
+ ((:) ((:) (ioFamily "harness/source-dependency-cache" (do { SourceCache.main; Coverage.passed "harness" "test_source_dependency_cache_controls" }))
+  ((:) (ioFamily "harness/native-driver-cache" (do { DriverCache.main; Coverage.passed "harness" "test_checked_native_driver_cache" }))
+  ((:) (ioFamily "harness/test-compilation-cache" (do { CompilationCache.main; Coverage.passed "harness" "test_unified_test_compilation_cache" })) [])))
+ ((:) ((:) (family "harness/release-evidence" (Release.evidenceChecks evidence manifest))
+  ((:) (ioFamily "harness/release-steps" Release.stepChecks)
+  ((:) (ioFamily "harness/release-installation" (Release.installationChecks evidence manifest)) [])))
+ ((:) (S.map (\((,) label action) -> ioFamily (caseIdentity label) action) (Bench.cases manifest))
+ ((:) ((:) (ioFamily "harness/regex-redux-execution" RegexRedux.main) []) [])))))
 manifestFamilies = O.words "harness/release-evidence harness/release-installation harness/all-workloads-have-complete-provenance-and-fixtures harness/dna-inputs-match-pinned-fasta-fixtures harness/vendored-adaptation-patches-reconstruct-build-sources harness/pin-tampering-fails"
 releaseFamilies = O.words "harness/release-evidence harness/release-installation"
+-- The family command and the shared CLI both select the same deferred cases.
+-- The original named observation stream remains the independent campaign check.
 runFamilies : [] String -> IO ()
 runFamilies args = do
- let available = S.map S.fst (families J.empty J.empty)
+ let inventory = registry J.empty J.empty
+ let available = S.map Case.id inventory
  if Selection.listing args then putStr (S.unlines available) else do
-  (,) full selected <- case Selection.choose available args of
-   Left error -> do { putErr (error ++ "\n"); exitWith 2 }
-   Right value -> return value
-  Coverage.begin "harness" full
-  Selection.begin "harness" full selected
-  manifest <- if S.any (\name -> S.elem eqString name manifestFamilies) selected then J.read "benchmarks/manifest.json" else return J.empty
-  evidence <- if S.any (\name -> S.elem eqString name releaseFamilies) selected then J.read "tests/golden/release-evidence.json" else return J.empty
-  S.mapM_ (\((,) name action) -> if S.elem eqString name selected then do
-   action
-   Selection.passed "harness" name
-   if eqString name "harness/native-driver-cache" && S.elem eqString "harness/source-dependency-cache" selected then putStrLn "2 native cache regression checks passed" else return ()
-   else return ()) (families manifest evidence)
-  if full then putStrLn "Native benchmark/bootstrap/release harness tests passed" else putStrLn (showInt (S.length selected) ++ " harness families; 0 failures")
-  Coverage.finish "harness"
-  Selection.finish "harness"
+  let familyMode = case args of { (:) "--families" _ -> true; _ -> false }
+  if familyMode then case Selection.choose available args of
+   Left error -> usage error
+   Right ((,) _ selected) -> runSelected (Runner.Options false false "" []) selected false
+  else case Runner.plan args inventory of
+   Left error -> usage error
+   Right ((,) options selected) ->
+    if Runner.listing options then finish (Runner.runOptions options inventory selected)
+    else runSelected options (S.map Case.id selected) (S.null (Runner.selectors options))
+
+usage message = do { putErr (message ++ "\n"); exitWith 2 }
+finish action = do { code <- action; if code == 0 then return () else exitWith code }
+reportOptions : Runner.Options -> IO Runner.Options
+reportOptions options =
+ if eqString (Runner.report options) "" then do
+  path <- getEnv "MLF_TEST_CASE_REPORT"
+  case options of { Runner.Options listing json _ selectors -> return (Runner.Options listing json path selectors) }
+ else return options
+
+runSelected options selected full = do
+ configured <- reportOptions options
+ Coverage.begin "harness" full
+ Selection.begin "harness" full selected
+ manifest <- if S.any (\name -> S.elem eqString name manifestFamilies) selected then J.read "benchmarks/manifest.json" else return J.empty
+ evidence <- if S.any (\name -> S.elem eqString name releaseFamilies) selected then J.read "tests/golden/release-evidence.json" else return J.empty
+ let cases = registry manifest evidence
+ let entries = S.filter (\entry -> S.elem eqString (Case.id entry) selected) cases
+ code <- Runner.runOptionsObserved (recordFamily selected) configured cases entries
+ if code /= 0 then do { Coverage.flush; Selection.flush; exitWith code } else return ()
+ if full then putStrLn "Native benchmark/bootstrap/release harness tests passed" else putStrLn (showInt (S.length selected) ++ " harness families; 0 failures")
+ Coverage.finish "harness"
+ Selection.finish "harness"
+recordFamily selected result =
+ if Runner.passed result then do
+  let identity = Runner.identity result
+  Selection.passed "harness" identity
+  if eqString identity "harness/native-driver-cache" && S.elem eqString "harness/source-dependency-cache" selected then putStrLn "2 native cache regression checks passed" else return ()
+ else return ()
 main : IO ()
 main = do
  args <- O.allArguments
@@ -149,4 +183,6 @@ main = do
    values <- S.mapM getEnv names
    H.assert (S.all (\value -> eqString value "") values) "gate inherited compiler or collector overrides"
   (:) "--driver-cache-case" ((:) compiler []) -> DriverCache.run compiler
+  (:) "--test-compilation-cache-case" ((:) compiler []) -> CompilationCache.run compiler
+  (:) "--test-compilation-producer-changed" ((:) compiler []) -> CompilationCache.producerChanged compiler
   _ -> runFamilies args

@@ -270,21 +270,35 @@ launchFailure work = do
  right result
  putStrLn "PASS explicit-launch-failure"
 
+runSelected : String -> String -> IO () -> IO Bool
+runSelected selection label action =
+ if eqString selection "" || eqString selection label then do
+  action
+  ioReturn True
+ else ioReturn False
+
 main = do
  helper <- getEnv "MLF_ASYNC_FIXTURE"
  work <- getEnv "MLF_ASYNC_WORK"
  assert (stringLength helper > 0 && stringLength work > 0) "fixture environment missing"
- capability
- dynamic helper work
- events helper work
- queue helper work
- retention helper work
- failureScope helper work
- closed helper work
- crossScope helper work
- timeouts helper work
- transport helper work
- inheritedEnvironment helper work
- logs helper work
- launchFailure work
- putStrLn "Async.Process: 13 interpreter/native contract cases passed"
+ selection <- getEnv "MLF_ASYNC_CASE"
+ ranCapability <- runSelected selection "capability-v1" (capability)
+ ranDynamic <- runSelected selection "dynamic-nonzero-repeat-await" (dynamic helper work)
+ ranEvents <- runSelected selection "event-exactly-once" (events helper work)
+ ranQueue <- runSelected selection "queued-cancel-and-bound" (queue helper work)
+ ranRetention <- runSelected selection "retained-bound" (retention helper work)
+ ranFailureScope <- runSelected selection "scope-left-cancel-and-join" (failureScope helper work)
+ ranClosed <- runSelected selection "normal-scope-join-closed-handle" (closed helper work)
+ ranCrossScope <- runSelected selection "cross-scope-handle" (crossScope helper work)
+ ranTimeouts <- runSelected selection "running-and-queued-timeout" (timeouts helper work)
+ ranTransport <- runSelected selection "transport-argv-env-cwd-stdin" (transport helper work)
+ ranInheritedEnvironment <- runSelected selection "inherited-environment-at-launch" (inheritedEnvironment helper work)
+ ranLogs <- runSelected selection "file-backed-large-logs" (logs helper work)
+ ranLaunchFailure <- runSelected selection "explicit-launch-failure" (launchFailure work)
+ if eqString selection "" then putStrLn "Async.Process: 13 interpreter/native contract cases passed"
+ else if ranCapability || ranDynamic || ranEvents || ranQueue ||
+  ranRetention || ranFailureScope || ranClosed || ranCrossScope ||
+  ranTimeouts || ranTransport || ranInheritedEnvironment || ranLogs ||
+  ranLaunchFailure
+ then ioReturn ()
+ else exitWith 2

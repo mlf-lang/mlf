@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
-"""Offline descriptive analysis. Reject incomplete/duplicate/nonfinite/incompatible cohorts."""
+"""Analyze timing and memory from qualified compiler-shape cohorts."""
 from pathlib import Path
+import fit_growth
 import worker
 import argparse
 import collections
@@ -10,6 +11,9 @@ import json
 import math
 import statistics as S
 import query_cache as Q
+
+
+RSS_SAMPLE = fit_growth.RSS_SAMPLE
 
 
 def require(condition,message):
@@ -34,22 +38,34 @@ def compatibility(plan):
     builtin={k:v for k,v in toolchain['builtin'].items() if k.endswith(('.mlfci','.mlfco'))}
     return {'endpoint':benchmark['endpoint']['id'],'suite':benchmark['suite'],'suite_version':benchmark['suite_version'],
             'order':benchmark.get('order'),'order_seed':benchmark.get('order_seed'),
+            'native_target_policy':plan.get('native_target_policy'),
             'repeats':benchmark['repeats'],'ghc_version':toolchain['ghc']['version'],
             'ghc_path':toolchain['ghc']['path'],'clang_version':toolchain['clang']['version'],
             'producer_receipt_sha256':toolchain['producer']['receipt_sha256'],
             'producer_emlf_sha256':toolchain['producer']['emlf_sha256'],
+            'reference_commit':plan.get('compiler_reference',{}).get('commit'),
+            'reference_runtime_sha256':plan.get('compiler_reference',{}).get('runtime_sha256'),
+            'reference_emlf_sha256':plan.get('compiler_reference',{}).get('emlf_sha256'),
             'builtin':builtin,'host_platform':plan['host'].get('platform'),'host_machine':plan['host'].get('machine')}
 
 
 def analyze(folder):
     folder=Path(folder);plan=load(folder/'plan.json');receipt=load(folder/'receipt.json')
-    require(plan.get('benchmark',{}).get('schema')==2,
+    require(plan.get('benchmark',{}).get('schema') in (2,3),
             'cohort predates benchmark schema 2; re-measure it instead of relabelling it')
     require(receipt['complete'] and receipt['all_cases_passed'] and not receipt['failures'],'incomplete/failed cohort; do not silently omit failures')
     require(sha(folder/'plan.json')==receipt['plan_sha256'],'frozen plan digest')
+    has_reference=plan['benchmark']['schema']==3
+    if has_reference:
+        ref=plan['compiler_reference']
+        require(ref['commit'] and plan['inputs'][str(Path(ref['producer'])/'bin/emlf')]==ref['emlf_sha256'],
+                'pinned baseline compiler')
+        if 'runtime' in ref:
+            require(Q.valid_hash(ref.get('runtime_sha256')) and
+                    plan['inputs'].get(ref['runtime']) == ref['runtime_sha256'], 'pinned baseline runtime')
     expected={(r['case'],r['position'],r['lane']) for r in plan['schedule']}
     actual=[(r['case'],r['position'],r['lane']) for r in receipt['runs']]
-    require(len(actual)==len(set(actual)) and set(actual)==expected,'exact scheduled runs, no missing or duplicate samples')
+    require(len(actual)==len(expected)==len(plan['schedule']) and set(actual)==expected,'exact scheduled runs, no missing or duplicate samples')
     repeats=plan['benchmark']['repeats']
     groups=collections.defaultdict(list);samples=[]
     for order,index in enumerate(plan['schedule']):
@@ -59,23 +75,31 @@ def analyze(folder):
         require(run['command'].get('exit_code')==0 and run['command'].get('reason') is None,'clean exit without guard')
         for k in ['wall_seconds','child_user_seconds','child_system_seconds']:
             require(math.isfinite(run['command'][k]) and run['command'][k]>=0,'finite nonnegative timings')
-        if run['lane']=='mlf':require(type(run['fresh']) is int and run['fresh']>0 and
+        peak = run['command'].get(RSS_SAMPLE)
+        require(peak is None or (type(peak) is int and peak >= 0),
+                f"invalid sampled peak RSS for {run['case']} {run['lane']} at position {run['position']}")
+        if run['lane'] in ('mlf','reference'):require(type(run['fresh']) is int and run['fresh']>0 and
             type(run['reused']) is int and run['reused']==0,'fresh MLF target')
         groups[run['case'],run['lane']].append(run)
         samples.append({'cohort':plan['benchmark']['cohort'],'order':order,'case':run['case'],'lane':run['lane'],
             'position':run['position'],'wall_seconds':run['command']['wall_seconds'],
             'child_user_seconds':run['command']['child_user_seconds'],
             'child_system_seconds':run['command']['child_system_seconds'],
+            RSS_SAMPLE:peak,
             'exit_code':run['command'].get('exit_code'),'fresh':run.get('fresh'),'reused':run.get('reused'),
             'output_correct':run['output_correct'],'started_utc':run['command'].get('started_utc'),
             'executable_sha256':run.get('executable_sha256')})
     rows=[]
     for case in plan['cases']:
         require(sha(case['source'])==case['source_sha256'],'unchanged shared source')
+        for library in worker.dependencies(case):
+            path = library['source']
+            require(sha(path) == library['sha256'] == plan['inputs'].get(path),
+                    f'unchanged pinned dependency source: {path}')
         row={'cohort':plan['benchmark']['cohort'],'endpoint':plan['benchmark']['endpoint']['id'],
              'case':case['id'],'family':case['family'],'size':case['size'],
              'source_bytes':case['source_bytes'],'source_sha256':case['source_sha256']}
-        for lane in ['ghc','mlf']:
+        for lane in (['ghc','mlf','reference'] if has_reference else ['ghc','mlf']):
             rs=groups[case['id'],lane];require(len(rs)==repeats,'exactly '+str(repeats)+' samples per compiler')
             times=[r['command']['wall_seconds'] for r in rs]
             row[lane+'_wall_median']=S.median(times);row[lane+'_wall_min']=min(times);row[lane+'_wall_max']=max(times)
@@ -83,40 +107,69 @@ def analyze(folder):
             row[lane+'_user_median']=S.median(r['command']['child_user_seconds'] for r in rs)
             row[lane+'_system_median']=S.median(r['command']['child_system_seconds'] for r in rs)
             row[lane+'_samples']=times
-            if lane=='mlf':
-                row['fresh']=rs[0]['fresh'];row['reused']=0;row['max_group_members']=rs[0]['max_group_members']
-                require(all(r['fresh']==row['fresh'] for r in rs),'stable query group count')
+            peaks=[r['command'].get(RSS_SAMPLE) for r in rs]
+            row[lane+'_peak_rss_bytes']=fit_growth.median_peak_rss(peaks)
+            if lane in ('mlf','reference'):
+                prefix = '' if lane=='mlf' else 'reference_'
+                row[prefix+'fresh']=rs[0]['fresh'];row[prefix+'reused']=0;row[prefix+'max_group_members']=rs[0]['max_group_members']
+                require(all(r['fresh']==row[prefix+'fresh'] for r in rs),'stable query group count')
                 require(sum(r['raw_compared_with_first_mlf_leg'] for r in rs)==repeats-1,'actual raw-byte comparisons on every repetition')
                 for stage in worker.mlf_stage_names(plan['benchmark']['endpoint']['id']):
                     ss=[next(s for s in r['stages']['stages'] if s['name']==stage) for r in rs]
                     for metric in ['wall_seconds','user_seconds','system_seconds']:
                         require(all(math.isfinite(s[metric]) and s[metric]>=0 for s in ss),'valid stage timings')
-                        row[stage+'_'+metric+'_median']=S.median(s[metric] for s in ss)
-                directories=sorted(p for p in (folder/'legs').iterdir() if p.name.endswith(case['id']+'-mlf'))
+                        row[prefix+stage+'_'+metric+'_median']=S.median(s[metric] for s in ss)
+                directories=sorted(p for p in (folder/'legs').iterdir() if p.name.endswith(case['id']+'-'+lane))
                 require(len(directories)==repeats,'all retained leg directories')
+                if row['endpoint'] == worker.CACHED_ENDPOINT:
+                    producer = plan['toolchain']['producer'] if lane == 'mlf' else plan['compiler_reference']
+                    for directory, sample in zip(directories, rs):
+                        require(sample.get('codegen_cache') == Q.cold_codegen_evidence(
+                            directory/'build', producer['emlf_sha256']), 'verified cold code generation receipt')
                 inventories=[load(d/'query-cache-inventory.json') for d in directories]
-                graph=[any(k.startswith(Q.GRAPH) or k.endswith(('.mlfqg','.mlfqr')) for k in inv)
-                       for inv in inventories]
-                require(all(graph) or not any(graph),'stable query storage format')
-                row['query_storage']=next((f'query-graph-v{v}' for v in (3, 2, 1) if f'query-graph-v{v}/CURRENT' in inventories[0]), 'query-graph-v1') if all(graph) else 'legacy-mlfq'
-                if all(graph):
-                    checks=[]
-                    for directory,inventory in zip(directories,inventories):
-                        evidence=directory/'query-graph-evidence.json'
-                        require(evidence.is_file(),'query graph evidence missing; re-measure, do not reconstruct an old cohort')
-                        checks.append(Q.check_graph(inventory,load(evidence),row['fresh'],row['max_group_members'],
-                            'compiler-shapes/'+case['id'],plan['toolchain']['producer']['emlf_sha256']))
-                    require(all(inv==inventories[0] for inv in inventories),'stable graph inventory bytes and identities')
-                    require(all(c['groups']==checks[0]['groups'] for c in checks),'stable ordered graph groups and raw hashes')
-                    row['query_files']=checks[0]['files']
-                    row['query_bytes_median']=S.median(c['bytes'] for c in checks)
-                else:
-                    counts=[sum(k.endswith('.mlfq') for k in inv) for inv in inventories]
-                    require(all(n==row['fresh'] for n in counts),'one persisted query object per fresh group')
-                    row['query_files']=counts[0]
-                    row['query_bytes_median']=S.median(sum(v['bytes'] for k,v in inv.items() if k.endswith('.mlfq')) for inv in inventories)
+                checks=[]
+                for directory,inventory in zip(directories,inventories):
+                    evidence=directory/'query-graph-evidence.json'
+                    require(evidence.is_file(),'query graph evidence missing; re-measure the cohort')
+                    inputs = (inventory,load(evidence),row[prefix+'fresh'],row[prefix+'max_group_members'],
+                              'compiler-shapes/'+case['id'])
+                    if lane == 'reference':
+                        checks.append(Q.check_reference_inventory(*inputs))
+                    else:
+                        checks.append(Q.check_graph(*inputs,plan['toolchain']['producer']['emlf_sha256']))
+                require(all(inv==inventories[0] for inv in inventories),'stable graph inventory bytes and identities')
+                require(all(c['groups']==checks[0]['groups'] for c in checks),'stable ordered graph groups and raw hashes')
+                row[prefix+'query_storage']='reference-inventory' if lane=='reference' else Q.CACHE_DIRECTORY
+                row[prefix+'query_files']=checks[0]['files']
+                row[prefix+'query_bytes_median']=S.median(c['bytes'] for c in checks)
+        if has_reference:
+            row['reference_commit']=plan['compiler_reference']['commit']
+            row['mlf_over_reference']=row['mlf_wall_median']/row['reference_wall_median']
+            row['mlf_over_reference_peak_rss']=fit_growth.peak_rss_ratio(row['mlf_peak_rss_bytes'],row['reference_peak_rss_bytes'])
+            cell=[sample for sample in samples if sample['case']==case['id']]
+            fit_growth.paired_cell(cell,repeats,reference='reference')
+        mlf_rss, ghc_rss = (row[field] for field in fit_growth.PEAK_RSS_MEDIANS)
+        row[fit_growth.PEAK_RSS_RATIO] = fit_growth.peak_rss_ratio(mlf_rss, ghc_rss)
         row['mlf_over_ghc']=row['mlf_wall_median']/row['ghc_wall_median'];rows.append(row)
     return rows,plan,receipt,samples
+
+
+def baseline_table(rows, plan):
+    choice = plan.get('baseline_selection')
+    if not choice:
+        return []
+    if not choice['commit']:
+        return ['', 'No committed compiler baseline for the initial commit.']
+    lines = ['', '## Working tree vs committed compiler', '',
+             f"Candidate `{choice['candidate_commit']}`, baseline `{choice['commit']}` ({choice['basis']}).", '',
+             '| Family | Size | Candidate (s) | Baseline (s) | Time ratio | Candidate RSS (MiB) | Baseline RSS (MiB) | RSS ratio |',
+             '|---|---:|---:|---:|---:|---:|---:|---:|']
+    for row in rows:
+        if 'mlf_over_reference' in row:
+            rss = ' | '.join(fit_growth.format_peak_rss(row, 'reference'))
+            lines.append(f"| {row['family']} | {row['size']} | {row['mlf_wall_median']:.4f} | "
+                         f"{row['reference_wall_median']:.4f} | {row['mlf_over_reference']:.4f} | {rss} |")
+    return lines
 
 
 def markdown(report,rows,samples):
@@ -152,12 +205,51 @@ def markdown(report,rows,samples):
     if report['duplicate_cells_across_cohorts']:
         lines+=['','Cells present in more than one cohort (listed, never combined): '
                 +', '.join('`'+c['family']+'-'+str(c['size'])+'`' for c in report['duplicate_cells_across_cohorts'])+'.']
+    lines+=['', '## Build performance checks', '']
+    for cohort in report['cohorts']:
+        label = cohort['benchmark']['cohort']
+        if len(report['cohorts']) > 1:
+            lines += ['### ' + label, '']
+        lines += fit_growth.markdown(cohort['growth']) + ['']
+        cell_rows = [row for row in rows if row['cohort'] == label]
+        lines += fit_growth.peak_rss_markdown(cell_rows) + ['']
+        lines += baseline_table(cell_rows, cohort['plan'])
+        if 'reference_growth' in cohort:
+            lines += ['', *fit_growth.markdown(cohort['reference_growth'], 'reference')]
     lines+=['','## Reading this table','']
     lines+=['- '+limit for limit in report['claim_limits']]
     lines+=['- Spread is (max - min) / median over the recorded repetitions; it is a description of this window, not an error bar.',
             '- A ratio above 1.00 means MLF took longer for that cell in this cohort. It is not a universal speed claim.',
             '- Cohorts are separate windows and are never pooled into one median.','']
     return '\n'.join(lines)
+
+
+def save_recorded_growth(folder):
+    """Publish a standalone growth report beside a recorder receipt."""
+    receipt_path = folder / 'receipt.json'
+    receipt = load(receipt_path)
+    if receipt['complete'] and receipt['all_cases_passed'] and not receipt['failures']:
+        rows, plan, _, samples = analyze(folder)
+    else:
+        plan_path = folder / 'plan.json'
+        require(sha(plan_path) == receipt['plan_sha256'], 'frozen plan digest')
+        plan = load(plan_path)
+        rows = [dict(case=case['id'], family=case['family'], size=case['size'], status='unqualified')
+                for case in plan['cases']]
+        samples = []
+    reports = fit_growth.family_reports(rows, samples, plan['benchmark']['repeats'])
+    result = {'endpoint': plan['benchmark']['endpoint']['id'], 'receipt_sha256': sha(receipt_path),
+              'growth': reports}
+    extra = baseline_table(rows,plan)
+    if 'compiler_reference' in plan:
+        result['baseline_selection'] = plan['baseline_selection']
+        result['reference_growth'] = fit_growth.family_reports(rows,samples,plan['benchmark']['repeats'],'reference')
+        extra.extend(['', *fit_growth.markdown(result['reference_growth'], 'reference')])
+    (folder / 'growth.json').write_text(json.dumps(result, indent=2) + '\n')
+    path = folder / 'growth.md'
+    path.write_text('\n'.join(['# Build performance checks', '', *fit_growth.markdown(reports), '',
+                              *fit_growth.peak_rss_markdown(rows), *extra, '']))
+    return path
 
 
 def main():
@@ -172,13 +264,15 @@ def main():
             'plan_sha256':sha(cohort/'plan.json'),'compile_runs':len(receipt['runs']),
             'executable_oracle_runs':sum(len(r['oracle_inputs']) for r in receipt['runs']),
             'cell_count':len(plan['cases']),'host':plan['host'],'compatibility':compatibility(plan),
-            'source':plan['source']})
+            'source':plan['source'],'growth':fit_growth.family_reports(data,points,plan['benchmark']['repeats'])})
+        if 'compiler_reference' in plan:
+            cohorts[-1]['reference_growth']=fit_growth.family_reports(data,points,plan['benchmark']['repeats'],'reference')
     reference=cohorts[0]['compatibility']
     for cohort in cohorts[1:]:
         difference=sorted(k for k in reference if cohort['compatibility'][k]!=reference[k])
         require(not difference,'incompatible cohorts differ in: '+', '.join(difference))
     seen=collections.Counter((r['family'],r['size']) for r in rows)
-    report={'scope':'descriptive measured medians, ratio of medians; no confidence intervals; cohorts are never pooled',
+    report={'scope':'timing and peak RSS medians with paired growth estimates per cohort',
         'endpoint':reference['endpoint'],
         'endpoint_summary':cohorts[0]['benchmark']['endpoint'],
         'native_installed_emlf_measured':False,

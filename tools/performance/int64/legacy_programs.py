@@ -11,7 +11,10 @@ def cases(root):
   rows=[tuple(json.loads(v) for v in row) for row in re.findall(TRIPLE,section)]
   if len(rows)!=count:raise ValueError('legacy literal-case inventory changed')
   for label,source,expected in rows:
-   if failure:source='do { putStrLn "before"; '+source+' }'
+   if failure:
+    # These probe actions can return an array or an element on success. The
+    # executable's IO () entry must still perform the original action first.
+    source='do { putStrLn "before"; '+source+'; ioReturn () }'
    result.append({'label':label,'source':source,'expected':expected,'failure':failure})
  return result
 

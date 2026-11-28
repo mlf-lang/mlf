@@ -126,6 +126,7 @@ module Bootstrap.Dependency where {
       SSourceDefinition inner -> visit inner rest; SCallSite _ _ inner -> visit inner rest;
       SGivenScope locals inner -> collect locals inner rest;
       SApp f a -> visit f (visit a rest);
+      SApplyDictionaries f names -> visit (referenceExpr f) (foldr (\n -> visit (SVar n)) rest names);
       SGlobal i n -> prepend (DeclRef i n) rest;
       SVar n -> prepend (LexicalRef (lexicalValueName n)) rest;
       SConstructor _ -> rest; SPrimitive _ -> rest; SIntLit _ -> rest; SBoolLit _ -> rest;
@@ -199,6 +200,7 @@ module Bootstrap.Dependency where {
       }
     } in case term of {
       SApp f a -> visit f (visit a rest);
+      SApplyDictionaries f arguments -> visit (referenceExpr f) (foldr (\n -> visit (SVar n)) rest arguments);
       SVar n -> if lexical then emit (LexicalRef (lexicalValueName n)) rest else rest;
       SGlobal i n -> emit (DeclRef i n) rest;
       SSourceDefinition body -> visit body rest;
@@ -207,6 +209,7 @@ module Bootstrap.Dependency where {
       SAnn body _ -> visit body rest;
       SChecked _ body -> visit body rest;
       SLam n _ body -> bind [n] body rest;
+      SBindDictionaries names body -> bind names body rest;
       SLet n rhs body -> visit rhs (bind [n] body rest);
       SDeclScope owners group -> scoped owners group;
       SLetRec defs body -> recursive (bind (defNames defs)) defs body;
@@ -234,6 +237,7 @@ module Bootstrap.Dependency where {
     SSourceDefinition body -> visit body rest;
     SCallSite _ _ body -> visit body rest;
     SApp f a -> visit f (visit a rest);
+    SApplyDictionaries f names -> visit (referenceExpr f) (foldr (\n -> visit (SVar n)) rest names);
     SGlobal i n -> case rest of { Observation vs ts cs ks -> Observation ((:) (DeclRef i n) vs) ts cs ks };
     SVar n -> case rest of { Observation vs ts cs ks -> Observation ((:) (LexicalRef (lexicalValueName n)) vs) ts cs ks };
     SConstructor n -> case rest of { Observation vs ts cs ks -> Observation vs ts ((:) n cs) ks };
@@ -261,6 +265,8 @@ module Bootstrap.Dependency where {
       };
       SLam n a b ->
         merge (observeOptional a) (bindObservation (S.singleton n) (child b));
+      SBindDictionaries names body ->
+        bindObservation (S.fromList compareString names) (child body);
       SLet n a b ->
         merge (child a) (bindObservation (S.singleton n) (child b));
       SAnn a t -> observeTypeAfter (child a) (observeAnnotation t);

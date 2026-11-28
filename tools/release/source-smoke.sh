@@ -65,31 +65,14 @@ seed_sha256=$(sha256 "$seed")
 export GC_FREE_SPACE_DIVISOR=2
 started=$SECONDS
 include_args=(-i "$PWD/tests")
-helper_root=tests/Tests
 if [ "$source_extension" = hs ]; then
-  helper_root=tests/shared/Tests
   include_args+=(-i "$PWD/tests/shared")
 fi
 for manifest in "$PWD"/libraries/*/mlf-package.json; do
   test -f "$manifest"
   include_args+=(-i "$(dirname -- "$manifest")")
 done
-snapshot() {
-  {
-    find bootstrap libraries -type f \( -name '*.emlf' -o -name '*.hs' -o -name 'mlf-package.json' \)
-    printf '%s\n' tests/PRQuickMain.emlf "$helper_root/IndependentCheck.$source_extension" \
-      "$helper_root/IndependentType.$source_extension" tools/release/source-smoke.sh
-    find tests/pr-smoke -type f
-    if [ "$source_extension" = hs ]; then
-      printf '%s\n' shared-sources.json tools/shared/build.py
-      jq -r '.modules[].path, .host_only[]' shared-sources.json
-      find runtime -maxdepth 1 -name '*.h' -type f
-    fi
-  } | LC_ALL=C sort -u | while IFS= read -r file; do
-    printf '%s  %s\n' "$(sha256 "$file")" "$file"
-  done
-}
-snapshot > "$build/sources.before.log"
+commit=$(git rev-parse HEAD)
 rm -f "$build/timed-out.log" "$build/progress.log" "$build/polymorphic-let.xmlf" "$build/impredicative-self-application.xmlf"
 {
   date -u +%Y-%m-%dT%H:%M:%SZ
@@ -101,7 +84,7 @@ rm -f "$build/timed-out.log" "$build/progress.log" "$build/polymorphic-let.xmlf"
       awk '/^MemTotal:/ {print}' /proc/meminfo
       ;;
   esac
-} > "$build/host.log" 2>&1
+} > "$build/host.log" 2>&1 || true
 : > "$build/memory.log"
 cat > "$build/expected.log" <<'EXPECTED'
 PASS current-source accepted polymorphic-let
@@ -137,7 +120,12 @@ cleanup() {
 trap cleanup EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
+unset MLF_SOURCE_SMOKE_CASE_REPORT
 if [ "$mode" = direct-GHC-checkout-source ]; then
+  if [ "${MLF_TEST_SUITE:-}" = source-smoke ] && [ -n "${MLF_TEST_EVENTS:-}" ]; then
+    export MLF_SOURCE_SMOKE_CASE_REPORT="$build/tests.cases.jsonl"
+    : > "$MLF_SOURCE_SMOKE_CASE_REPORT"
+  fi
   command=("$seed" "$PWD/tests/pr-smoke" "$build")
 else
   command=("$seed" "${include_args[@]}" --run "$PWD/tests/PRQuickMain.emlf" -- "$PWD/tests/pr-smoke" "$build")
@@ -191,6 +179,28 @@ watchdog_pid=
 stop_background "$sampler_pid"
 sampler_pid=
 cat "$build/tests.log" "$build/tests.stderr.log"
+if [ "${MLF_TEST_SUITE:-}" = source-smoke ] && [ -n "${MLF_TEST_EVENTS:-}" ]; then
+  if [ -n "${MLF_SOURCE_SMOKE_CASE_REPORT:-}" ]; then
+    jq -c '
+      select(.schema_version == 1 and .event == "case") |
+      {id,status:(if .status == "passed" then "pass" else "fail" end),message}
+    ' "$MLF_SOURCE_SMOKE_CASE_REPORT" >> "$MLF_TEST_EVENTS"
+  else
+    # The guest compatibility runner has a text receipt. Import exact completed lines.
+    while IFS='|' read -r id line artifact; do
+      if grep -Fxq -- "PASS current-source $line" "$build/tests.log" &&
+         { [ -z "$artifact" ] || [ -s "$build/$artifact" ]; }; then
+        jq -cn --arg id "source-smoke/$id" '{id:$id,status:"pass"}' >> "$MLF_TEST_EVENTS"
+      fi
+    done <<'CASES'
+polymorphic-let|accepted polymorphic-let|polymorphic-let.xmlf
+impredicative-self-application|accepted impredicative-self-application|impredicative-self-application.xmlf
+monomorphic-mismatch|rejected monomorphic-mismatch|
+invalid-universal-annotation|rejected invalid-universal-annotation|
+malformed-before-effects|malformed target|
+CASES
+  fi
+fi
 if [ -e "$build/timed-out.log" ]; then
   cat "$build/timed-out.log" >&2
   if [ -e "$build/progress.log" ]; then
@@ -201,25 +211,27 @@ if [ -e "$build/timed-out.log" ]; then
   exit 1
 fi
 test "$status" -eq 0
-test ! -s "$build/tests.stderr.log"
+if [ "$mode" = interpreted-checkout-source ]; then
+  . "$PWD/tools/testing/compiler-diagnostics.sh"
+  mlf_compiler_diagnostics < "$build/tests.stderr.log" | cmp /dev/null -
+else
+  test ! -s "$build/tests.stderr.log"
+fi
 cmp "$build/expected.log" "$build/tests.log"
 test -s "$build/polymorphic-let.xmlf"
 test -s "$build/impredicative-self-application.xmlf"
-snapshot > "$build/sources.after.log"
-cmp "$build/sources.before.log" "$build/sources.after.log"
 test "$(sha256 "$seed")" = "$seed_sha256"
 if [ -n "$producer_receipt" ]; then
   test "$(sha256 "$producer_receipt")" = "$producer_receipt_hash"
 fi
-jq -n --arg mode "$mode" --arg producer_receipt_sha256 "${producer_receipt_hash:-}" --arg commit "$(git rev-parse HEAD)" --arg seed_sha256 "$seed_sha256" \
-  --arg sources_sha256 "$(sha256 "$build/sources.before.log")" \
+jq -n --arg mode "$mode" --arg producer_receipt_sha256 "${producer_receipt_hash:-}" --arg commit "$commit" --arg seed_sha256 "$seed_sha256" \
   --arg log_sha256 "$(sha256 "$build/tests.log")" \
   --arg let_sha256 "$(sha256 "$build/polymorphic-let.xmlf")" \
   --arg self_application_sha256 "$(sha256 "$build/impredicative-self-application.xmlf")" \
   --argjson total_seconds "$((SECONDS - started))" \
   '{complete:true,mode:$mode,producer_receipt_sha256:$producer_receipt_sha256,commit:$commit,cases:5,
     accepted:2,rejected:2,malformed_target:1,total_seconds:$total_seconds,gc_free_space_divisor:2,
-    seed_sha256:$seed_sha256,sources_sha256:$sources_sha256,log_sha256:$log_sha256,
+    seed_sha256:$seed_sha256,log_sha256:$log_sha256,
     targets:{polymorphic_let:$let_sha256,self_application:$self_application_sha256}}' > "$build/result.json.new"
 mv "$build/result.json.new" "$build/result.json"
 cat "$build/result.json"

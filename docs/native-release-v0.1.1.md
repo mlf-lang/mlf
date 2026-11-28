@@ -38,7 +38,7 @@ is retained separately. No packaging guard was changed. Main now retains outer
 test logs and stderr in future workflow artifacts. Its README also uses two
 native generations, with input tools kept outside the candidate output directory.
 
-The [machine-readable record](native-release-v0.1.1.json) binds the source,
+The [machine-readable record](https://github.com/mlf-lang/mlf/blob/0704d216b8cf6d887d3737efa30a2eae3c152f0a/docs/native-release-v0.1.1.json) binds the source,
 compiler, native manager, Clang, GMP, BDWGC, test-driver and supervisor hashes.
 The supplementary `mlf-0.1.1-validation.tar.gz` release asset retains successful
 reports, local process samples, LLVM, serialized targets, logs, tool context,

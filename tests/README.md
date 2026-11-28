@@ -3,6 +3,10 @@
 For suite migration, CI deduplication and timing comparisons, follow the
 [test migration roadmap](../docs/test-migration-roadmap.md).
 
+Historical source and release certification has been retired from current
+qualification. See [retirement and archival reproduction](../docs/testing-history-retirement.md)
+for the preserved behavior checks and the Git snapshot of the old audits.
+
 The root `tuple-list` test target checks tuple/list sugar through the checkout
 frontend: fixed ASTs and types, malformed syntax, current and frozen target
 checking, serialized-target round trips, module scope and lazy interpretation.
@@ -16,29 +20,26 @@ LLVM execution parity or a self-hosting fixed point.
 The POSIX root `tuple-list-native` target builds the checkout compiler and runs
 the actual interpreter/native fixture. Run
 `./mlfpkg --timeout 21600 test --target tuple-list-native`, or use an already
-built compiler with `bash tools/release/test-tuple-list.sh /absolute/path/to/emlf`. With
+built toolset with `bash tools/release/test-tuple-list.sh /absolute/path/to/emlf`.
+The script uses the sibling `compiler-tests` executable, or the executable selected
+by `MLF_TEST_COMPILATION_SERVICE`; the package target builds both required tools. With
 Clang, GMP and BDWGC configured, it checks nine independently specified output
 lines on both paths, including recursion, tuple arities, do patterns and lazy
 fields. Its source and expected output are `fixtures/tuple-list-runtime.*`;
 logs and generated LLVM default to `.mlf-build/tuple-list-runtime/`.
 
-Pull requests require the small [compiler source smoke suite](../docs/ci.md):
-the verified seed interprets `PRQuickMain.emlf` against the checkout frontend and
-current/frozen target checkers through the split library roots, with two accepted
-cases, two source rejections and one malformed target. This does not build fresh
-tools or test current LLVM execution. Every push to `main` automatically runs all
-six complete Linux/macOS campaigns, the native Windows qualification and the
-full ten-workload Benchmark Game with seven samples and explicit 3x C compilation
-/ 2x C runtime gates. The eight direct CLI and three package/cache checks are
-preserved against the final macOS candidate. Manual CI with `full_validation`
-(or `self_host`) enabled runs the same graph. SDK packaging and publication are
-reserved for explicit release runs; no full-test or platform coverage is silently
-replaced by a smoke result. See [the CI policy](../docs/ci.md).
+The ordinary CI routine uses one GHC O0 producer for source smoke, direct-host
+checks, TupleList, Figure 12, parity and the interpreter/LLVM backend matrix.
+The optimizer profile retains its O2 checks and measured compiler-shape
+comparison. The Windows runtime and native C lifecycle jobs run their own
+platform adapters. Manual CI with `full_validation` or `self_host` enabled
+runs native qualification. Explicit release workflows also rehearse packaging
+and relocation. [CI policy](../docs/ci.md)
 
-The broader campaign remains available as `tools/release/native-ci.sh extended-pr-smoke`:
-framework/process contracts, Figure 12, four independent checker controls,
-12 interpreter/LLVM fixtures and package/cache checks. The six full root groups
-below retain their existing coverage.
+The expanded native smoke profile remains available as
+`tools/release/native-ci.sh extended-pr-smoke`. It checks the framework
+contracts, Figure 12, four independent target controls, 12 backend fixtures and
+package cache behavior. It uses the same Figure 12 registry as native unit.
 
 The local `mlf-tests` package preserves the original assertions, input corpora,
 runtime event traces, generated graph properties, and harness fault injections.
@@ -49,12 +50,14 @@ metadata. The six root commands remain full-qualification campaigns. Selected
 families share their execution unit's setup. Core uses four independent
 compilation targets while retaining the same logical execution unit.
 The test-owned `compiler-tests` runner is a private root executable; its sources
-live in `tests/CompilerTestsMain.emlf` and `Tests/CompilerTests.emlf`. It receives
+live in `tests/MLF/Entry/CompilerTests.hs` and `tests/Tests/CompilerTests.hs`. It receives
 the real package manager through `--manager`, keeps the existing six root groups
 and report paths, and fingerprints the manager and runner separately.
-The old Haskell/Python suites and Haskell compiler have been removed.
-No GHC, Cabal, or Python executable is needed. C fixtures live in `tests/native/`;
-benchmark baselines and golden oracle data remain unchanged.
+The shared source tree supplies both the GHC-hosted compiler and the native
+self-built compiler. Python dispatches specialized producers through the
+[external test catalog](external-suites.json). C fixtures live in `tests/native/`.
+The [Phase 1 handoff](../docs/test-migration-phase-1/README.md) records the
+coverage mappings and comparison commands.
 
 The reusable [`mlf-test` library](../testing/README.md) provides `Test.Case`,
 `Test.Assert` and `Test.Runner`. `int-set-unions` is the first focused runner
@@ -70,21 +73,18 @@ required fallbacks, existing conditional/layout compatibility, diagnostics, and
 independently checked target round trips. The inventory additions are transcribed
 from the authored assertions in `Tests.Guards`, without changing existing oracles.
 
-The ordinary-recursion amendment migrates four signature-required rejection
-identities to their reviewed acceptance controls and adds three graph/qualified
-module/crate leaves: 739 - 4 + 7 = 742. All 735 unaffected identities retain
-their family and order. The static migration guard compares this explicit delta
-with the registry, catalog and golden inventory; discovery is not a claim that
-all 746 actions have executed.
+The current [Core descriptor contract](golden/core-registry-contract.json)
+records the public IDs, labels, families and discovery order, independently of
+the compiler's emitted inventory. Metadata checks compare it directly with the
+current catalog. The campaign runner and retained-evidence verifier compare
+real discovery and execution reports with that contract. Adding a case requires
+updating these current public expectations, without replaying old migrations.
+Discovery alone does not establish that an action executed.
 
-The canonical-source cutover adds a separately reviewed 742 → 746 amendment:
-eight explicit label migrations and four upstream do/surface controls. It retains
-the original recursion migration and all unlisted family/label ordering. Canonical
-Unit, String equality and MonadFail changes have explicit oracles; unsigned
-same-name functions and divergent loops are type-only positive controls, not
-runtime fixtures. The static guard preserves the old helper and partition source
-pins and projects only reviewed canonical tokens plus two intended annotation
-strings. See the focused recursion README for scope and validation limits.
+Canonical Unit, String equality and MonadFail behavior have explicit oracles;
+unsigned same-name functions and divergent loops are type-only positive
+controls, not runtime fixtures. See the focused recursion README for scope
+and validation limits.
 
 The shared test library contains helper, transport, collection-wrapper and
 independent-checker modules, plus `Tests.Coverage`, `Tests.TestDrivers`,
@@ -134,28 +134,47 @@ Root builds and nested test builds share a checked artifact store through
 `{cache}` and `--cache-dir`. Each test group keeps its own `suite-build` report
 and logs. Source/tool identities, artifact checksums and recursive dependency
 receipts still control reuse; a fresh self-host stage keeps a new store.
-Prepared port targets and source driver LLVM now use the compiler module loader's
-current import closure, including ordered search roots and newly introduced
-module shadows. Search roots come from the resolved package graph, including
-the compiler libraries under `libraries/`; Port also includes `tests/`.
-Unrelated example, benchmark and test files remain in the full
-verification snapshot without invalidating these artifacts. Port targets retain
-their independent checking and serialization receipts.
+Port preparation resolves each fixture's imports using the compiler's search
+order, including `tests/` and the packages under `libraries/`. Each target
+retains its independent checking and serialization receipts.
+
+`bootstrap/mlf-package.json` declares the `runtime` and `llvm` driver targets.
+On a cache miss, driver preparation executes the package build plan through LLVM
+emission, then links the runtime and trace objects required by the matrix.
+The transferable LLVM artifact binds the compiler, builder, target manifest
+and inputs of the participating packages. A fresh group can reuse that
+artifact directly.
 Driver LLVM objects, native links, runtime objects and trace objects also share
 checked artifacts. Their keys include actual native inputs, resolved C headers,
 library bytes, compiler/environment identities and ordered flags. Group reports
-identify each reused artifact and its checksums. The two new cache regressions
+identify each reused artifact and its checksums. The cache regressions
 exercise source resolution, cross-group reuse, invalidation, corruption repair
 and traced runtime behavior with small programs; every selected matrix still runs.
+`compiler-tests backend-prepare` prepares only these two drivers and records
+`scope: preparation`; it cannot qualify a backend campaign. CI exports the
+artifacts named in its completed, hashed build report with
+`tools/testing/driver_cache.py`, then saves the snapshot before the matrix runs.
+Import validates artifact stamps and bytes, and ordinary build-key validation
+still decides reuse. Missing or damaged entries are rebuilt. The full backend
+invocation runs independently, including after a failed preparation attempt.
+`Tests.TestCompilation` is the common preparation service for checked source,
+serialized-target LLVM, native links and C objects. Backend and Port matrices
+share successful LLVM/native products across output directories; each matrix
+retains its own compilation report, runtime processes, traces and assertions.
+Port's runtime preparation uses the same checked C object store as RuntimeDriver.
+Parity executes and emits the exact xMLF already produced by its source batch
+and independently checked, avoiding two additional source compilations for each
+runtime row. Source CLI diagnostic controls still exercise the source route.
+The tuple/list native fixture uses `compiler-tests prepare-fixture`; selecting
+only its interpreter still requires no native toolchain. See
+[Test Compilation Service](../docs/test-compilation-service.md) for stage keys,
+failure behavior, fresh-store boundaries and regression commands.
 Self-host selects the candidate artifact from its actual package build report,
 checks that report's source snapshot and retains a copy. Equal native binary
 hashes elsewhere in the shared store do not identify the producing LLVM input.
-The backend group's two test drivers preserve the source frontend's verified LLVM; crate linking
-regressed RuntimeDriver's interpreter performance. Their LLVM artifacts are
-shared by actual source/tool identity, and each test group retains its own
-traced runtime linking. Port prepares only LLVMDriver; it does not build or launch
-an outer RuntimeDriver. Focused interpreter coverage remains in backends, parity,
-package integration and the LLVM-compiled RuntimeCases/StateRuntime probes.
+Port prepares only LLVMDriver. The backends and parity groups exercise the
+interpreter, alongside package integration and the LLVM-compiled RuntimeCases
+and StateRuntime probes.
 
 Port preparation compiles each of the 25 fixtures once per source/tool identity.
 It checks the inferred target with the independent checker, checks its serialized
@@ -176,7 +195,7 @@ wrapper chooses 4 for port on hosts with at most 8 GiB RAM, while preserving the
 
 | Root group | MLF entry | Preserved coverage |
 | --- | --- | --- |
-| unit | CoreCratesMain, CoreSolverMain, CoreLanguageMain, CoreModulesMain, Figure12SuiteMain, HarnessMain, TestFrameworkMain, RegexMain | framework API/CLI contracts; 746 compiler checks; 6712 Algorithm W cases represented by 6703 executions; annotations, crate resolution, SCC queries and codegen caching, POSIX/Windows crate paths and native cache commands, indexed optimizer and legacy differential checks; all 43 Figure 12 labels with 41 distinct executions and 36 controls; 69 benchmark/bootstrap/release/cache harness methods including two cache regressions; 56 regex actions |
+| unit | CoreCratesMain, CoreSolverMain, CoreLanguageMain, CoreModulesMain, Figure12SuiteMain, HarnessMain, TestFrameworkMain, RegexMain | framework API/CLI contracts; 746 compiler checks; 6712 Algorithm W cases represented by 6703 executions; annotations, crate resolution, SCC queries and codegen caching, POSIX/Windows crate paths and native cache commands, indexed optimizer and legacy differential checks; all 43 Figure 12 labels with 41 distinct executions and 36 controls; 73 benchmark/bootstrap/release/cache harness observations including three cache regression families; 56 regex actions |
 | packages | PackagesMain | 79 completed cases: 22 resolver checks; 29 compiler integration cases, including native PGO isolation, shared cache survival, corruption recovery and source invalidation; 28 checked-release cases covering source-free builds, relocation, shared dependencies, compatibility, pins, damaged artifacts, GitHub fetching, offline cache repair and packed asset validation; target dependency/instance selection; scheduler diamond and variant deduplication, jobs 1/2/4 equivalence, concurrent cache publication, failure recovery, empty graphs and target-name collisions; 22 native runner lifecycle and protocol checks |
 | backends | BackendSuiteMain | 541 fixtures and 593 execution rows on interpreter and LLVM, compact-GC layout |
 | port | PortMain, ReferencesMain | 25 LLVM fixtures with compact-GC, six reference programs, generated inference input equality |
@@ -276,6 +295,17 @@ Some Backends families exercise compiler/type/rejection contracts without
 runtime rows. They require nonempty completed-family evidence; the full backend
 matrix still requires all 593 rows on both backends.
 
+Backends checks each selected case's runtime row count against its reviewed
+catalog entry. The reverse-complement and k-nucleotide input tables compile
+and round-trip their fixed source once per table. Their ten input pairs retain
+ten separate interpreter and LLVM comparisons, with two source preparations.
+
+Coverage, family, and matrix journals publish ordinary JSONL on completion
+and on a recoverable suite failure. After an abrupt interruption, use
+`Tests.ReportJournal.recover reportPath` to read the committed prefix. Keep
+the report, its `.previous.jsonl` sibling, and its `.journal/` directory
+together. Larger runs store alternating snapshots of bounded row blocks.
+
 Package integration and distribution have separate execution units: source
 integration retains 51 reviewed IDs and distribution retains 28. Integration
 also runs the target-dependency/scheduler fixture and 22 native build-runner
@@ -291,15 +321,15 @@ variants, independent implementations, fixture limits and generated-loop counts
 are not derived from classification metadata.
 
 The pre-merge family-selection validation record is
-[`test-family-selection-validation.json`](../docs/test-family-selection-validation.json).
+[`test-family-selection-validation.json`](https://github.com/mlf-lang/mlf/blob/0704d216b8cf6d887d3737efa30a2eae3c152f0a/docs/test-family-selection-validation.json).
 Earlier execution-unit classification results remain separately recorded in
-[`test-classification-validation.json`](../docs/test-classification-validation.json).
+[`test-classification-validation.json`](https://github.com/mlf-lang/mlf/blob/0704d216b8cf6d887d3737efa30a2eae3c152f0a/docs/test-classification-validation.json).
 Each record states its tested source/tool identities, scope and command wall
 times. Both describe historical snapshots before integration of the split
 libraries and parallel-build changes from `main`. The 161 individual-family
 timings in the family-selection record apply to that pre-merge snapshot.
 Fresh integration results are recorded separately in
-[`test-family-pr-integration-validation.json`](../docs/test-family-pr-integration-validation.json).
+[`test-family-pr-integration-validation.json`](https://github.com/mlf-lang/mlf/blob/0704d216b8cf6d887d3737efa30a2eae3c152f0a/docs/test-family-pr-integration-validation.json).
 Shared-cache measurements are not a performance comparison against a
 previous layout, and a focused pass does not establish a full-campaign pass.
 
@@ -317,16 +347,17 @@ retains the persistent map algorithm, Kahn traversal, and path-based LCA.
 `Tests.IndependentCheck` and `Tests.IndependentType` are frozen test checking
 modules rather than aliases to the candidate's checking implementation.
 
-`golden/parity-seed.tar.gz` preserves the previously verified source corpus and
-Haskell-seed expected types. `Tests.Corpus` reproduces the exhaustive, seeded,
-annotation, and Figure 12 inputs and validates their independent acceptance
-oracles before use. It checks current repository inputs against the reviewed
-baseline. Golden expectations are never rewritten from candidate inference.
-Exactly two archived module-import-cycle rejections have explicit, source-guarded
-acceptance overlays for crate compilation. Their prescribed type is `Int`,
-checked against the independent literal target `42`; the archive itself is
-unchanged. The resulting corpus has 3,204 accepted cases. See the
-[oracle migration record](../docs/crate-migration.md#oracle-migration).
+The [parity manifest](golden/parity/manifest.jsonl) defines the IDs, input paths
+and independent expectations used by both discovery and execution. It contains
+7,086 cases, including 3,204 acceptances with checked types and 80 runtime
+cases with exact output on both backends. `Tests.Corpus` unpacks the reviewed
+[case sources](golden/parity/cases.tar.gz) and copies the 30 example and
+benchmark inputs from the checkout. It reproduces the exhaustive, seeded,
+annotation and Figure 12 terms and checks their acceptance independently.
+The two import-cycle programs each evaluate to the literal 42. The independent
+checker checks their reference xMLF and their compiler-emitted targets against
+the prescribed type `Int`.
+
 The `unit` and `packages` groups now validate structured execution evidence
 against [`golden/unit-inventory.json`](golden/unit-inventory.json). Completed
 callbacks emit case IDs, explicit aliases and measured execution counts. The
@@ -437,7 +468,7 @@ choose-id source/type/roundtrip check previously repeated in Core. These changes
 reduce Core's method count from 686 to 684; they preserve the underlying graph
 inputs, principal-type assertion, Figure 12 labels and independent parity oracle.
 
-The historical [cache-cleanup validation record](../docs/test-cache-cleanup.json)
+The historical [cache-cleanup validation record](https://github.com/mlf-lang/mlf/blob/0704d216b8cf6d887d3737efa30a2eae3c152f0a/docs/test-cache-cleanup.json)
 covers unit, packages, backends and cold/warm port execution on the source
 snapshot before upstream integration. The warm port control
 changed an unrelated inventory file and corrupted one prepared target: 24
@@ -448,7 +479,7 @@ times were 25m 6s and 5m 13s under concurrent host load; these are not a
 controlled before/after speed benchmark. Self-host and parity were not rerun.
 These results predate the upstream regex additions and do not validate the
 combined source tree.
-The subsequent [integration record](../docs/test-cache-cleanup-integration.json)
+The subsequent [integration record](https://github.com/mlf-lang/mlf/blob/0704d216b8cf6d887d3737efa30a2eae3c152f0a/docs/test-cache-cleanup-integration.json)
 records a rebuilt manager and a passing full unit group on upstream `4af369d`,
 including regex, both cache regressions, Core and Figure 12. That record predates
 this framework integration and does not validate the current merged source tree.
@@ -465,18 +496,18 @@ Historical validation on 2026-10-15 passed all six root groups through the nativ
 package manager, with GHC, Cabal, and Python blocked on `PATH`. The blocker log
 was empty. Both matrices ran independently for both backends and runtime
 layouts; the fresh self-host build reproduced the compiler's LLVM and binary
-hashes. The [validation record](../docs/native-tests-validation.json) records
+hashes. The [validation record](https://github.com/mlf-lang/mlf/blob/0704d216b8cf6d887d3737efa30a2eae3c152f0a/docs/native-tests-validation.json) records
 the source manifest, artifact hashes, coverage totals, and local log paths.
 
 After retiring the Haskell compiler and old harnesses, the 2026-10-19
-[complete native validation](../docs/native-only-validation.json) passed all six
+[complete native validation](https://github.com/mlf-lang/mlf/blob/0704d216b8cf6d887d3737efa30a2eae3c152f0a/docs/native-only-validation.json) passed all six
 groups with a fresh two-generation native build and `--locked test`. Both full
 matrices and the self-host fixed point passed; the forbidden-tool log was
 empty. All 72 benchmark pins and the archived measurements remain unchanged.
 That record precedes the crate migration and does not validate its changes;
 the [crate migration ledger](../docs/crate-migration.md) records separate acceptance.
 
-The 2026-10-20 [crate validation](../docs/crate-validation.json) completes all six
+The 2026-10-20 [crate validation](https://github.com/mlf-lang/mlf/blob/0704d216b8cf6d887d3737efa30a2eae3c152f0a/docs/crate-validation.json) completes all six
 native groups against the immutable R11 source and recorded PGO compiler. Both
 backend/port layouts pass, and a fresh source self-host reproduces complete LLVM
 and native bytes using the same profile. Each group has a successful actual outer
@@ -605,3 +636,22 @@ read boundaries, binary data and filesystem errors, for both the selected host
 implementation and a forced portable implementation. On macOS the selected
 implementation uses CommonCrypto from the system library; other platforms retain
 the portable SHA-256 implementation.
+
+## Workflow policy controls
+
+The workflow policy controls parse GitHub Actions YAML and execute shell routing
+with recording tools. Install their small, test-only parser dependency before
+running `tools/release/check.sh` or those controls directly:
+
+```sh
+python3 -m venv .mlf-build/workflow-tests
+.mlf-build/workflow-tests/bin/python -m pip install -r tools/testing/requirements.txt
+PATH="$PWD/.mlf-build/workflow-tests/bin:$PATH" tools/release/check.sh
+```
+
+CI installs the pinned dependency in an isolated environment in each metadata or
+packaging job that runs the release checks. Tests never install dependencies or
+access the network themselves. Actionlint continues to check the complete Actions
+schema; behavioral controls check routing, command arguments, failure handling
+and retained evidence. Display names, YAML key order and scalar presentation are
+not assertions.

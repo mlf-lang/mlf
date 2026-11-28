@@ -14,7 +14,7 @@ modules (11 crates, including the separate async package) and the actual emlf
 and mlfpkg entries passed: 2,843 fresh inference groups, none reused. The earlier
 foundation/language-core/frontend specs were rerun with the current producer;
 checked interface/object bytes matched their preserved historical outputs.
-See [compact evidence](../../tools/shared/evidence/modular-current/README.md) and the later [guest repair evidence](../../tools/shared/evidence/guest-framework-recovery/README.md).
+See [compact evidence](https://github.com/mlf-lang/mlf/blob/0704d216b8cf6d887d3737efa30a2eae3c152f0a/tools/shared/evidence/modular-current/README.md) and the later [guest repair evidence](https://github.com/mlf-lang/mlf/blob/0704d216b8cf6d887d3737efa30a2eae3c152f0a/tools/shared/evidence/guest-framework-recovery/README.md).
 
 Checking the remaining root graph found defects the shared-only GHC inventory
 could not detect in guest files. `Test.Evidence` imported a conflicting `Binding`;
@@ -56,7 +56,7 @@ bootstrap. No native bootstrap stage was run as part of these checks.
 
 ## Additional guest campaign prerequisites
 
-A later, separately scoped [prerequisite check](../../tools/shared/evidence/guest-campaign-prerequisites/README.md)
+A later, separately scoped [prerequisite check](https://github.com/mlf-lang/mlf/blob/0704d216b8cf6d887d3737efa30a2eae3c152f0a/tools/shared/evidence/guest-campaign-prerequisites/README.md)
 passed actual MLF source checking for test-tools (2 modules), the tests library
 (14), and the test-framework target including its entry (9): 552 fresh groups,
 none reused. This is not execution of those campaigns and does not cover all
@@ -70,7 +70,7 @@ the Figure12 semantic digest was deliberately updated. Old-pin rejection,
 mutation controls, and fresh O0/O2 faithful Figure12 passes are retained. Shared
 compiler producer inputs and the frozen bridge archive are unchanged.
 
-The separately recorded [small-target batch](../../tools/shared/evidence/guest-small-targets/README.md)
+The separately recorded [small-target batch](https://github.com/mlf-lang/mlf/blob/0704d216b8cf6d887d3737efa30a2eae3c152f0a/tools/shared/evidence/guest-small-targets/README.md)
 checks Figure12, int-set-unions, check-target and pr-smoke through actual MLF
 source inference: 19 module entries **including overlap**, 153 fresh groups,
 zero reuse. Figure12 needed the same explicit guest class selection in its
@@ -81,7 +81,7 @@ guest campaigns or complete native/bootstrap qualification.
 
 ## Core/backend checkpoint and next semantic revision
 
-The [Core/backend compatibility checkpoint](../../tools/shared/evidence/core-guest-class-recovery/README.md)
+The [Core/backend compatibility checkpoint](https://github.com/mlf-lang/mlf/blob/0704d216b8cf6d887d3737efa30a2eae3c152f0a/tools/shared/evidence/core-guest-class-recovery/README.md)
 adds six actual source checks (124 module entries including overlap, 1,627 fresh
 groups), a reviewed standard-class test Graph state action, and a narrow
 independent Oracle traversal repair. Existing strings, expected outcomes and the

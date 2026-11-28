@@ -3,8 +3,9 @@
              KindSignatures, FlexibleContexts, FlexibleInstances,
              MultiParamTypeClasses, OverloadedStrings #-}
 module Bootstrap.LLVM.Library
-  (ExportLayout, prepareLayout, prepareLayoutWithTypeNames, prepareLayoutIds, withTypeNames, emitRootIds, identity, exports, declarations, constructorTags,
-   reservedTypeNames, libraryTypeNames, rootConstructorTags, libraryTerm, emitLibrary, emitRoot) where {
+  (ExportLayout, prepareLayout, prepareLayoutWithTypeNames, prepareLayoutIds, withTypeNames, identity, exports, declarations,
+   reservedTypeNames, libraryTypeNames, libraryTerm,
+   exportProduct, exportProductType, projectExport, closedCrateTypes, emitCrateLibrary, emitCrateProgram, emitCrateExecutable, crateConstructorTags) where {
   import MLF.Primitive;
   import Bootstrap.Types;
   import Bootstrap.Std;
@@ -24,8 +25,8 @@ module Bootstrap.LLVM.Library
   -- Layout validity is not native-object authentication. The consumer must
   -- bind these compiler-owned fields to its independently verified installed
   -- object/runtime identities before linking. No raw native object is a
-  -- CheckedTerm, and no alleged result type is accepted by emitRoot.
-  -- A root and its fixed library share an ABI order but may allocate different
+  -- CheckedTerm, and no alleged result type is accepted by emitCrateProgram.
+  -- A root and its library share an ABI order but may allocate different
   -- declaration slots. The numeric ABI slot is used only at the LLVM boundary.
   data AbiSlot = AbiSlot;
   data ExportRows = ExportRows (V.IndexVec AbiSlot ((,) (V.Index Declaration) ((,,) String String XType)))
@@ -71,7 +72,7 @@ module Bootstrap.LLVM.Library
     Right (ExportLayout input (ExportRows rows byKey byDecl) ds Nothing)
   };
   -- This is sealed schema data, not a proof manufactured by the caller.
-  -- emitLibrary checks its exact census against the actual checked code; the
+  -- emitCrateLibrary checks its exact census against the actual checked code; the
   -- consumer authenticates the corresponding compiled installation registry.
   prepareLayoutWithTypeNames :: String -> [] ((,,) String String XType) -> [] DataDecl -> [] String -> Either String ExportLayout;
   prepareLayoutWithTypeNames input entries ds names = do {
@@ -87,18 +88,11 @@ module Bootstrap.LLVM.Library
   };
   reservedTypeNames :: ExportLayout -> [] String;
   reservedTypeNames (ExportLayout _ _ _ known) = case known of { Nothing -> []; Just names -> S.toList names };
-  constructorTags :: ExportLayout -> Map String ((,) Int Int);
-  constructorTags layout = contextTags (declarations layout);
-  contextTags :: [] DataDecl -> Map String ((,) Int Int);
-  contextTags ds = let {
-    builtins = concatMap LLVM.dataConstructors D.builtinDeclarations;
-    builtinNames = map D.constructorName builtins;
-    users = filter (\c -> not (elem eqString (D.constructorName c) builtinNames))
-      (concatMap LLVM.dataConstructors ds)
+  builtinConstructorTags :: Map String ((,) Int Int);
+  builtinConstructorTags = let {
+    builtins = concatMap LLVM.dataConstructors D.builtinDeclarations
   } in M.fromList compareString
-    (zipWith LLVM.constructorEntry (range 0 (length builtins + length users - 1)) (append builtins users));
-  symbol :: ExportLayout -> String;
-  symbol layout = "mlf_fixed_" ++ identity layout;
+    (zipWith LLVM.constructorEntry (range 0 (length builtins - 1)) builtins);
 
   -- Every leaf has its own closed type, including impredicative forall types.
   -- Existing checked pairs provide the heterogeneous product; no casts, holes
@@ -126,7 +120,8 @@ module Bootstrap.LLVM.Library
     }) (V.indices rows)
   };
   envelope :: ExportLayout -> Product;
-  envelope layout = case buildProduct (exportEntries layout) of {
+  envelope layout = wrapProduct (exportEntries layout);
+  wrapProduct entries = case buildProduct entries of {
     Product body ty paths ->
       -- Even one export must remain a lazy field, never the evaluated root.
       Product (XApp (XApp (XConstructor "(,)" [XCon "()" [],ty]) (XConstructor "()" [])) body)
@@ -181,6 +176,8 @@ module Bootstrap.LLVM.Library
     XAbs _ annotation body -> join [typeNames annotation, termNames body];
     XApp a b -> join [termNames a, termNames b];
     XTypeAbs _ bound body -> join [typeNames bound, termNames body];
+    XInstantiationSpine _ rows -> join (concatMap (\((,,) constructor _ value) ->
+      [S.singleton constructor,termNames value]) rows);
     XTypeApp body proof -> join [termNames body, proofNames proof];
     XLet _ rhs body -> join [termNames rhs, termNames body];
     XLetRec definitions body -> join ((:) (termNames body)
@@ -200,94 +197,153 @@ module Bootstrap.LLVM.Library
      S.fromList compareString (M.keys D.primitiveKinds)]);
   libraryTypeNames :: ExportLayout -> Checked.LinkedSpine -> Either String ([] String);
   libraryTypeNames layout linked = mapEither (checkedTypeNames layout) (libraryTerm layout linked);
-  generate :: [] DataDecl -> [] DataDecl -> Checked.CheckedTerm -> Either String ((,) String ([] String));
-  generate private ds checked = let {
-    cs = contextTags ds;
+  generateWithTags :: Map String ((,) Int Int) -> Checked.CheckedTerm -> Either String ((,) String ([] String));
+  generateWithTags cs checked = let {
     -- Whole-program strict-wrapper erasure changes constructor representation.
-    -- Independently compiled library and root cannot infer the same candidate
-    -- set, so this boundary always preserves the ordinary boxed datatype ABI.
-    optimized = Optimize.optimizeChecked (X.erase (Checked.term checked));
-    -- The installed nominal census rules out independent library construction
-    -- of these fresh root types. Their local sites still undergo the ordinary
-    -- all-site/escaping-constructor proof; shared constructors remain open.
-    names = S.fromList compareString (concatMap (\d -> map D.constructorName (D.datatypeConstructors d)) private)
-  } in Codegen.generateWithPrivate names cs optimized;
-  header :: [] String;
-  header = ["; Generated from checked xMLF and an authenticated fixed native library boundary.",
-    "source_filename = \"emlf-fixed-native\"", ""];
-  abi :: [] String;
-  abi = ["declare void @mlf_require_haskell_boundary_v4_abi()", "declare void @mlf_require_byte_file_v2_abi()\ndeclare void @mlf_require_freeze_st_array_abi()\ndeclare void @mlf_require_st_to_io_abi()\ndeclare void @mlf_require_byte_array_crc32_abi()"];
+    -- Independently compiled libraries and roots preserve one boxed ABI.
+    optimized = Optimize.optimizeChecked (X.erase (Checked.term checked))
+  } in Codegen.generatePreparedProgram False S.empty cs M.empty optimized;
   chunks :: [] String -> [] String;
   chunks = map (\line -> line ++ "\n");
-  emitLibrary :: ExportLayout -> Checked.LinkedSpine -> Either String ([] String);
-  emitLibrary layout linked = do {
-    checked <- libraryTerm layout linked;
+  -- The generic object ABI assigns user constructor tags by their resolved,
+  -- crate-qualified name. Adding another crate cannot renumber a producer.
+  -- The modulus keeps both the accumulator and tagged immediates within the
+  -- signed native Int range. Check collisions across the whole linked closure.
+  crateConstructorTags :: [] DataDecl -> Either String (Map String ((,) Int Int));
+  crateConstructorTags ds = do {
+    D.validateDeclarations ds;
+    let { builtin = builtinConstructorTags;
+          user = filter (\c -> not (M.member compareString (D.constructorName c) builtin))
+            (concatMap LLVM.dataConstructors ds);
+          hash text i state = if i == stringLength text then state else
+            let { next = remInt (state * 257 + stringCodeAt text i + 1) 140737488355213 }
+            in seq next (hash text (i + 1) next);
+          row c = LLVM.constructorEntry (M.size builtin + hash (D.constructorName c) 0 1) c;
+          rows = map row user;
+          distinct = IS.fromList (map (\entry -> fst (snd entry)) rows) };
+    ensure (IS.size distinct == length rows) "native crate constructor tag collision";
+    Right (M.union compareString builtin (M.fromList compareString rows))
+  };
+  crateSymbol layout = "mlf_crate_" ++ identity layout;
+  exportProduct :: ExportLayout -> Map String ((,) XName XType) -> Either String XTerm;
+  exportProduct layout bindings = do {
+    actual <- traverseEither (\((,) slot ((,,) key _ expected)) ->
+      case M.lookup compareString key bindings of {
+        Nothing -> Left ("missing native crate export " ++ key);
+        Just ((,) name ty) -> do {
+          ensure (T.alphaEq ty expected) ("native crate export type mismatch: " ++ key);
+          Right ((,,) slot name ty)
+        }
+      }) (zip (range 0 (length (exports layout) - 1)) (exports layout));
+    case wrapProduct actual of { Product body _ _ -> Right body }
+  };
+  exportProductType :: ExportLayout -> XType;
+  exportProductType layout = case envelope layout of { Product _ ty _ -> ty };
+  -- The factory returns the same balanced pair product built by exportProduct.
+  -- Follow only this slot's path; unused sibling fields remain lazy.
+  projectExport :: ExportLayout -> String -> Int -> XTerm -> Either String ((,) Int XTerm);
+  projectExport layout key serial source = case exportRows layout of {
+    ExportRows rows byKey byDecl -> do {
+      d <- maybe (Left ("missing native crate projection " ++ key)) Right (M.lookup compareString key byKey);
+      slot <- maybe (Left "native crate export slot missing") Right (IM.lookup (V.toInt d) byDecl);
+      let { ty = case snd (V.at rows slot) of { (,,) _ _ t -> t };
+            path size i = if size <= 1 then [] else let { middle = size / 2 } in
+              if i < middle then (:) 0 (path middle i) else (:) 1 (path (size - middle) (i - middle));
+            project next term branches = case branches of {
+              [] -> (,) next term;
+              (:) side rest -> let {
+                name = XName next "nativeExportField";
+                fields = if side == 0 then [Just name,Nothing] else [Nothing,Just name];
+                deeper = project (next + 1) (XVarTerm name) rest
+              } in (,) (fst deeper) (XCase term ty [XAlternative (XConstructorPattern "(,)" fields) (snd deeper)])
+            }
+          };
+      Right (project serial source ((:) 1 (path (V.count rows) (V.toInt slot))))
+    }
+  };
+  checkedParts checked = case Checked.term checked of {
+    XWithData ds body -> (,) ds body;
+    body -> (,) [] body
+  };
+  crateHeader :: [] String;
+  crateHeader = ["; Generated from checked xMLF using the boxed crate object ABI.",
+    "source_filename = \"emlf-native-crate\"", ""];
+  -- Independently compiled bodies must not reinterpret an open nominal type
+  -- when another crate adds a datatype with that name.
+  closedCrateTypes :: ExportLayout -> Checked.CheckedTerm -> Either String ();
+  closedCrateTypes layout checked = let {
+    declared = S.fromList compareString (append (M.keys D.primitiveKinds)
+      (map D.datatypeName (append D.builtinDeclarations (declarations layout))))
+  } in case find (\name -> not (S.member compareString name declared)) (checkedTypeNames layout checked) of {
+    Nothing -> Right ();
+    Just name -> Left ("native crate uses an undeclared nominal type: " ++ name)
+  };
+  emitCrateLibrary :: ExportLayout -> Checked.CheckedTerm -> Either String ([] String);
+  emitCrateLibrary layout checked = do {
+    closedCrateTypes layout checked;
     case layout of {
       ExportLayout _ _ _ Nothing -> Right ();
       ExportLayout _ _ _ (Just known) -> ensure
         (eqList eqString (S.toList known) (checkedTypeNames layout checked))
-        "native library type-name census differs from actual checked code"
+        "native crate type-name census differs from actual checked code"
     };
-    generated <- generate [] (declarations layout) checked;
-    let { paths = case envelope layout of { Product _ _ value -> value } };
-    Right (chunks (concat [header, snd generated, abi, libraryAdapter layout (fst generated) paths]))
+    let { ds = fst (checkedParts checked) };
+    -- Check the declared producer layout against the actual checked wrapper.
+    ensure (eqList eqString (map D.prettyDeclaration (declarations layout)) (map D.prettyDeclaration ds))
+      "native crate producer declaration layout mismatch";
+    tags <- crateConstructorTags ds;
+    case envelope layout of { Product _ ty paths -> do {
+      ensure (T.alphaEq ty (Checked.typeOf checked)) "native crate export product type mismatch";
+      generated <- generateWithTags tags checked;
+      Right (chunks (concat [crateHeader, snd generated, [LLVM.abiDeclaration],
+        libraryAdapter (crateSymbol layout) (length paths) (fst generated) paths]))
+    } }
   };
-  -- The installed constructor prefix is independent of root declaration order.
-  -- Fresh declarations may not change a nominal constant used by installed code.
-  rootContext :: ExportLayout -> [] DataDecl -> Either String ([] DataDecl);
-  rootContext layout ds = do {
-    let { installed = declarations layout;
-          oldNames = map D.datatypeName installed;
-          fresh = filter (\d -> not (elem eqString (D.datatypeName d) oldNames)) ds };
-    ensure (all (\d -> any (\actual -> eqString (D.prettyDeclaration d) (D.prettyDeclaration actual)) ds) installed)
-      "native root changed or omitted an installed datatype";
-    case layout of {
-      ExportLayout _ _ _ Nothing -> ensure (null fresh)
-        "native root datatype extension requires an installed type-name census";
-      ExportLayout _ _ _ (Just known) -> ensure
-        (all (\d -> not (S.member compareString (D.datatypeName d) known)) fresh)
-        "native root datatype extension changes an installed nominal type"
-    };
-    D.validateDeclarations ds;
-    let { combined = append installed fresh };
-    D.validateDeclarations combined;
-    Right combined
-  };
-  rootConstructorTags :: ExportLayout -> [] DataDecl -> Either String (Map String ((,) Int Int));
-  rootConstructorTags layout ds = mapEither contextTags (rootContext layout ds);
-  rootParameters inventory@(ExportRows rows _ byDecl) selected term ty = case selected of {
+  crateParameters selected term ty = case selected of {
     [] -> Right ((,) [] ty);
-    (:) d rest -> case IM.lookup (V.toInt d) byDecl of {
-      Nothing -> Left "native root requested an uninstalled export";
-      Just slot -> case snd (V.at rows slot) of { (,,) _ hint expected -> case (,) term ty of {
-        (,) (XAbs name actual body) (XArrow parameter result) -> do {
-          ensure (eqString (X.nameHint name) hint && T.alphaEq expected actual && T.alphaEq expected parameter)
-            "native root import wrapper does not match installed contract";
-          next <- rootParameters inventory rest body result;
-          Right ((,) ((:) (V.toInt slot) (fst next)) (snd next))
-        };
-        _ -> Left "native root lost its checked import arrow"
-      } }
+    (:) ((,) layout key) rest -> case exportRows layout of {
+      ExportRows rows byKey byDecl -> case M.lookup compareString key byKey of {
+        Nothing -> Left ("native crate does not export " ++ key);
+        Just d -> case IM.lookup (V.toInt d) byDecl of {
+          Nothing -> Left "native crate export slot missing";
+          Just slot -> case (,,) (snd (V.at rows slot)) term ty of {
+            (,,) ((,,) _ hint expected) (XAbs binder annotation body) (XArrow parameter result) -> do {
+              ensure (eqString (X.nameHint binder) hint && T.alphaEq expected annotation && T.alphaEq expected parameter)
+                ("native crate import wrapper type or name mismatch: " ++ key);
+              (,) later answer <- crateParameters rest body result;
+              Right ((,) ((:) ((,) (crateSymbol layout) (V.toInt slot)) later) answer)
+            };
+            _ -> Left "native crate root lost its checked import arrow"
+          }
+        }
+      }
     }
   };
-  emitRoot :: ExportLayout -> [] String -> Checked.CheckedTerm -> Either String ([] String);
-  emitRoot layout keys checked = case exportRows layout of { ExportRows _ byKey _ -> do {
-    ids <- traverseEither (\key -> case M.lookup compareString key byKey of {
-      Nothing -> Left "native root requested an uninstalled export"; Just d -> Right d
-    }) keys;
-    emitRootIds layout ids checked
-  } };
-  emitRootIds :: ExportLayout -> [] (V.Index Declaration) -> Checked.CheckedTerm -> Either String ([] String);
-  emitRootIds layout selected checked = do {
-    ensure (length selected == IS.size (IS.fromList (map V.toInt selected))) "native root duplicate import key";
-    let { parts = case Checked.term checked of { XWithData ds body -> (,) ds body; body -> (,) [] body } };
-    ds <- rootContext layout (fst parts);
-    imports <- rootParameters (exportRows layout) selected (snd parts) (Checked.typeOf checked);
-    generated <- generate (drop (length (declarations layout)) ds) ds checked;
-    Right (chunks (concat [header, snd generated, rootAdapter layout (fst generated) (fst imports) (LLVM.ioType (snd imports))]))
+  emitCrateProgram :: [] ((,) ExportLayout String) -> Checked.CheckedTerm -> Either String ([] String);
+  emitCrateProgram = emitCrateRoot (\_ -> Right ());
+  emitCrateExecutable :: [] ((,) ExportLayout String) -> Checked.CheckedTerm -> Either String ([] String);
+  emitCrateExecutable = emitCrateRoot T.checkExecutableType;
+  emitCrateRoot :: (XType -> Either String ()) -> [] ((,) ExportLayout String) -> Checked.CheckedTerm -> Either String ([] String);
+  emitCrateRoot validate selected checked = do {
+    let { parts = checkedParts checked; ds = fst parts; body = snd parts;
+          layouts = M.fromList compareString (map (\entry -> (,) (identity (fst entry)) (fst entry)) selected);
+          declarationsByName = M.fromList compareString (map (\d -> (,) (D.datatypeName d) (D.prettyDeclaration d)) ds);
+          agrees d = case M.lookup compareString (D.datatypeName d) declarationsByName of {
+            Nothing -> False; Just actual -> eqString actual (D.prettyDeclaration d)
+          } };
+    ensure (length selected == S.size (S.fromList compareString (map snd selected)))
+      "duplicate native crate import";
+    ensure (all (\layout -> all agrees (declarations layout)) (M.elems layouts))
+      "native crate dependency datatype layout mismatch";
+    tags <- crateConstructorTags ds;
+    (,) imports result <- crateParameters selected body (Checked.typeOf checked);
+    validate result;
+    generated <- generateWithTags tags checked;
+    Right (chunks (concat [crateHeader, snd generated,
+      rootAdapter (map crateSymbol (M.elems layouts)) (fst generated) imports (LLVM.ioType result)]))
   };
-  libraryAdapter :: ExportLayout -> String -> [] ((,) Int ([] Int)) -> [] String;
-  libraryAdapter layout entry paths = let { prefix = symbol layout; count = length (exports layout) } in
+  libraryAdapter :: String -> Int -> String -> [] ((,) Int ([] Int)) -> [] String;
+  libraryAdapter prefix count entry paths =
     append ["@" ++ prefix ++ "_root = private global ptr null, align 8",
       "@" ++ prefix ++ "_slots = private global [" ++ showInt count ++ " x ptr] zeroinitializer, align 8",
       "@" ++ prefix ++ "_state = private global i32 0, align 4",
@@ -297,8 +353,7 @@ module Bootstrap.LLVM.Library
       "  switch i32 %state, label %cycle [ i32 0, label %start i32 2, label %done ]",
       "cycle:", "  call void @llvm.trap()", "  unreachable", "start:",
       "  store i32 1, ptr @" ++ prefix ++ "_state",
-      "  call void @mlf_require_haskell_boundary_v4_abi()",
-      "  call void @mlf_require_byte_file_v2_abi()\n  call void @mlf_require_freeze_st_array_abi()\n  call void @mlf_require_st_to_io_abi()\n  call void @mlf_require_byte_array_crc32_abi()",
+      LLVM.abiCall,
       "  %root = call ptr " ++ entry ++ "(ptr null, ptr null)",
       "  store ptr %root, ptr @" ++ prefix ++ "_root, align 8"]
       (append (concatMap (slotCode prefix count) paths)
@@ -320,14 +375,13 @@ module Bootstrap.LLVM.Library
   } in append steps ["  " ++ local ++ "_slot = getelementptr [" ++ showInt count ++ " x ptr], ptr @" ++ prefix ++
       "_slots, i64 0, i64 " ++ showInt slot,
       "  store ptr " ++ value ++ ", ptr " ++ local ++ "_slot, align 8"];
-  rootAdapter :: ExportLayout -> String -> [] Int -> Bool -> [] String;
-  rootAdapter layout entry imports executeIO = let { prefix = symbol layout } in
-    concat [abi,
-      ["declare ptr @" ++ prefix ++ "_get(i64)", "define ptr @mlf_entry() {", "entry:",
-       "  call void @mlf_require_haskell_boundary_v4_abi()",
-      "  call void @mlf_require_byte_file_v2_abi()\n  call void @mlf_require_freeze_st_array_abi()\n  call void @mlf_require_st_to_io_abi()\n  call void @mlf_require_byte_array_crc32_abi()",
+  rootAdapter :: [] String -> String -> [] ((,) String Int) -> Bool -> [] String;
+  rootAdapter symbols entry imports executeIO =
+    concat [[LLVM.abiDeclaration], map (\prefix -> "declare ptr @" ++ prefix ++ "_get(i64)") symbols,
+      ["define ptr @mlf_entry() {", "entry:",
+       LLVM.abiCall,
        "  %wrapper = call ptr " ++ entry ++ "(ptr null, ptr null)"],
-      concat (zipWith (\index slot ->
+      concat (zipWith (\index ((,) prefix slot) ->
         ["  %import" ++ showInt index ++ " = call ptr @" ++ prefix ++ "_get(i64 " ++ showInt slot ++ ")",
          "  %apply" ++ showInt index ++ " = call ptr @mlf_application(ptr " ++
          (if index == 0 then "%wrapper" else "%apply" ++ showInt (index - 1)) ++

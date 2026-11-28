@@ -11,8 +11,10 @@ module Main where {
   import qualified Bootstrap.Module as Modules;
   import qualified Bootstrap.Lexer as Lexer;
   import qualified Bootstrap.Crate as Crate;
+  import qualified Bootstrap.CrateSession as Session;
   import qualified Bootstrap.CrateArtifact as Artifact;
   import qualified Bootstrap.Separate as Separate;
+  import qualified Bootstrap.ArtifactStorage as Storage;
   import qualified Bootstrap.PreparedLibraries as Prepared;
   import qualified Bootstrap.PreparedLibraryLiteral as Literal;
   import qualified Bootstrap.BuiltinPreludeLiteral as SourceLiteral;
@@ -63,15 +65,17 @@ module Main where {
   };
   readObject prefix = do {
     iface <- Artifact.readInterface (prefix ++ ".mlfci") >>= require;
-    object <- Artifact.readObject (prefix ++ ".mlfco") iface >>= require;
+    bytes <- Storage.readRaw (prefix ++ ".mlfco") >>= require;
     metadataHash <- fileDigest (prefix ++ ".mlfci");
-    objectHash <- fileDigest (prefix ++ ".mlfco");
-    ioReturn (Prepared.LibraryObject metadataHash objectHash object)
+    objectHash <- byteArrayDigest bytes;
+    size <- lengthByteArray bytes;
+    image <- SourceLiteral.compilerImageFields bytes size;
+    ioReturn (Prepared.EncodedLibraryObject metadataHash objectHash iface image)
   };
   parsedEntry index entry = SourceLiteral.application "(,,)"
     [SourceLiteral.string (Modules.sourcePath (Modules.loadedSource entry)),
      SourceLiteral.string (Modules.loadedText entry), "(mlfParsedModule" ++ showInt index ++ " ())"];
-  generated raw entries = let { pieces = Literal.rawLibraryPieces raw } in unlines [
+  generated pieces entries = unlines [
     "-- mlf:syntax shared-haskell-v1",
     "{-# LANGUAGE NoImplicitPrelude, NoMonomorphismRestriction, RankNTypes, KindSignatures, FlexibleContexts, FlexibleInstances, MultiParamTypeClasses, OverloadedStrings #-}",
     "-- Generated from the ordinary parser profile and authenticated checked artifacts.",
@@ -98,7 +102,7 @@ module Main where {
     "}"
   ];
   artifactRecord prefix object = J.object [
-    (,) "identity" (J.str (Artifact.crateId (Artifact.objectInterface (Prepared.libraryObject object)))),
+    (,) "identity" (J.str (Artifact.crateId (Prepared.libraryInterface object))),
     (,) "metadata_path" (J.str (prefix ++ ".mlfci")),
     (,) "metadata_sha256" (J.str (Prepared.metadataHash object)),
     (,) "object_path" (J.str (prefix ++ ".mlfco")),
@@ -124,12 +128,13 @@ module Main where {
           spec = Crate.CrateSpec libraryIdentity "" preludeMode
             (map (\source -> (,) (Modules.moduleIdentity source) (Modules.sourcePath source)) sources)
             [metadata] (J.getText "query_directory" (directory ++ "/queries") request) builtinPrefix };
-    Crate.compileSources spec cleaned [(,) metadata (Artifact.objectInterface builtin)] libraryPrefix >>= require;
+    Session.compileSources spec cleaned [(,) metadata (Artifact.objectInterface builtin)] libraryPrefix >>= require;
     builtinObject <- readObject builtinPrefix;
     libraryObject <- readObject libraryPrefix;
-    raw <- require (Prepared.prepareFresh identity preludeMode recorded [builtinObject, libraryObject]);
+    raw <- Prepared.prepareFresh identity preludeMode recorded [builtinObject, libraryObject] >>= require;
     let { destination = J.getText "generated_source" "" request };
-    let { output = generated raw entries };
+    pieces <- Literal.rawLibraryPieces raw >>= require;
+    let { output = generated pieces entries };
     -- Check the generated module itself with the ordinary shared parser before
     -- publishing it; parsing this generator does not validate emitted syntax.
     require (Parser.parseModule destination output);
@@ -143,9 +148,9 @@ module Main where {
       (,) "source_paths" (J.stringArray (map Modules.sourcePath sources)),
       (,) "source_sha256" (J.stringArray (map Prepared.sourceHash recorded)),
       (,) "binding_names" (J.stringArray (map fst (Artifact.crateBindings
-        (Artifact.objectInterface (Prepared.libraryObject libraryObject))))),
+        (Prepared.libraryInterface libraryObject)))),
       (,) "class_names" (J.stringArray (map Modules.className (Artifact.crateClasses
-        (Artifact.objectInterface (Prepared.libraryObject libraryObject))))),
+        (Prepared.libraryInterface libraryObject)))),
       (,) "artifacts" (J.array [artifactRecord builtinPrefix builtinObject, artifactRecord libraryPrefix libraryObject]),
       (,) "generated_source" (J.str destination), (,) "generated_sha256" (J.str digest),
       (,) "user_program_cache" (J.Boolean False), (,) "native_object_reuse" (J.Boolean False)

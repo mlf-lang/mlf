@@ -7,16 +7,10 @@
 /* Compact 64-bit BDWGC ABI. Low bits encode immediate integers, booleans
  * and nullary constructors. Heap value tags start at byte 0; payloads at
  * byte 8, packed fields at byte 16, wide fields at byte 24 and environment
- * slots at byte 8. The runtime requires GMP and BDWGC. Old standard-layout
- * LLVM/object files must be regenerated; their ABI guard is not exported. */
-/* Boundary v4: signed Int64 payloads, explicit GMP Integer, true unit tag1,
- * tuple arities2..64, and source stack frames7/evidence8. No earlier ABI guard is exported: old generated
- * objects must use their frozen old runtime, not silently cross this boundary. */
-void mlf_require_haskell_boundary_v4_abi(void);
-void mlf_require_byte_file_v2_abi(void);
-void mlf_require_freeze_st_array_abi(void);
-void mlf_require_st_to_io_abi(void);
-void mlf_require_byte_array_crc32_abi(void);
+ * slots at byte 8. The boundary includes signed Int64, GMP Integer, unit
+ * tag 1, tuple arities 2..64, stack frames and evidence, and primitive IDs
+ * 0..136. Generated modules require this exact symbol. */
+void mlf_require_runtime_v5_abi(void);
 
 typedef struct MlfValue MlfValue;
 typedef struct MlfEnv MlfEnv;

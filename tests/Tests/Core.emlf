@@ -1,5 +1,6 @@
 module Tests.Core where
 import Bootstrap.Types
+import qualified Tests.CoreRegistry as Registry
 import qualified Bootstrap.Std as S
 import qualified Tests.CorePartitions as P
 import qualified Tests.CoreCrates as Crates
@@ -7,10 +8,8 @@ import qualified Tests.CoreSolver as Solver
 import qualified Tests.CoreLanguage as Language
 import qualified Tests.CoreModules as Modules
 
-families : [] ((,) String ([] ((,) String (IO ()))))
+families : [] ((,) String ([] ((,) String Registry.Action)))
 families =
  let all = S.concat ((:) Crates.families ((:) Solver.families ((:) Language.families ((:) Modules.families [])))) in
  S.map (\name -> (,) name (S.fromMaybe (panic "missing core family") (S.lookup eqString name all)))
   (S.filter (\name -> S.not (eqString name "core/substring-adapter")) P.familyNames)
-suite : [] ((,) String (IO ()))
-suite = S.concatMap S.snd families

@@ -16,7 +16,7 @@ expected label | "source" `isInfixOf` label = "source definition provenance esca
 reject label result = case result of
  T.Left e -> if expected label == B.unpack e then putStrLn ("PASS "++label++" REJECT "++B.unpack e) else error ("wrong diagnostic: "++B.unpack e)
  T.Right _ -> error ("accepted "++label)
-accept label p = case C.compileProgram p of
+accept label p = C.compileProgram p >>= \outcome -> case outcome of
  T.Left e -> error (label++" "++B.unpack (C.prettyError e))
  T.Right c -> case Check.checkClosed (C.compiledTerm c) of
   T.Left e -> error (B.unpack e)
@@ -35,7 +35,7 @@ main = do
 
 
 
-negative label body expectedPhase needle = case C.compile "Negative.emlf" (B.literal body) of
+negative label body expectedPhase needle = C.compile "Negative.emlf" (B.literal body) >>= \outcome -> case outcome of
  T.Right _ -> error (label++" accepted")
  T.Left e@(T.CompileError phase msg) -> if phaseOK expectedPhase phase && needle `isInfixOf` B.unpack msg then putStrLn ("PASS "++label++" "++B.unpack (C.prettyError e)) else error (B.unpack (C.prettyError e))
 phaseOK "inference" T.Inference = True

@@ -13,6 +13,7 @@ module Package.Scheduler where {
   import qualified Package.Json as J;
   import qualified Package.Manifest as M;
   import qualified Package.Build as B;
+  import qualified Package.DependencyMode as Mode;
   -- The coordinator resolves one graph. Workers deserialize it and execute one
   -- action; they never acquire the build-directory lock or call ordinary build.
   moduleJson m =
@@ -154,17 +155,17 @@ module Package.Scheduler where {
             };
             let {
               compilation =
-                J.set "codegen-identity" (J.str (M.crateIdentity p ("target-" ++ label)))
+                J.set "profile" profile (J.set "codegen-identity" (J.str (M.crateIdentity p ("target-" ++ label)))
                  (J.set "name" (J.str name)
                   (J.set "entry" (J.str entry)
                      (J.set "modules" (J.Array (S.map moduleJson modules))
-                        (J.set "no-prelude" (J.Boolean noPrelude) (job "target" compileId deps)))))
+                        (J.set "no-prelude" (J.Boolean noPrelude) (job "target" compileId deps))))))
             };
             let {
               emission =
-                J.set "crate" (J.str compileId)
+                J.set "profile" profile (J.set "crate" (J.str compileId)
                   (J.set "identity" (J.str (M.crateIdentity p ("target-" ++ label)))
-                     (job "emit" emitId ((:) compileId [])))
+                     (job "emit" emitId ((:) compileId []))))
             };
             let {
               object =
@@ -173,10 +174,10 @@ module Package.Scheduler where {
             };
             let {
               link =
-                J.set "llvm" (J.str objectId)
+                J.set "emitted" (J.str emitId) (J.set "llvm" (J.str objectId)
                   (J.set "runtime" (J.str runtimeId)
                      (J.set "profile" profile
-                        (job "link" linkId ((:) objectId ((:) runtimeId [])))))
+                        (job "link" linkId [objectId, runtimeId, emitId]))))
             };
             let {
               assembly =
@@ -223,20 +224,83 @@ module Package.Scheduler where {
         ("invalid worker result: " ++ identity);
       ioReturn value
     };
-  artifactOf directory invocation identity =
-    do {
-      value <- readResult directory invocation identity;
-      let {
-        result = J.get "result" value
+  checkedArtifact :: String -> J.Json -> IO String;
+  checkedArtifact identity result = do {
+    let { artifact = B.artifactPath result };
+    O.require (O.absolute artifact) "worker returned a relative artifact";
+    valid <- B.validActionResult result;
+    O.require valid ("worker artifact failed validation: " ++ identity);
+    ioReturn (B.importPath result)
+  };
+  artifactOf directory invocation identity = do {
+    value <- readResult directory invocation identity;
+    checkedArtifact identity (J.get "result" value)
+  };
+  isCompileJob :: J.Json -> Bool;
+  isCompileJob selected = S.elem eqString (J.getText "kind" "" selected) ["library", "target", "emit"];
+  jobPackage graph selected = M.packageAt graph (M.packageId graph (J.getText "package" "" selected));
+  runCompileJob :: B.Builder -> J.Json -> [] String -> IO J.Json;
+  runCompileJob b selected dependencies = do {
+    let { graph = B.graph b;
+          kind = J.getText "kind" "" selected;
+          noPrelude = J.getBool "no-prelude" False selected;
+          closed = J.getBool "closed-llvm" False selected;
+          profile = J.getObject "profile" selected };
+    if eqString kind "library"
+    then B.libraryResultUsing (S.not closed) b (jobPackage graph selected) dependencies noPrelude
+    else if eqString kind "target"
+    then let { compile = if closed then B.compileTargetCrateResult
+             else \builder pkg kind identity entry modules deps mode ->
+               B.compilePackageTarget builder pkg kind identity entry modules deps mode profile }
+         in compile b (M.rootPackage graph) ("target-" ++ J.getText "name" "" selected)
+           (J.getText "codegen-identity" "" selected) (J.getText "entry" "" selected)
+           (S.map moduleFrom (J.values (J.get "modules" selected))) dependencies noPrelude
+    else case dependencies of {
+      [crate] -> do {
+        O.require (S.eqList eqString (J.getStrings "dependencies" selected) [J.getText "crate" "" selected])
+          "LLVM emission requires its declared target crate";
+        metadata <- fileDigest (crate ++ "/unit.mlfci");
+        object <- fileDigest (crate ++ "/unit.mlfco");
+        let { identity = J.getText "identity" "" selected };
+        if closed then B.emitCrateResult b identity crate metadata object
+          else B.emitPackageCrate b identity crate metadata object profile
       };
-      let {
-        artifact = J.getText "artifact" "" result
-      };
-      O.require (O.absolute artifact) "worker returned a relative artifact";
-      valid <- B.validActionResult result;
-      O.require valid ("worker artifact failed validation: " ++ identity);
-      ioReturn (B.importPath result)
-    };
+      _ -> O.fatal "LLVM emission requires exactly one target crate"
+    }
+  };
+  -- A client supplying its own runtime consumes the same target plan through
+  -- LLVM emission, with library and root results kept in the current session.
+  llvmPlan :: B.Builder -> String -> J.Json -> IO ([] J.Json);
+  llvmPlan b name target = do {
+    jobs <- planTarget b [] (request name target True);
+    ioReturn (S.map (J.set "closed-llvm" (J.Boolean True)) (S.filter isCompileJob jobs))
+  };
+  -- All members of a library are inputs to its checked crate. Pinned releases
+  -- bind their object inventory through the verified manifest.
+  llvmPlanFiles :: M.PackageGraph -> [] J.Json -> [] String;
+  llvmPlanFiles graph jobs =
+    let { files job = if eqString (J.getText "kind" "" job) "library"
+            then let { p = jobPackage graph job } in (:) (M.packagePath p)
+              (if M.isRelease p then [] else S.map M.moduleSource (M.packageModules p))
+            else S.map (S.compose M.moduleSource moduleFrom)
+              (J.values (J.getOr "modules" (J.Array []) job)) } in
+    (:) (M.packagePath (M.rootPackage graph)) (S.concatMap files jobs);
+  executeLLVMPlan :: B.Builder -> [] J.Json -> IO String;
+  executeLLVMPlan b jobs = do {
+    let { run done job = do {
+      dependencies <- S.mapM (\identity -> case S.lookup eqString identity done of {
+        Nothing -> O.fatal ("missing target prerequisite: " ++ identity);
+        Just result -> checkedArtifact identity result
+      }) (J.getStrings "dependencies" job);
+      result <- runCompileJob b job dependencies;
+      ioReturn ((:) ((,) (jobId job) result) done)
+    } };
+    completed <- S.foldM run [] jobs;
+    case completed of {
+      (:) ((,) identity result) _ -> checkedArtifact identity result;
+      [] -> O.fatal "empty LLVM target plan"
+    }
+  };
   -- Reading every predecessor manifest is part of the worker contract even
   -- for non-crate actions. No worker infers readiness from file existence.
   worker contextPath invocation identity =
@@ -281,63 +345,25 @@ module Package.Scheduler where {
         dependency = artifactOf directory invocation
       };
       dependencies <- S.mapM dependency (J.getStrings "dependencies" selected);
-      result <-
-        let {
-          matchValueShared2 = J.getText "kind" "" selected
-        } in
-        if MLF.Primitive.eqString matchValueShared2 "library"
-        then do {
-               let {
-                 q = M.packageAt graph (M.packageId graph (J.getText "package" "" selected))
-               };
-               B.libraryResult b q dependencies (J.getBool "no-prelude" False selected)
-             }
-        else if MLF.Primitive.eqString matchValueShared2 "target"
-             then B.compileTargetCrateResult b p ("target-" ++ J.getText "name" "" selected)
-                    (J.getText "codegen-identity" "" selected)
-                    (J.getText "entry" "" selected)
-                    (S.map moduleFrom (J.values (J.get "modules" selected)))
-                    dependencies
-                    (J.getBool "no-prelude" False selected)
-             else if MLF.Primitive.eqString matchValueShared2 "runtime"
-                  then B.runtimeObjectWithPgoResult b gc profile
-                  else if MLF.Primitive.eqString matchValueShared2 "emit"
-                       then do {
-                              crate <- dependency (J.getText "crate" "" selected);
-                              metadata <- fileDigest (crate ++ "/unit.mlfci");
-                              object <- fileDigest (crate ++ "/unit.mlfco");
-                              B.emitCrateResult b (J.getText "identity" "" selected) crate metadata
-                                object
-                            }
-                       else if MLF.Primitive.eqString matchValueShared2 "object"
-                            then do {
-                                   emitted <- dependency (J.getText "emitted" "" selected);
-                                   B.nativeLLVMObjectWithPgoResult b emitted profile
-                                 }
-                            else if MLF.Primitive.eqString matchValueShared2 "link"
-                                 then do {
-                                        llvm <- dependency (J.getText "llvm" "" selected);
-                                        runtime <- dependency (J.getText "runtime" "" selected);
-                                        B.linkNativeWithPgoResult b llvm runtime gc profile
-                                      }
-                                 else if MLF.Primitive.eqString matchValueShared2 "assemble"
-                                      then do {
-                                             crate <- dependency (J.getText "crate" "" selected);
-                                             emitted <-
-                                               dependency (J.getText "emitted" "" selected);
-                                             linked <- dependency (J.getText "linked" "" selected);
-                                             let {
-                                               request = J.get "selection" selected
-                                             };
-                                             B.assembleTargetResult b p
-                                               (J.getText "name" "" request)
-                                               (J.get "target" request)
-                                               crate
-                                               emitted
-                                               linked
-                                               profile
-                                           }
-                                      else O.fatal "unsupported build action";
+      let { kind = J.getText "kind" "" selected };
+      result <- if isCompileJob selected then runCompileJob b selected dependencies
+        else if eqString kind "runtime" then B.runtimeObjectWithPgoResult b gc profile
+        else if eqString kind "object" then do {
+          emitted <- dependency (J.getText "emitted" "" selected);
+          B.nativeLLVMObjectWithPgoResult b emitted profile
+        } else if eqString kind "link" then do {
+          llvm <- dependency (J.getText "llvm" "" selected);
+          runtime <- dependency (J.getText "runtime" "" selected);
+          emitted <- dependency (J.getText "emitted" "" selected);
+          B.linkPackageResult b llvm runtime emitted gc profile
+        } else if eqString kind "assemble" then do {
+          crate <- dependency (J.getText "crate" "" selected);
+          emitted <- dependency (J.getText "emitted" "" selected);
+          linked <- dependency (J.getText "linked" "" selected);
+          let { request = J.get "selection" selected };
+          B.assembleTargetResult b p (J.getText "name" "" request) (J.get "target" request)
+            crate emitted linked profile
+        } else O.fatal "unsupported build action";
       report <- J.read (B.reportPath b);
       J.write (resultPath directory identity)
         (B.info
@@ -386,9 +412,11 @@ module Package.Scheduler where {
   mergeReport b identity report =
     S.mapM_
       (\((,) key value) ->
-         if S.elem eqString key (O.words "commands builds crates releases codegen native_inputs")
-         then S.mapM_ (\row -> B.record b key (J.set "job_id" (J.str identity) row))
-                (J.values value)
+         if S.elem eqString key (O.words "commands builds crates releases codegen native_inputs dependency_modes")
+         then S.mapM_ (\row -> do {
+                if eqString key "dependency_modes" then Mode.emit (B.savedDecision row) else ioReturn ();
+                B.record b key (J.set "job_id" (J.str identity) row)
+              }) (J.values value)
          else ioReturn ())
       (J.items report);
   -- A killed coordinator releases its lock before every descendant is reaped.

@@ -14,6 +14,7 @@ module Bootstrap.InferenceUnit where {
   import qualified Bootstrap.IntSet as IS;
   import qualified Bootstrap.IntMap as IM;
   import qualified Bootstrap.Classes as Classes;
+  import qualified Bootstrap.Evidence as Evidence;
   import qualified Bootstrap.Constraint as Constraint;
   import qualified Bootstrap.Elaborate as Elaborate;
   import qualified Bootstrap.Graph as Graph;
@@ -28,27 +29,34 @@ module Bootstrap.InferenceUnit where {
   import qualified Bootstrap.Kinding as Kinding;
   import qualified Bootstrap.SourceEquality as SourceEquality;
   import qualified Bootstrap.OpenFragment as Open;
+  import qualified Bootstrap.ImportedRoot as Imported;
   import qualified Bootstrap.X.Pretty as Pretty;
   -- Class translation is a crate query, before the value dependency graph is
   -- built. Its generated selectors/dictionaries become ordinary signed graph
   -- vertices. Inference queries consume this lowered representation directly.
   data LoweredDeclarations =
+    ScriptDeclarations String LoweredDeclarations |
     LoweredDeclarations ([] DataDecl) ([] ((,,) String (Maybe SAnnotation) SExpr)) (Map String String) |
     IndexedDeclarations ([] DataDecl) Dependency.GeneratedTable
       ([] ((,) (V.Index Declaration) ((,,) String (Maybe SAnnotation) SExpr))) (Map String String);
   loweredData lowered = case lowered of {
+    ScriptDeclarations _ declarations -> loweredData declarations;
     LoweredDeclarations ds _ _ -> ds; IndexedDeclarations ds _ _ _ -> ds
   };
   loweredValues lowered = case lowered of {
+    ScriptDeclarations _ declarations -> loweredValues declarations;
     LoweredDeclarations _ values _ -> values; IndexedDeclarations _ _ values _ -> map snd values
   };
   loweredNames lowered = case lowered of {
+    ScriptDeclarations _ declarations -> loweredNames declarations;
     LoweredDeclarations _ _ names -> names; IndexedDeclarations _ _ _ names -> names
   };
   loweredDeclarationTable lowered = case lowered of {
+    ScriptDeclarations _ declarations -> loweredDeclarationTable declarations;
     LoweredDeclarations _ _ _ -> Nothing; IndexedDeclarations _ table _ _ -> Just table
   };
   loweredIdValues lowered = case lowered of {
+    ScriptDeclarations _ declarations -> loweredIdValues declarations;
     LoweredDeclarations _ _ _ -> []; IndexedDeclarations _ _ rows _ -> rows
   };
   recursiveAnnotation :: RecursiveMode -> Maybe SAnnotation;
@@ -309,7 +317,24 @@ module Bootstrap.InferenceUnit where {
       (,) externalTypes lowered <- prepareNamedGroup dependencies datatypes members;
       finishOpenGroup externalTypes members lowered
     };
+  -- A script exports the type of its final expression at its use site.
+  -- Inferring it inside an unused let can default an otherwise free
+  -- instance argument to bot before the expression is generalized.
+  compileNamedOpenGroup scriptEntry name dependencies datatypes members = case (,) scriptEntry members of {
+    (,) (Just entry) [((,,) n Nothing rhs)] -> if eqString n entry then do {
+      (,) externalTypes lowered <- prepareNamedBody dependencies datatypes members rhs;
+      (,,) declarations parameters body <- compileGroupBody externalTypes lowered;
+      let { fresh = 1 + Separate.maximumTermIdentity
+              (foldl (\largest pair -> max largest (X.nameId (fst pair))) 0 parameters) body };
+      checkGroupBody members ((,,) declarations parameters (XLet (XName fresh entry) body (XConstructor "()" [])))
+    } else compileOpenGroup name dependencies datatypes members;
+    _ -> compileOpenGroup name dependencies datatypes members
+  };
   prepareNamedGroup dependencies datatypes members = do {
+      body <- Surface.bindValues members (SConstructor "()");
+      prepareNamedBody dependencies datatypes members body
+  };
+  prepareNamedBody dependencies datatypes members body = do {
       ensure (not (null members)) "cannot infer an empty declaration group";
       externalTypes <- foldM mergeExternal M.empty (concatMap Separate.unitBindings dependencies);
       traverseEither
@@ -317,7 +342,6 @@ module Bootstrap.InferenceUnit where {
            ensure (not (M.member compareString n externalTypes))
              ("inference group also imports its own binding: " ++ n))
         members;
-      body <- Surface.bindValues members (SConstructor "()");
       let {
         -- Members already contain explicit evidence applications. Recovering
         -- source qualifications here would insert the managed argument twice.
@@ -327,29 +351,62 @@ module Bootstrap.InferenceUnit where {
       Right ((,) externalTypes lowered)
   };
   compileOpenGroupIndexed = compileOpenGroupIndexedWith Surface.bindIndexedMembers;
-  compileOpenGroupIndexedWith = compileIndexedUsing Compiler.finishCompilation;
+  compileOpenGroupIndexedWith = compileIndexedUsing (\_ -> finishOpenGroupWith Compiler.finishCompilation);
   -- The file pass supplies members lowered against one resolver snapshot.
-  compileFileGroupIndexedWith = compileIndexedUsing (Compiler.finishCompilationWith Constraint.generateFileProgram);
-  compileIndexedUsing finish bindMembers name parameters datatypes members =
-    case signedApplicationGroup parameters datatypes members of {
-      Right fragment -> Right fragment;
-      Left _ -> compileElaboratedUsing finish bindMembers parameters datatypes members
+  compileFileGroupIndexedWith = compileIndexedUsing finishFileGroup;
+  finishFileGroup = finishFileGroupIn Nothing;
+  finishFileGroupIn known parameters externalTypes members lowered = let {
+    ordinary = do {
+      compiled <- compileGroupBodyWith Compiler.finishFileCompilation externalTypes lowered;
+      checkGroupBodyIn known members compiled
+    };
+    imported authenticated = do {
+      compiled <- Imported.finishFileImportsIn known authenticated lowered;
+      checkGroupBodyIn known members compiled
+    }
+  } in case Imported.fileImports parameters lowered of {
+    Left _ -> ordinary;
+    Right authenticated -> case imported authenticated of {
+      Right checked -> Right checked;
+      -- Preserve the source diagnostic, including graph identities, if any
+      -- declaration or target fails to check on the direct route.
+      Left _ -> ordinary
+    }
+  };
+  -- Route evidence is projected from the branch that actually returned a
+  -- checked fragment, not from a second attempt against the same source.
+  data IndexedInferenceRoute = IndexedSpecialized | IndexedSignedGround |
+    IndexedSignedRecursion | IndexedMixedForwarder | IndexedOrdinary;
+  compileIndexedUsing = compileIndexedIn Nothing;
+  compileFileGroupIn = compileFileGroupRoutingIn (\_ fragment -> fragment);
+  compileFileGroupRoutingIn report env =
+    compileIndexedRoutingIn report (Just env) (finishFileGroupIn (Just env));
+  compileIndexedIn = compileIndexedRoutingIn (\_ fragment -> fragment);
+  compileIndexedRoutingIn report known finish bindMembers name parameters datatypes members =
+    case signedApplicationGroupIn known parameters datatypes members of {
+      Right fragment -> Right (report IndexedSpecialized fragment);
+      Left _ -> compileElaboratedRoutingIn report known finish bindMembers parameters datatypes members
     };
   compileElaboratedGroup = compileElaboratedGroupWith Surface.bindIndexedMembers;
-  compileElaboratedGroupWith = compileElaboratedUsing Compiler.finishCompilation;
-  compileElaboratedUsing finish bindMembers parameters datatypes members = do {
-    (,) externalTypes lowered <- prepareIndexedGroupWith bindMembers parameters datatypes members;
-    case monomorphicIndexed parameters members lowered of {
-      Right fragment -> Right fragment;
-      Left _ -> case groundIndexed parameters members lowered of {
-        Right fragment -> Right fragment;
-        Left _ -> case groundRecursiveIndexed parameters members lowered of {
-          Right fragment -> Right fragment;
-          Left _ -> case signedDataGroup parameters members lowered of {
-            Right fragment -> Right fragment;
-            Left _ -> case signedLocalGroup parameters members lowered of {
-              Right fragment -> Right fragment;
-              Left _ -> finishOpenGroupWith finish externalTypes (map snd members) lowered
+  compileElaboratedGroupWith = compileElaboratedUsing (\_ -> finishOpenGroupWith Compiler.finishCompilation);
+  compileElaboratedUsing = compileElaboratedIn Nothing;
+  compileElaboratedIn = compileElaboratedRoutingIn (\_ fragment -> fragment);
+  compileElaboratedRoutingIn report known finish bindMembers parameters datatypes members = do {
+    (,) externalTypes lowered <- prepareIndexedGroupIn known bindMembers parameters datatypes members;
+    case monomorphicIndexedIn known parameters members lowered of {
+      Right fragment -> Right (report IndexedSpecialized fragment);
+      Left _ -> case signedDataGroupIn known parameters members lowered of {
+        Right fragment -> Right (report IndexedSpecialized fragment);
+        Left _ -> case signedLocalGroupIn known parameters members lowered of {
+          Right fragment -> Right (report IndexedSpecialized fragment);
+          Left _ -> case groundIndexedIn known parameters members lowered of {
+            Right fragment -> Right (report IndexedSignedGround fragment);
+            Left _ -> case groundRecursiveDispatchIn report known parameters members lowered of {
+              Right result -> Right result;
+              Left _ -> case unsignedGroundIndexedIn known parameters members lowered of {
+                Right fragment -> Right (report IndexedSpecialized fragment);
+                Left _ -> mapEither (report IndexedOrdinary) (finish parameters externalTypes (map snd members) lowered)
+              }
             }
           }
         }
@@ -359,7 +416,8 @@ module Bootstrap.InferenceUnit where {
   -- A closed simply typed lambda spine checks against its declared arrows.
   -- Obtain the export's forall order from the signature graph itself: flexible
   -- bottom leaves occur in graph traversal order, regardless of their spelling.
-  signedLocalGroup parameters members lowered = case (,,) parameters members lowered of {
+  signedLocalGroup = signedLocalGroupIn Nothing;
+  signedLocalGroupIn known parameters members lowered = case (,,) parameters members lowered of {
     (,,) [] [(,) owner ((,,) exported (Just declared) _)]
       ((,) (SProgram datatypes (SDeclScope [slot] (SLet name (SSignature source written)
         (SConstructor "()")))) _) -> do {
@@ -394,7 +452,7 @@ module Bootstrap.InferenceUnit where {
         }
       };
       prefix S.empty signature;
-      env <- Open.environment datatypes;
+      env <- Open.environmentUsing known datatypes;
       Kinding.annotationType (Open.dataEnvironment env) M.empty signature;
       (,) root (Constraint.Generation graph _ _) <- Constraint.runGenerate
         (Constraint.embed (Open.dataEnvironment env) M.empty signature)
@@ -432,7 +490,8 @@ module Bootstrap.InferenceUnit where {
   -- A closed, explicitly quantified constructor or case projection has its
   -- type arguments in the declaration. The ordinary xMLF checker verifies
   -- constructor arity, coverage, branch types and the complete exported type.
-  signedDataGroup parameters members lowered = case (,,) parameters members lowered of {
+  signedDataGroup = signedDataGroupIn Nothing;
+  signedDataGroupIn known parameters members lowered = case (,,) parameters members lowered of {
     (,,) [] [(,) owner ((,,) exported (Just declared) _)]
       ((,) (SProgram datatypes (SDeclScope [slot] (SLet name (SSignature source written)
         (SConstructor "()")))) _) -> do {
@@ -449,7 +508,7 @@ module Bootstrap.InferenceUnit where {
         };
         _ -> Right source
       };
-      env <- Open.environment datatypes;
+      env <- Open.environmentUsing known datatypes;
       Kinding.annotationType (Open.dataEnvironment env) M.empty signature;
       field <- Classes.fieldType signature;
       expected <- T.instantiateField M.empty field;
@@ -521,7 +580,8 @@ module Bootstrap.InferenceUnit where {
   -- In a signed first-order body, applications introduce neither a type
   -- annotation nor a binder. Build the resolved term once and let the
   -- independent checker establish every intermediate type in its environment.
-  signedApplicationGroup parameters declarations members = case members of {
+  signedApplicationGroup = signedApplicationGroupIn Nothing;
+  signedApplicationGroupIn known parameters declarations members = case members of {
     [(,) owner ((,,) exported (Just annotation) expression)] -> do {
       expected <- monomorphicAnnotation annotation;
       let { numbered = zip parameters (range 0 (length parameters - 1));
@@ -542,7 +602,7 @@ module Bootstrap.InferenceUnit where {
           signedApplicationSpineUsing (\n ty -> SignedValue (XVarTerm n) ty) signedInstanceTerm
             identity (M.map scoped globals) (M.map scoped names) serial expected expression
         };
-      env <- Open.environment declarations;
+      env <- Open.environmentUsing known declarations;
       fragment <- Open.check env bindings (XLet (XName count exported) result (XConstructor "()" []));
       ensure (case Open.bindings fragment of {
         [(,) actual ty] -> eqString (X.nameHint actual) exported && T.alphaEq ty expected; _ -> False
@@ -689,24 +749,29 @@ module Bootstrap.InferenceUnit where {
     value <- visit expression;
     case value of { SignedValue term _ -> Right term; _ -> Left "signed application result requires a monotype" }
   };
-  -- A signed monotype can specialize imported schemes without building a
-  -- generalization graph. Every temporary variable, including every imported
-  -- type argument, must become closed. Bounded forall arguments carry checked
-  -- instance computations; this never replaces an unsigned export's MLF scheme
-  -- with a rank-1 approximation. Ambiguity and unsupported forms fall back.
-  data GroundType = GroundVar Int | GroundArrow GroundType GroundType |
+  -- A signed declaration can specialize imported schemes without building a
+  -- generalization graph. Its explicit type parameters stay rigid, and all
+  -- temporary variables must resolve in that scope. The general solver handles
+  -- ambiguous uses, other syntax and any term rejected by the xMLF checker.
+  data GroundType = GroundVar Int | GroundRigid XTyVar | GroundArrow GroundType GroundType |
     GroundCon String ([] GroundType) | GroundApply GroundType GroundType;
   data GroundState = GroundState Int (IntMap GroundType) (IntMap Int) Int;
   -- A unary scheme can pass its fresh type argument straight from an operand
   -- to the result. The wrapper, if present, must contain exactly that variable.
   data GroundParameter = GroundBare | GroundWrapped String;
   data GroundEvidence = GroundEvidence (GroundState -> [] ((,) XTyVar GroundType) -> Either String XComputation);
+  data GroundLetPolicy = GroundMonomorphicLets | GroundSingleUseLets;
+  data GroundContext = GroundContext GroundLetPolicy DataEnv ([] ((,) EvidenceRole GroundBinding)) |
+    GroundModuleContext GroundLetPolicy DataEnv ([] ((,) EvidenceRole GroundBinding))
+      ([] ((,) EvidenceRole TermRef) -> Maybe (Map XTyVar XType ->
+        [] ((,,) EvidenceRole XName XType) -> XType -> Either Evidence.EvidenceFailure XTerm));
   data GroundArrowHead = GroundArrowHead Bool Int GroundType GroundType (GroundType -> GroundTerm);
   data GroundBinding = GroundLocal XName GroundType | GroundImport XName XType |
     GroundQuantifiedImport XName XType GroundEvidence |
     GroundArrowOperand GroundBinding (GroundState -> GroundState -> GroundType -> Maybe ((,) GroundArrowHead GroundState)) |
-    GroundPreparedImport (GroundState -> Either String ((,,) GroundTerm GroundType GroundState)) |
-    GroundUnaryImport XName XType XTyVar GroundParameter GroundParameter;
+    GroundPreparedImport XName XType (GroundState -> Either String ((,,) GroundTerm GroundType GroundState)) |
+    GroundUnaryImport XName XType XTyVar GroundParameter GroundParameter |
+    GroundPrincipalSelector XName XType Int;
   groundImport name scheme = let {
     general = GroundImport name scheme;
     shape variable ty = case ty of {
@@ -736,7 +801,13 @@ module Bootstrap.InferenceUnit where {
   data GroundTerm = GroundLiteral XTerm | GroundVariable XName XType ([] ((,) XTyVar GroundType)) |
     GroundQuantifiedUse XName GroundEvidence ([] ((,) XTyVar GroundType)) |
     GroundPrimitive Primitive ([] GroundType) | GroundLambda XName GroundType GroundTerm |
-    GroundApplication GroundTerm GroundTerm;
+    GroundApplication GroundTerm GroundTerm | GroundTypeUse GroundTerm GroundType | GroundBoundUse GroundTerm |
+    GroundProjectionApplication XName ([] ((,,) GroundType Bool GroundTerm)) |
+    GroundConstructor String ([] GroundType) |
+    GroundCase GroundTerm GroundType ([] ((,) XPattern GroundTerm)) |
+    GroundLet XName GroundTerm GroundTerm |
+    GroundLetRec XName GroundType GroundTerm GroundTerm |
+    GroundWanted (Map XTyVar XType -> GroundState -> Either String XTerm);
   groundFresh (GroundState next known ranks serial) =
     (,) (GroundVar next) (GroundState (advanceIdentity next 1) known ranks serial);
   groundDeref state ty = case (,) state ty of {
@@ -747,6 +818,7 @@ module Bootstrap.InferenceUnit where {
   };
   groundOccurs state identity ty = case groundDeref state ty of {
     GroundVar i -> i == identity;
+    GroundRigid _ -> False;
     GroundArrow a b -> groundOccurs state identity a || groundOccurs state identity b;
     GroundCon _ args -> any (groundOccurs state identity) args;
     GroundApply f a -> groundOccurs state identity f || groundOccurs state identity a
@@ -756,13 +828,26 @@ module Bootstrap.InferenceUnit where {
     (,) (GroundVar i) (GroundVar j) -> Right (if i == j then state else groundUnion state i j);
     (,) (GroundVar i) value -> groundBind state i value;
     (,) value (GroundVar i) -> groundBind state i value;
+    (,) (GroundRigid a) (GroundRigid b) -> do {
+      ensure (T.equalTyVar a b) "ground rigid variable mismatch";
+      Right state
+    };
     (,) (GroundArrow a b) (GroundArrow c d) -> do { next <- groundUnify state a c; groundUnify next b d };
     (,) (GroundCon a xs) (GroundCon b ys) -> do {
       ensure (eqString a b && length xs == length ys) "ground constructor mismatch";
       foldM (\next ((,) x y) -> groundUnify next x y) state (zip xs ys)
     };
     (,) (GroundApply f a) (GroundApply g b) -> do { next <- groundUnify state f g; groundUnify next a b };
+    (,) (GroundApply f a) (GroundCon name arguments) -> groundUnifyApplication state f a name arguments;
+    (,) (GroundCon name arguments) (GroundApply f a) -> groundUnifyApplication state f a name arguments;
     _ -> Left "ground type mismatch"
+  };
+  groundUnifyApplication state f a name arguments = case reverse arguments of {
+    [] -> Left "ground type mismatch";
+    (:) last prefix -> do {
+      next <- groundUnify state f (GroundCon name (reverse prefix));
+      groundUnify next a last
+    }
   };
   -- Both arguments are unbound roots after dereferencing. Rank bounds alias
   -- depth even when a nested polymorphic call spine joins them in reverse order.
@@ -789,9 +874,10 @@ module Bootstrap.InferenceUnit where {
   groundClosed :: GroundState -> GroundType -> Either String XType;
   groundClosed state ty = case groundDeref state ty of {
     GroundVar _ -> Left "ground specialization is ambiguous";
+    GroundRigid variable -> Right (XVar variable);
     GroundArrow a b -> do { x <- groundClosed state a; y <- groundClosed state b; Right (XArrow x y) };
     GroundCon n args -> mapEither (XCon n) (traverseEither (groundClosed state) args);
-    GroundApply f a -> do { x <- groundClosed state f; y <- groundClosed state a; Right (XApply x y) }
+    GroundApply f a -> do { x <- groundClosed state f; y <- groundClosed state a; Right (T.apply x y) }
   };
   groundScheme variables reversed state ty = case ty of {
     XForall v bound body -> let { fresh = groundFresh state; value = fst fresh; next = snd fresh } in do {
@@ -824,6 +910,7 @@ module Bootstrap.InferenceUnit where {
           };
           rebase shape = case shape of {
             GroundVar slot -> fresh slot;
+            GroundRigid _ -> shape;
             GroundArrow a b -> GroundArrow (rebase a) (rebase b);
             GroundCon n [] -> shape;
             GroundCon n args -> GroundCon n (map rebase args);
@@ -836,7 +923,7 @@ module Bootstrap.InferenceUnit where {
     }
   } in collect 0 M.empty [] source;
   prepareGroundImport name ty = let {
-    prepare term = let { instantiate = prepareGroundScheme ty } in GroundPreparedImport (\state ->
+    prepare term = let { instantiate = prepareGroundScheme ty } in GroundPreparedImport name ty (\state ->
       mapEither (\((,,) actual arguments next) -> (,,) (term arguments) actual next) (instantiate state))
   } in case groundImport name ty of {
     GroundQuantifiedImport _ _ evidence -> prepare (GroundQuantifiedUse name evidence);
@@ -975,20 +1062,261 @@ module Bootstrap.InferenceUnit where {
       groundEvidence solved source arguments
     }
   };
-  groundSeal state term = case term of {
+  -- Recover the whole instantiation spine before building individual
+  -- XTypeApps. A compact call still carries each operand and its exact proof.
+  sealGroundSpine gamma state root = let {
+    collect term pending = case term of {
+      GroundApplication (GroundBoundUse (GroundTypeUse head ty)) operand ->
+        collect head ((:) ((,,) ty True operand) pending);
+      GroundApplication (GroundTypeUse head ty) operand ->
+        collect head ((:) ((,,) ty False operand) pending);
+      GroundLiteral (XVarTerm name) -> case pending of {
+        (:) _ ((:) _ _) -> do {
+          let { prepare ((,,) ty eliminate operand) = case groundClosed state ty of {
+            Right (XCon tag []) -> case groundSealIn gamma state operand of {
+              Right arg -> if X.plainSpineOperand arg then Just ((,,) tag eliminate arg) else Nothing;
+              _ -> Nothing
+            };
+            _ -> Nothing
+          } };
+          mapOptional (XInstantiationSpine name) (mapM prepare pending)
+        };
+        _ -> Nothing
+      };
+      _ -> Nothing
+    }
+  } in collect root [];
+  -- The saturated route already has the instantiation rows. Keep their
+  -- operands in source order and expand only when a row needs general proof.
+  sealGroundProjection gamma state name rows = let {
+    applyRow result ty eliminate operand = let {
+      witness = X.instantiate result (X.typeApplication ty)
+    } in XApp (if eliminate then X.instantiate witness XElim else witness) operand;
+    close ((,,) ty eliminate operand) = do {
+      actual <- groundClosed state ty;
+      sealed <- groundSealIn gamma state operand;
+      Right ((,,) actual eliminate sealed)
+    };
+    expanded result pending = case pending of {
+      [] -> Right result;
+      (:) row rest -> do {
+        (,,) ty eliminate operand <- close row;
+        expanded (applyRow result ty eliminate operand) rest
+      }
+    };
+    collect packed pending = case pending of {
+      [] -> Right (XInstantiationSpine name (reverse packed));
+      (:) row rest -> do {
+        (,,) ty eliminate operand <- close row;
+        let {
+          prefix = case packed of {
+            [] -> XVarTerm name;
+            [(,,) tag drops value] -> applyRow (XVarTerm name) (XCon tag []) drops value;
+            _ -> XInstantiationSpine name (reverse packed)
+          };
+          ordinary = expanded (applyRow prefix ty eliminate operand) rest
+        };
+        case ty of {
+          XCon tag [] -> if X.plainSpineOperand operand
+            then collect ((:) ((,,) tag eliminate operand) packed) rest else ordinary;
+          _ -> ordinary
+        }
+      }
+    }
+  } in collect [] rows;
+  groundSeal = groundSealIn M.empty;
+  groundSealIn gamma state term = case term of {
     GroundLiteral value -> Right value;
     GroundVariable name scheme arguments -> mapEither (X.instantiate (XVarTerm name))
       (groundEvidence state scheme arguments);
     GroundQuantifiedUse name (GroundEvidence evidence) arguments -> mapEither (X.instantiate (XVarTerm name)) (evidence state arguments);
     GroundPrimitive primitive arguments -> mapEither (XPrimitive primitive) (traverseEither (groundClosed state) arguments);
-    GroundLambda name ty body -> do { actual <- groundClosed state ty; value <- groundSeal state body; Right (XAbs name actual value) };
-    GroundApplication f a -> do { x <- groundSeal state f; y <- groundSeal state a; Right (XApp x y) }
+    GroundLambda name ty body -> do { actual <- groundClosed state ty; value <- groundSealIn gamma state body; Right (XAbs name actual value) };
+    GroundApplication f a -> case sealGroundSpine gamma state term of {
+      Just compact -> Right compact;
+      Nothing -> do { x <- groundSealIn gamma state f; y <- groundSealIn gamma state a; Right (XApp x y) }
+    };
+    GroundProjectionApplication name rows -> sealGroundProjection gamma state name rows;
+    GroundBoundUse body -> mapEither (\term -> X.instantiate term XElim) (groundSealIn gamma state body);
+    GroundTypeUse body argument -> do {
+      value <- groundSealIn gamma state body;
+      ty <- groundClosed state argument;
+      Right (X.instantiate value (X.typeApplication ty))
+    };
+    GroundConstructor name arguments -> mapEither (XConstructor name) (traverseEither (groundClosed state) arguments);
+    GroundCase scrutinee result alternatives -> do {
+      subject <- groundSealIn gamma state scrutinee;
+      ty <- groundClosed state result;
+      branches <- traverseEither (\((,) pattern body) -> mapEither (XAlternative pattern) (groundSealIn gamma state body)) alternatives;
+      Right (XCase subject ty branches)
+    };
+    GroundLet name rhs body -> do {
+      value <- groundSealIn gamma state rhs;
+      result <- groundSealIn gamma state body;
+      Right (XLet name value result)
+    };
+    GroundLetRec name bindingType rhs body -> do {
+      actual <- groundClosed state bindingType;
+      value <- groundSealIn gamma state rhs;
+      result <- groundSealIn gamma state body;
+      Right (XLetRec [(,,) name actual value] result)
+    };
+    GroundWanted resolve -> resolve gamma state
+  };
+  groundApply f a = case f of {
+    GroundCon name args -> GroundCon name (append args [a]);
+    _ -> GroundApply f a
+  };
+  groundField :: Map String GroundType -> Field -> Either String GroundType;
+  groundField scope field = case field of {
+    Parameter name -> case M.lookup compareString name scope of {
+      Nothing -> Left "unbound ground constructor parameter";
+      Just ty -> Right ty
+    };
+    Function a b -> do { x <- groundField scope a; y <- groundField scope b; Right (GroundArrow x y) };
+    Applied name types -> mapEither (GroundCon name) (traverseEither (groundField scope) types);
+    Application f a -> do { x <- groundField scope f; y <- groundField scope a; Right (groundApply x y) };
+    Quantified _ _ _ -> Left "polymorphic constructor field requires general inference"
+  };
+  groundParameters state parameters = do {
+    (,) arguments next <- foldM (\((,) reversed current) _ ->
+      case groundFresh current of { (,) ty following -> Right ((,) ((:) ty reversed) following) })
+      ((,) [] state) parameters;
+    Right ((,) (reverse arguments) next)
+  };
+  groundConstructorTypes datatypes state name = do {
+    (,) declaration constructor <- Data.lookupConstructor datatypes name;
+    let { parameters = Data.datatypeParameters declaration };
+    (,) actual next <- groundParameters state parameters;
+    let { scope = M.fromList compareString (zip parameters actual) };
+    fields <- traverseEither (groundField scope) (Data.constructorFields constructor);
+    Right ((,,,) (Data.datatypeName declaration) actual fields next)
+  };
+  groundCandidateReference :: Map Int GroundBinding -> Map String GroundBinding ->
+    (,) EvidenceRole TermRef -> Either String ((,) EvidenceRole GroundBinding);
+  groundCandidateReference globals names ((,) role ref) = case (case ref of {
+    LexicalRef name -> M.lookup compareString name names;
+    DeclRef identity _ -> M.lookup compareInt (V.toInt identity) globals
+  }) of {
+    Just binding -> Right ((,) role binding);
+    Nothing -> Left "ground evidence candidate is out of scope"
+  };
+  groundCandidateWith local imported binding = case binding of {
+    GroundLocal name ty -> local name ty;
+    GroundImport name scheme -> imported name scheme;
+    GroundQuantifiedImport name scheme _ -> imported name scheme;
+    GroundPreparedImport name scheme _ -> imported name scheme;
+    GroundUnaryImport name scheme _ _ _ -> imported name scheme;
+    GroundPrincipalSelector name scheme _ -> imported name scheme;
+    GroundArrowOperand original _ -> groundCandidateWith local imported original
+  };
+  groundCandidateType state = groundCandidateWith
+    (\name ty -> mapEither ((,) name) (groundClosed state ty))
+    (\name scheme -> Right ((,) name scheme));
+  -- Declaration slots in the initial environment cannot be rebound by
+  -- groundBindLocal. Share only their immutable schemes, in request order.
+  groundModuleContext = groundModuleContextWith GroundSingleUseLets;
+  groundModuleContextWith localLets datatypes globals expression = let {
+    first = Dependency.fileOccurrencesUsing False True (\_ rest -> rest)
+      (\_ _ _ (CandidateEnvironment _ refs) _ -> Just refs) Nothing expression;
+    declared ((,) role ref) = case ref of {
+      DeclRef slot _ -> case M.lookup compareInt (V.toInt slot) globals of {
+        Just binding -> groundCandidateWith (\_ _ -> Nothing)
+          (\name ty -> Just ((,,) role name ty)) binding;
+        Nothing -> Nothing
+      };
+      LexicalRef _ -> Nothing
+    };
+    same ((,) a lhs) ((,) b rhs) = Evidence.sameRole a b && (case (,) lhs rhs of {
+      (,) (DeclRef i _) (DeclRef j _) -> V.toInt i == V.toInt j;
+      _ -> False
+    });
+    prepared = case first of {
+      Just refs -> mapOptional (\rows -> (,) refs (Evidence.scopedResolver datatypes rows)) (mapM declared refs);
+      Nothing -> Nothing
+    };
+    select refs = case prepared of {
+      Just ((,) expected resolve) -> if eqList same expected refs then Just resolve else Nothing;
+      Nothing -> Nothing
+    }
+  } in GroundModuleContext localLets datatypes [] select;
+  groundGivenContext context globals names bindings = let {
+    within = case context of {
+      GroundContext localLets datatypes _ -> GroundContext localLets datatypes;
+      GroundModuleContext localLets datatypes _ select -> \givens -> GroundModuleContext localLets datatypes givens select
+    }
+  } in mapEither within
+    (traverseEither (\name -> groundCandidateReference globals names ((,) GivenEvidence (LexicalRef name))) bindings);
+  -- Evidence is selected after the ordinary argument constraints determine
+  -- the wanted type. Use the same ordered inventories and proof checker as
+  -- the graph elaborator, including replacement of a lexical given frame.
+  groundWanted = groundWantedUsing (\_ -> Nothing);
+  groundWantedUsing select datatypes scoped givens globals names refs dictionary state = do {
+    declaration <- Data.lookupDatatype datatypes dictionary;
+    candidates <- traverseEither (groundCandidateReference globals names) refs;
+    (,) arguments next <- groundParameters state (Data.datatypeParameters declaration);
+    let {
+      wanted = GroundCon dictionary arguments;
+      resolve gamma solved = do {
+        ty <- groundClosed solved wanted;
+        let { types = traverseEither (\((,) role binding) -> do {
+          (,) name scheme <- groundCandidateType solved binding;
+          Right ((,,) role name scheme)
+        }) };
+        let { inScope resolveFrom = do {
+          locals <- types givens;
+          mapLeft Evidence.evidenceFailureMessage (resolveFrom gamma locals ty)
+        } };
+        if scoped then case select refs of {
+          Just prepared -> inScope prepared;
+          Nothing -> do { authorized <- types candidates; inScope (Evidence.scopedResolver datatypes authorized) }
+        } else do { authorized <- types candidates; Evidence.resolveDictionary datatypes gamma authorized ty }
+      }
+    };
+    Right ((,,) (GroundWanted resolve) wanted next)
+  };
+  groundName (GroundState count known ranks serial) hint =
+    (,) (XName serial hint) (GroundState count known ranks (advanceIdentity serial 1));
+  groundBindLocal globals names state identity hint ty = do {
+    let { named = groundName state hint; name = fst named; binding = GroundLocal name ty };
+    scope <- case identity of {
+      Nothing -> Right globals;
+      Just slot -> do {
+        let { i = V.toInt slot };
+        ensure (not (M.member compareInt i globals)) "ground binder identity already in scope";
+        Right (M.insert compareInt i binding globals)
+      }
+    };
+    Right ((,,,) name scope (M.insert compareString hint binding names) (snd named))
+  };
+  groundPattern datatypes names state subject pattern = case pattern of {
+    SDefaultPattern Nothing -> Right ((,,) (XDefaultPattern Nothing) names state);
+    SDefaultPattern (Just hint) -> case groundName state hint of {
+      (,) name next -> Right ((,,) (XDefaultPattern (Just name))
+        (M.insert compareString hint (GroundLocal name subject) names) next)
+    };
+    SConstructorPattern name hints -> do {
+      (,,,) owner arguments fields next <- groundConstructorTypes datatypes state name;
+      ensure (length fields == length hints) "ground pattern arity mismatch";
+      solved <- groundUnify next subject (GroundCon owner arguments);
+      let { named = catMaybes hints };
+      ensure (length named == S.size (S.fromList compareString named)) "duplicate ground pattern variable";
+      (,,) reversed scope current <- foldM (\((,,) rs scope current) ((,) hint ty) -> case hint of {
+        Nothing -> Right ((,,) ((:) Nothing rs) scope current);
+        Just n -> case groundName current n of { (,) field following ->
+          Right ((,,) ((:) (Just field) rs) (M.insert compareString n (GroundLocal field ty) scope) following)
+        }
+      }) ((,,) [] names solved) (zip hints fields);
+      Right ((,,) (XConstructorPattern name (reverse reversed)) scope current)
+    };
+    _ -> Left "ground case requires a lowered pattern"
   };
   groundUse state binding = case binding of {
     Nothing -> Left "unknown ground variable";
     Just (GroundLocal name ty) -> Right ((,,) (GroundLiteral (XVarTerm name)) ty state);
+    Just (GroundPrincipalSelector _ _ _) -> Left "inferred selector must be fully applied";
     Just (GroundArrowOperand ordinary _) -> groundUse state (Just ordinary);
-    Just (GroundPreparedImport instantiate) -> instantiate state;
+    Just (GroundPreparedImport _ _ instantiate) -> instantiate state;
     Just (GroundUnaryImport name ty _ _ _) -> groundUse state (Just (GroundImport name ty));
     Just (GroundQuantifiedImport name ty evidence) -> do {
       (,,) actual arguments next <- groundScheme M.empty [] state ty;
@@ -1024,11 +1352,152 @@ module Bootstrap.InferenceUnit where {
     actual <- groundType known ty;
     Right ((,,) (GroundPrimitive primitive (reverse reversed)) actual next)
   } };
-  groundInfer globals names state expression = case expression of {
+  groundInfer = groundInferIn (GroundContext GroundSingleUseLets Data.emptyDataEnv []);
+  -- A declared selector can bind types after receiving its dictionary.
+  -- Admit only a direct, resolved call with bottom bounds along the result
+  -- spine. Its operands keep their own constraints and final xMLF checks.
+  -- A fresh result-only binder can be eliminated at its closed domain's
+  -- exact bound. This keeps the prior scope of the bound and never selects a
+  -- subtype before seeing the rest of the actual argument list.
+  groundBoundArrow variable bound body = case body of {
+    XArrow domain (XVar result) ->
+      let { independent = case domain of {
+        XVar input -> not (T.equalTyVar variable input);
+        _ -> S.null (T.freeVars domain) && monomorphicTarget domain
+      } } in if T.equalTyVar variable result && independent
+        then Just (XArrow domain bound) else Nothing;
+    _ -> Nothing
+  };
+  groundImportedApplication context globals names state expression = let {
+    spine term arguments = case term of {
+      SApp f a -> spine f ((:) a arguments);
+      SApplyDictionaries function dictionaries -> let {
+        head = case function of { LexicalRef name -> SVar name; DeclRef slot hint -> SGlobal slot hint }
+      } in spine head (append (map SVar dictionaries) arguments);
+      SCallSite _ _ body -> spine body arguments;
+      SSourceDefinition body -> spine body arguments;
+      SGlobal i _ -> (,) (M.lookup compareInt (V.toInt i) globals) arguments;
+      SVar n -> (,) (M.lookup compareString n names) arguments;
+      _ -> (,) Nothing arguments
+    };
+    imported binding = case binding of {
+      GroundLocal _ _ -> Left "direct selector needs an imported scheme";
+      GroundArrowOperand original _ -> imported original;
+      _ -> groundCandidateType state binding
+    };
+    nested seen ty = case ty of {
+      XForall _ _ body -> seen || nested seen body;
+      XArrow _ body -> nested True body;
+      _ -> False
+    };
+    instantiateArgument eliminate actual ty = let { prepared = GroundTypeUse actual ty }
+      in if eliminate then GroundBoundUse prepared else prepared;
+    argumentType independent variables actual tail rest following =
+      case rest of {
+        [] -> Left "direct selector needs a saturated argument";
+        (:) argument remaining -> do {
+          (,,) operand ty solved <- groundInferIn context globals names following argument;
+          let {
+            fn = instantiateArgument (snd independent) actual ty;
+            bindings = M.insert T.compareTyVar (fst independent) ty variables
+          };
+          apply bindings (GroundApplication fn operand) tail remaining solved
+        }
+      };
+    apply variables actual ty arguments following = let {
+      ordinary = applyOrdinary variables actual ty arguments following;
+      solved a result tail = argumentType ((,) a result) variables actual tail arguments following
+    } in if null arguments then ordinary else case ty of {
+      XForall a XBot (XForall r bound (XArrow (XVar input) (XVar output))) ->
+        if T.equalTyVar a input && T.equalTyVar r output && not (T.equalTyVar a r)
+          then solved a True bound else ordinary;
+      XForall a XBot (XArrow (XVar input) result) ->
+        if T.equalTyVar a input then solved a False result else ordinary;
+      _ -> ordinary
+    };
+    applyOrdinary variables actual ty arguments following = case ty of {
+      XForall v bound result -> case bound of {
+        XBot -> instantiate variables actual v result arguments following;
+        XBotKind _ -> instantiate variables actual v result arguments following;
+        _ -> case groundBoundArrow v bound result of {
+          Just erased -> apply variables (GroundBoundUse actual) erased arguments following;
+          Nothing -> Left "direct selector needs bottom or result-only bounds"
+        }
+      };
+      _ -> case arguments of {
+        [] -> mapEither (\answer -> (,,) actual answer following) (groundType variables ty);
+        (:) argument rest -> case ty of {
+          XArrow from to -> do {
+            wanted <- groundType variables from;
+            (,) operand solved <- groundCheckBody context globals names following wanted argument;
+            apply variables (GroundApplication actual operand) to rest solved
+          };
+          _ -> Left "direct selector has too many arguments"
+        }
+      }
+    };
+    instantiate variables actual variable result arguments following = case groundFresh following of {
+      (,) argument next -> apply (M.insert T.compareTyVar variable argument variables)
+        (GroundTypeUse actual argument) result arguments next
+    };
+    direct name scheme arguments = let {
+      root = GroundLiteral (XVarTerm name);
+      ordinary = apply M.empty root scheme arguments state;
+      project selected index answer reversed pending following = case pending of {
+        [] -> case answer of {
+          Just ty -> Right ((,,) (GroundProjectionApplication name (reverse reversed)) ty following);
+          Nothing -> Left "projection does not select an argument"
+        };
+        (:) argument rest -> do {
+          (,,) operand ty solved <- groundInferIn context globals names following argument;
+          let {
+            next = (:) ((,,) ty (not (null rest)) operand) reversed;
+            result = if index == selected then Just ty else answer
+          };
+          project selected (index + 1) result next rest solved
+        }
+      }
+    } in case T.projectionTypeLayout scheme of {
+      Just ((,) width selected) -> if width == length arguments
+        then project selected 0 Nothing [] arguments state else ordinary;
+      Nothing -> ordinary
+    }
+  } in case spine expression [] of {
+    (,) (Just (GroundPrincipalSelector name ty width)) arguments ->
+      Just (do {
+        ensure (length arguments == width) "inferred selector must be fully applied";
+        direct name ty arguments
+      });
+    (,) (Just binding) arguments -> case imported binding of {
+      Right ((,) name ty) -> if nested False ty then
+        Just (direct name ty arguments) else Nothing;
+      Left _ -> Nothing
+    };
+    _ -> Nothing
+  };
+  groundInferIn = groundInferApplication True;
+  groundInferApplication inspect context = case context of {
+    GroundContext localLets datatypes givens -> groundInferWith inspect context localLets datatypes givens (\_ -> Nothing);
+    GroundModuleContext localLets datatypes givens select -> groundInferWith inspect context localLets datatypes givens select
+  };
+  groundInferWith inspect context localLets datatypes givens select globals names state expression = case expression of {
     SVar name -> groundUse state (M.lookup compareString name names);
     SGlobal identity _ -> groundUse state (M.lookup compareInt (V.toInt identity) globals);
-    SDeclScope [identity] (SLam name annotation body) -> groundLambda globals names state (Just identity) name annotation body;
-    SLam name annotation body -> groundLambda globals names state Nothing name annotation body;
+    SDeclScope [identity] (SLam name annotation body) -> groundLambda context globals names state (Just identity) name annotation body;
+    SLam name annotation body -> groundLambda context globals names state Nothing name annotation body;
+    SDeclScope [identity] (SLet name rhs body) -> groundLet context localLets globals names state (Just identity) name rhs body;
+    SLet name rhs body -> groundLet context localLets globals names state Nothing name rhs body;
+    SDeclScope [identity] (SLetRec [(,,) name InferRecursive value] body) ->
+      groundLetRecursive context globals names state (Just identity) name value body;
+    SLetRec [(,,) name InferRecursive value] body ->
+      groundLetRecursive context globals names state Nothing name value body;
+    SBindDictionaries parameters body -> do {
+      ensure (not (null parameters)) "missing inferred dictionary binders";
+      groundInferIn context globals names state (foldr (\name -> SLam name Nothing) body parameters)
+    };
+    SApplyDictionaries function arguments -> let { head = case function of {
+      LexicalRef name -> SVar name; DeclRef slot hint -> SGlobal slot hint
+    } } in groundInferApplication inspect context globals names state (foldlStrict SApp head (map SVar arguments));
     SApp f a -> let {
       apply function functionType argument argumentType following = let {
           allocated = groundFresh following;
@@ -1050,12 +1519,12 @@ module Bootstrap.InferenceUnit where {
       ordinary = ordinaryOn a;
       ordinaryOn operand operator = do {
         (,,) function functionType next <- operator;
-        (,,) argument argumentType following <- groundInfer globals names next operand;
+        (,,) argument argumentType following <- groundInferIn context globals names next operand;
         apply function functionType argument argumentType following
       };
       firstOperand original forward operand accept fallback = do {
         (,,) function functionType next <- groundUse state (Just original);
-        (,,) first actual following <- groundInfer globals names next operand;
+        (,,) first actual following <- groundInferIn context globals names next operand;
         case forward state following actual of {
           Just ((,) head fresh) -> accept head first fresh;
           Nothing -> fallback (apply function functionType first actual following)
@@ -1066,7 +1535,7 @@ module Bootstrap.InferenceUnit where {
       } in Right ((,,) (GroundApplication (term hole) first)
         (GroundArrow (GroundArrow hole domain) (GroundArrow hole codomain)) after);
       second head@(GroundArrowHead safe identity domain codomain term) first after = do {
-        (,,) argument actual following <- groundInfer globals names after a;
+        (,,) argument actual following <- groundInferIn context globals names after a;
         let {
           fresh = snd (groundFresh following);
           fallback = do {
@@ -1105,7 +1574,7 @@ module Bootstrap.InferenceUnit where {
         Just (GroundUnaryImport name scheme variable input output) -> let {
           allocated = groundFresh state; hole = fst allocated; next = snd allocated
         } in do {
-          (,,) argument actual following <- groundInfer globals names next operand;
+          (,,) argument actual following <- groundInferIn context globals names next operand;
           let {
             fresh = snd (groundFresh following);
             applied value = GroundApplication (GroundVariable name scheme [(,) variable value]) argument
@@ -1121,55 +1590,234 @@ module Bootstrap.InferenceUnit where {
           }
         };
         _ -> ordinaryOn operand (groundUse state binding)
-      }
-    } in case f of {
-      SGlobal i _ -> bound a (M.lookup compareInt (V.toInt i) globals);
-      SVar name -> bound a (M.lookup compareString name names);
-      SApp operator operand -> case operator of {
-        SGlobal i _ -> pair (M.lookup compareInt (V.toInt i) globals) operand;
-        SVar name -> pair (M.lookup compareString name names) operand;
-        _ -> ordinary (groundInfer globals names state f)
       };
-      _ -> ordinary (groundInfer globals names state f)
+      solveOrdinary rescan = case f of {
+        SGlobal i _ -> bound a (M.lookup compareInt (V.toInt i) globals);
+        SVar name -> bound a (M.lookup compareString name names);
+        SApp operator operand -> case operator of {
+          SGlobal i _ -> pair (M.lookup compareInt (V.toInt i) globals) operand;
+          SVar name -> pair (M.lookup compareString name names) operand;
+          _ -> ordinary (groundInferApplication rescan context globals names state f)
+        };
+        _ -> ordinary (groundInferApplication rescan context globals names state f)
+      };
+      -- The complete source application owns this selector attempt. Its
+      -- argument subexpressions still inspect their own application spines.
+      direct = if inspect then groundImportedApplication context globals names state expression else Nothing
+    } in case direct of {
+      Nothing -> solveOrdinary False;
+      Just result -> case result of {
+        Right correct -> Right correct;
+        Left reason -> case solveOrdinary True of {
+          Right ordinary -> Right ordinary;
+          Left _ -> Left reason
+        }
+      }
     };
+    SConstructor name -> do {
+      (,,,) owner arguments fields next <- groundConstructorTypes datatypes state name;
+      Right ((,,) (GroundConstructor name arguments) (foldr GroundArrow (GroundCon owner arguments) fields) next)
+    };
+    SCase subject alternatives -> do {
+      ensure (not (null alternatives)) "ground case has no alternatives";
+      (,,) scrutinee subjectType next <- groundInferIn context globals names state subject;
+      let { fresh = groundFresh next; result = fst fresh; begin = snd fresh };
+      (,) branches done <- foldM (\((,) reversed following) (SAlternative pattern body) -> do {
+        (,,) checked scope entered <- groundPattern datatypes names following subjectType pattern;
+        (,,) value actual finish <- groundInferIn context globals scope entered body;
+        solved <- groundUnify finish result actual;
+        Right ((,) ((:) ((,) checked value) reversed) solved)
+      }) ((,) [] begin) alternatives;
+      Right ((,,) (GroundCase scrutinee result (reverse branches)) result done)
+    };
+    SWantedScope dictionary (CandidateEnvironment _ refs) ->
+      groundWantedUsing select datatypes True givens globals names refs dictionary state;
+    SWantedRefs dictionary refs -> groundWanted datatypes False [] globals names refs dictionary state;
+    SWanted dictionary bindings -> groundWanted datatypes False [] globals names
+      (map (\((,) role name) -> (,) role (LexicalRef name)) bindings) dictionary state;
+    SGivenScope bindings body -> do {
+      local <- groundGivenContext context globals names bindings;
+      groundInferIn local globals names state body
+    };
+    SCallSite _ _ body -> groundInferApplication inspect context globals names state body;
+    SSourceDefinition body -> groundInferApplication inspect context globals names state body;
     SPrimitive primitive -> groundPrimitive state primitive;
     SIntLit n -> Right ((,,) (GroundLiteral (XIntTerm n)) (GroundCon "Int" []) state);
     SDoubleLit n -> Right ((,,) (GroundLiteral (XDoubleTerm n)) (GroundCon "Double" []) state);
     SBoolLit b -> Right ((,,) (GroundLiteral (XBoolTerm b)) (GroundCon "Bool" []) state);
     SStringLit s -> Right ((,,) (GroundLiteral (XStringTerm s)) (GroundCon "String" []) state);
-    SSignature body annotation -> groundAnnotated globals names state body annotation;
-    SAnn body annotation -> groundAnnotated globals names state body annotation;
-    SChecked ty body -> groundAnnotated globals names state body (SAnnotation [] ty);
+    SSignature body annotation -> groundAnnotated context globals names state body annotation;
+    SAnn body annotation -> groundAnnotated context globals names state body annotation;
+    SChecked ty body -> groundAnnotated context globals names state body (SAnnotation [] ty);
     _ -> Left "expression requires general inference"
   };
-  groundAnnotated globals names state body annotation = do {
+  groundAnnotated context globals names state body annotation = do {
     expected <- monomorphicAnnotation annotation >>= groundType M.empty;
-    (,,) term actual next <- groundInfer globals names state body;
+    (,,) term actual next <- groundInferIn context globals names state body;
     solved <- groundUnify next actual expected;
     Right ((,,) term expected solved)
   };
-  groundLambda globals names state identity name annotation body = do {
+  groundLambda context globals names state identity name annotation body = do {
     (,) ty next <- case annotation of {
       Nothing -> Right (groundFresh state);
       Just written -> mapEither (\ty -> (,) ty state) (monomorphicAnnotation written >>= groundType M.empty)
     };
-    case next of { GroundState count known ranks serial -> do {
-      let { binder = XName serial name; binding = GroundLocal binder ty };
-      scope <- case identity of {
-        Nothing -> Right globals;
-        Just i -> do {
-          ensure (not (M.member compareInt (V.toInt i) globals)) "ground parameter identity already bound";
-          Right (M.insert compareInt (V.toInt i) binding globals)
-        }
-      };
-      (,,) value result final <- groundInfer scope (M.insert compareString name binding names)
-        (GroundState count known ranks (advanceIdentity serial 1)) body;
-      Right ((,,) (GroundLambda binder ty value) (GroundArrow ty result) final)
-    } }
+    (,,,) binder scope locals following <- groundBindLocal globals names next identity name ty;
+    (,,) value result final <- groundInferIn context scope locals following body;
+    Right ((,,) (GroundLambda binder ty value) (GroundArrow ty result) final)
   };
-  groundIndexed parameters members lowered = case (,) members lowered of {
+  groundFreeVariables state found value = case groundDeref state value of {
+    GroundVar i -> IS.insert i found;
+    GroundRigid _ -> found;
+    GroundArrow a b -> groundFreeVariables state (groundFreeVariables state found a) b;
+    GroundCon _ arguments -> foldlStrict (groundFreeVariables state) found arguments;
+    GroundApply f a -> groundFreeVariables state (groundFreeVariables state found f) a
+  };
+  -- Variables free in the surrounding monomorphic environment cannot be
+  -- generalized here. Let the body refine them as it would a lambda's input.
+  groundLocalMonotype names state ty = case groundClosed state ty of {
+    Right _ -> Right ();
+    Left message -> let {
+      missing = groundFreeVariables state IS.empty ty;
+      remove found binding = case binding of {
+        GroundLocal _ value -> IS.difference found (groundFreeVariables state IS.empty value);
+        _ -> found
+      }
+    } in ensure (IS.null (foldlStrict remove missing (M.elems names))) message
+  };
+  -- A locally generalized variable would be instantiated at only this use.
+  -- Leave its slots live until that use has supplied the remaining equations.
+  -- An implicit evidence reference may instantiate it separately, so only
+  -- admit one explicit use with no further candidates.
+  groundSingleUse identity hint body = let {
+    owns ref = case ref of {
+      LexicalRef n -> eqString n hint;
+      DeclRef slot _ -> case identity of {
+        Just bound -> V.toInt slot == V.toInt bound; Nothing -> False
+      }
+    }
+  } in case take 2 (filter owns (Dependency.valueOccurrences True False body)) of {
+    [_] -> any owns (Dependency.valueOccurrences False False body);
+    _ -> False
+  };
+  groundLet context localLets globals names state identity hint rhs body = do {
+    (,,) value ty following <- groundInferIn context globals names state rhs;
+    case groundLocalMonotype names following ty of {
+      Right _ -> Right ();
+      Left reason -> case localLets of {
+        GroundMonomorphicLets -> Left reason;
+        GroundSingleUseLets -> ensure (groundSingleUse identity hint body) reason
+      }
+    };
+    (,,,) name scope locals next <- groundBindLocal globals names following identity hint ty;
+    (,,) enclosed result done <- groundInferIn context scope locals next body;
+    Right ((,,) (GroundLet name value enclosed) result done)
+  };
+  -- A singleton recursive function has a monotype while checking its own
+  -- body. Use this route only if that type is closed before the continuation
+  -- is visited, so no local quantifier or polymorphic recursion is suppressed.
+  groundLetRecursive context globals names state identity hint rhs body = do {
+    ensure (case rhs of {
+      SLam _ _ _ -> True;
+      SDeclScope [_] (SLam _ _ _) -> True;
+      _ -> False
+    }) "ground local recursion requires a function";
+    let { allocated = groundFresh state; wanted = fst allocated; next = snd allocated };
+    (,,,) name scope locals declared <- groundBindLocal globals names next identity hint wanted;
+    (,) value solved <- groundCheckBody context scope locals declared wanted rhs;
+    _ <- groundClosed solved wanted;
+    (,,) enclosed result done <- groundInferIn context scope locals solved body;
+    Right ((,,) (GroundLetRec name wanted value enclosed) result done)
+  };
+  -- A signed function's argument types are available before visiting its
+  -- body. Carry them into the lambda instead of solving for them afterwards.
+  groundCheckBody context globals names state wanted expression = let {
+    ordinary = do {
+      (,,) term actual next <- groundInferIn context globals names state expression;
+      solved <- groundUnify next wanted actual;
+      Right ((,) term solved)
+    };
+    lambda identity name annotation body = case groundDeref state wanted of {
+      GroundArrow domain result -> do {
+        following <- case annotation of {
+          Nothing -> Right state;
+          Just written -> do {
+            declared <- monomorphicAnnotation written >>= groundType M.empty;
+            groundUnify state domain declared
+          }
+        };
+        (,,,) binder scope locals next <- groundBindLocal globals names following identity name domain;
+        (,) term solved <- groundCheckBody context scope locals next result body;
+        Right ((,) (GroundLambda binder domain term) solved)
+      };
+      _ -> ordinary
+    }
+  } in case expression of {
+    SDeclScope [identity] (SLam name annotation body) -> lambda (Just identity) name annotation body;
+    SLam name annotation body -> lambda Nothing name annotation body;
+    SGivenScope bindings body -> do {
+      local <- groundGivenContext context globals names bindings;
+      groundCheckBody local globals names state wanted body
+    };
+    SCallSite _ _ body -> groundCheckBody context globals names state wanted body;
+    SSourceDefinition body -> groundCheckBody context globals names state wanted body;
+    _ -> ordinary
+  };
+  groundRigidVariables ty = let {
+    visit current node = case node of {
+      GroundRigid variable -> case current of { (,) seen reversed ->
+        if IS.member (T.tyVarId variable) seen then current
+        else (,) (IS.insert (T.tyVarId variable) seen) ((:) variable reversed) };
+      GroundArrow a b -> visit (visit current a) b;
+      GroundCon _ args -> foldlStrict visit current args;
+      GroundApply f a -> visit (visit current f) a;
+      GroundVar _ -> current
+    }
+  } in reverse (snd (visit ((,) IS.empty []) ty));
+  groundDeclarationType datatypes annotation = case annotation of {
+    SAnnotation [] signature -> let { leading = Constraint.leadingVariables signature; variables = fst leading } in
+      if null variables then do {
+        ty <- monomorphicAnnotation annotation;
+        wanted <- groundType M.empty ty;
+        Right ((,,) ty wanted [])
+      } else do {
+        Kinding.annotationType datatypes M.empty signature;
+        let {
+          slots = mapIndexed (\i ((,) name kind) -> (,,) name (XTyVar (0 - 1 - i)) (T.bottomKind kind)) variables;
+          names = M.fromList compareString (map (\((,,) name v _) -> (,) name (GroundRigid v)) slots);
+          bounds = M.fromList T.compareTyVar (map (\((,,) _ v bound) -> (,) v bound) slots)
+        };
+        ensure (M.size names == length variables) "ground declaration repeats a quantified variable";
+        field <- Classes.fieldType (snd leading);
+        wanted <- groundField names field;
+        case wanted of { GroundRigid _ -> Left "bare quantified result requires general inference"; _ -> Right () };
+        let { ordered = groundRigidVariables wanted };
+        ensure (length ordered == length variables) "unused quantified variable requires general inference";
+        mono <- groundClosed (GroundState 0 IM.empty IM.empty 0) wanted;
+        let { prefix = map (\v -> (,) v (M.get T.compareTyVar v bounds)) ordered };
+        Right ((,,) (foldr (\((,) v bound) -> XForall v bound) mono prefix) wanted prefix)
+      };
+    _ -> Left "ground declaration needs a closed ordinary signature"
+  };
+  groundDeclaredBody annotation expression = case expression of {
+    SSignature body written -> do {
+      ensure (SourceEquality.eqSAnnotation annotation written) "ground declaration signature mismatch";
+      groundDeclaredBody annotation body
+    };
+    SChecked ty body -> do {
+      ensure (SourceEquality.eqSAnnotation annotation (SAnnotation [] ty)) "ground declaration body annotation mismatch";
+      groundDeclaredBody annotation body
+    };
+    _ -> Right expression
+  };
+  groundAbstract prefix term = foldr (\((,) v bound) -> XTypeAbs v bound) term prefix;
+  -- The conservative signed checker admits only already-monomorphic local
+  -- lets. Dispatch may also specialize one explicit use, but it must seal
+  -- that use and target-check the same result before publishing a fragment.
+  groundIndexed = groundIndexedUsing GroundMonomorphicLets Nothing;
+  groundIndexedIn = groundIndexedUsing GroundSingleUseLets;
+  groundIndexedUsing localLets known parameters members lowered = case (,) members lowered of {
     (,) [(,) identity ((,,) name (Just annotation) _)] ((,) (SProgram declarations expression) _) -> do {
-      expected <- monomorphicAnnotation annotation;
       let { entries = zip parameters (range 0 (length parameters - 1));
         binding = \((,,) _ hint ty) serial -> prepareGroundApplication (XName serial hint) ty;
         globals = M.fromList compareInt (map (\((,) row@((,,) i _ _) serial) -> (,) (V.toInt i) (binding row serial)) entries);
@@ -1185,11 +1833,13 @@ module Bootstrap.InferenceUnit where {
         };
         _ -> Left "not a single signed nonrecursive monotype"
       };
-      (,,) template actual initial <- groundInfer globals names (GroundState 0 IM.empty IM.empty (length parameters + 1)) rhs;
-      wanted <- groundType M.empty expected;
-      solved <- groundUnify initial actual wanted;
-      implementation <- groundSeal solved template;
-      env <- Open.environment declarations;
+      env <- Open.environmentUsing known declarations;
+      let { datatypes = Open.dataEnvironment env };
+      (,,) expected wanted prefix <- groundDeclarationType datatypes annotation;
+      source <- groundDeclaredBody annotation rhs;
+      (,) template solved <- groundCheckBody (groundModuleContextWith localLets datatypes globals source) globals names
+        (GroundState 0 IM.empty IM.empty (length parameters + 1)) wanted source;
+      implementation <- mapEither (groundAbstract prefix) (groundSealIn (M.fromList T.compareTyVar prefix) solved template);
       fragment <- Open.check env ps (XLet (XName (length parameters) name) implementation (XConstructor "()" []));
       ensure (case Open.bindings fragment of {
         [(,) actual ty] -> eqString (X.nameHint actual) name && T.alphaEq expected ty; _ -> False
@@ -1198,15 +1848,163 @@ module Bootstrap.InferenceUnit where {
     };
     _ -> Left "ground specialization requires a signed monotype"
   };
+  principalSelectorArity ty = let {
+    mono t = case t of {
+      XVar _ -> True;
+      XArrow from to -> mono from && mono to;
+      XApply f a -> mono f && mono a;
+      XCon _ fields -> all mono fields;
+      _ -> False
+    };
+    visit count afterArrow t = case t of {
+      XForall variable bound body -> case bound of {
+        XBot -> visit count (afterArrow || count > 0) body;
+        XBotKind _ -> visit count (afterArrow || count > 0) body;
+        _ -> case groundBoundArrow variable bound body of {
+          Just substituted -> visit count True substituted;
+          Nothing -> Nothing
+        }
+      };
+      XArrow from to -> if mono from then visit (count + 1) afterArrow to else Nothing;
+      _ -> if afterArrow && mono t then Just count else Nothing
+    }
+  } in visit 0 False ty;
+  -- An inferred lambda spine returning one of its own parameters has no
+  -- equations between distinct parameter types. Give each lambda the same
+  -- independent bottom bound and bounded result as ordinary elaboration.
+  groundProjection :: GroundState -> GroundTerm -> Either String ((,) XType XTerm);
+  groundProjection (GroundState next _ _ _) term = let {
+    collect reversed expression = case expression of {
+      GroundLambda name (GroundVar slot) body -> let {
+        result = case body of { GroundLambda _ _ _ -> Just (XTyVar (advanceIdentity next slot)); _ -> Nothing }
+      } in collect ((:) ((,,) name (XTyVar slot) result) reversed) body;
+      GroundLiteral (XVarTerm name) -> do {
+        let { rows = reverse reversed };
+        ensure (case rows of { (:) _ ((:) _ _) -> True; _ -> False })
+          "projection has no bounded result binder";
+        (,) ty _ <- X.projectionParts rows name;
+        Right ((,) ty (XProjection rows name))
+      };
+      _ -> Left "projection requires an unannotated lambda spine"
+    }
+  } in collect [] term;
+  -- The resolved lambda spine supplies all identities needed for this proof.
+  -- Delay construction of the bounded result rows until its width is known.
+  sourceProjection start expression = let {
+    finish count reversed selected = case selected of {
+      Nothing -> Nothing;
+      Just ((,,) _ name _) -> if count < 2 then Nothing else let {
+        binders pending = case pending of {
+          [] -> [];
+          (:) ((,,) _ binder arg) rest -> let {
+            result = case rest of { [] -> Nothing; _ -> Just (XTyVar (advanceIdentity count arg)) }
+          } in (:) ((,,) binder (XTyVar arg) result) (binders rest)
+        };
+        rows = binders (reverse reversed)
+      } in case X.projectionParts rows name of {
+        Right ((,) ty _) -> Just ((,) ty (XProjection rows name));
+        Left _ -> Nothing
+      }
+    };
+    walk count serial seen reversed term = let {
+      enter identity hint body ids = walk (advanceIdentity count 1) (advanceIdentity serial 1) ids
+        ((:) ((,,) identity (XName serial hint) count) reversed) body
+    } in case term of {
+      SDeclScope [slot] (SLam hint Nothing body) -> let { i = V.toInt slot } in
+        if IS.member i seen then Nothing else enter (Just i) hint body (IS.insert i seen);
+      SLam hint Nothing body -> enter Nothing hint body seen;
+      SCallSite _ _ body -> walk count serial seen reversed body;
+      SSourceDefinition body -> walk count serial seen reversed body;
+      SVar hint -> finish count reversed (find (\((,,) _ name _) -> eqString hint (X.nameHint name)) reversed);
+      SGlobal slot _ -> finish count reversed (find (\((,,) i _ _) -> case i of {
+        Just identity -> identity == V.toInt slot; Nothing -> False
+      }) reversed);
+      _ -> Nothing
+    }
+  } in walk 0 start IS.empty [] expression;
+  -- Keep the declared source binding and all use sites; the root is
+  -- admitted only if its result and its complete checked term are solved
+  -- without any expected type. Every admitted import has rank one.
+  unsignedGroundIndexedIn known parameters members lowered = case (,) members lowered of {
+    (,) [(,) identity ((,,) name Nothing _)] ((,) (SProgram declarations expression) _) -> do {
+      let {
+        indexed = zip parameters (range 0 (length parameters - 1));
+        admitted = mapMaybe (\((,) ((,,) slot hint ty) serial) ->
+          if groundPrincipalScheme ty then
+            Just ((,,) (V.toInt slot) hint (prepareGroundImport (XName serial hint) ty))
+          else mapOptional (\arity -> (,,) (V.toInt slot) hint
+            (GroundPrincipalSelector (XName serial hint) ty arity)) (principalSelectorArity ty)) indexed;
+        globals = M.fromList compareInt (map (\((,,) slot _ value) -> (,) slot value) admitted);
+        names = M.fromList compareString (map (\((,,) _ hint value) -> (,) hint value) admitted);
+        ps = map (\((,) ((,,) _ hint ty) serial) -> (,) (XName serial hint) ty) indexed;
+        core = if null parameters then expression else case expression of {
+          SDeclScope _ (SLetRec _ body) -> body;
+          _ -> expression
+        }
+      };
+      rhs <- case core of {
+        SDeclScope [i] (SLet hint value (SConstructor "()")) -> do {
+          ensure (V.toInt i == V.toInt identity && eqString hint name) "unsigned ground binding identity";
+          Right value
+        };
+        _ -> Left "unsigned ground requires a singleton nonrecursive binding"
+      };
+      env <- Open.environmentUsing known declarations;
+      let { datatypes = Open.dataEnvironment env; count = length parameters };
+      let { infer = do {
+        (,,) template ty solved <- groundInferIn (groundModuleContext datatypes globals rhs) globals names
+          (GroundState 0 IM.empty IM.empty (count + 1)) rhs;
+        case groundClosed solved ty of {
+          Right closed -> mapEither ((,) closed) (groundSeal solved template);
+          Left reason -> if null parameters then groundProjection solved template else Left reason
+        }
+      } };
+      (,) expected implementation <- case (if null parameters then sourceProjection 1 rhs else Nothing) of {
+        Just proof -> Right proof;
+        Nothing -> infer
+      };
+      fragment <- Open.check env ps (XLet (XName count name) implementation (XConstructor "()" []));
+      ensure (case Open.bindings fragment of {
+        [(,) actual ty] -> eqString (X.nameHint actual) name && T.alphaEq expected ty;
+        _ -> False
+      }) "unsigned ground export mismatch";
+      Right fragment
+    };
+    _ -> Left "unsigned ground requires an inferred binding"
+  };
   -- Each member of a fully signed recursive group can be checked against the
   -- common declared environment. Its local unification variables cannot occur
   -- in a peer's closed signature. Only the term identity supply crosses RHSs.
-  data GroundMember = GroundMember Int XName XType GroundType SExpr;
-  groundRecursiveIndexed parameters members lowered = case lowered of {
-    (,) (SProgram declarations expression) _ -> groundRecursiveGroup parameters members declarations expression;
+  data GroundMember = GroundMember Int XName XType GroundType ([] ((,) XTyVar XType)) SExpr;
+  groundRecursiveIndexed = groundRecursiveIndexedIn Nothing;
+  groundRecursiveIndexedIn = groundRecursiveIndexedUsing groundRecursiveGroupIn;
+  groundRecursiveDispatchIn report = groundRecursiveIndexedUsing
+    (groundRecursiveGroupUsing (groundRecursiveRoutes report));
+  groundRecursiveIndexedUsing :: forall a b c d e.
+    (a -> b -> c -> [] DataDecl -> SExpr -> Either String d) ->
+    a -> b -> c -> (,) SProgram e -> Either String d;
+  groundRecursiveIndexedUsing group known parameters members lowered = case lowered of {
+    (,) (SProgram declarations expression) _ -> group known parameters members declarations expression;
     _ -> Left "ground recursive group requires lowered declarations"
   };
-  groundRecursiveGroup parameters members declarations expression = do {
+  groundRecursiveGroup = groundRecursiveGroupIn Nothing;
+  groundRecursiveGroupIn = groundRecursiveGroupUsing
+    (\datatypes declared count _ definitions complete -> do {
+      rows <- groundSignedRecursiveRows datatypes declared count definitions;
+      complete rows
+    });
+  -- The signed and mixed routes share inventory validation and target checking.
+  -- Share the signed attempt too: a signed RHS failure must not retry as mixed.
+  groundRecursiveRoutes report datatypes declared count imported definitions complete =
+    case groundSignedRecursiveRows datatypes declared count definitions of {
+      Right rows -> mapEither (report IndexedSignedRecursion) (complete rows);
+      Left reason -> do {
+        rows <- groundMixedForwarderRows datatypes declared count imported definitions reason;
+        mapEither (report IndexedMixedForwarder) (complete rows)
+      }
+    };
+  groundSignedRecursiveRows datatypes declared count = traverseEither (groundMember datatypes declared count);
+  groundRecursiveGroupUsing selectRows known parameters members declarations expression = do {
     let { sorted = sortBy (\((,,) _ n _) ((,,) _ m _) -> compareString n m) parameters;
       imported = mapIndexed (\serial ((,,) i name ty) -> (,,) (V.toInt i) (XName serial name) ty) sorted;
       count = length imported;
@@ -1221,42 +2019,118 @@ module Bootstrap.InferenceUnit where {
       };
       _ -> Left "ground recursive import boundary"
     };
-    rows <- case core of {
+    env <- Open.environmentUsing known declarations;
+    let { datatypes = Open.dataEnvironment env };
+    definitions <- case core of {
       SDeclScope ids (SLetRec definitions (SConstructor "()")) -> do {
         ensure (not (null definitions) && length ids == length definitions && length ids == length members &&
           length members == M.size declared) "ground recursive declaration inventory";
-        traverseEither (groundMember declared count) (mapIndexed (,) (zip ids definitions))
+        Right (mapIndexed (,) (zip ids definitions))
       };
       _ -> Left "ground specialization requires a recursive group"
     };
-    let { bindings = append (map (\((,,) i n ty) -> (,,) i n (prepareGroundImport n ty)) imported)
-            (map (\(GroundMember i n _ ty _) -> (,,) i n (GroundLocal n ty)) rows);
-      globals = M.fromList compareInt (map (\((,,) i _ value) -> (,) i value) bindings);
-      names = M.fromList compareString (map (\((,,) _ n value) -> (,) (X.nameHint n) value) bindings);
-      ps = map (\((,,) _ n ty) -> (,) n ty) imported;
-      memberTypes = map (\(GroundMember _ n ty _ _) -> (,) n ty) rows };
-    ensure (M.size globals == length bindings && M.size names == length bindings) "duplicate ground recursive binding";
-    (,) reversed _ <- foldM (groundRecursiveBody globals names) ((,) [] (advanceIdentity count (length rows))) rows;
-    env <- Open.environment declarations;
-    fragment <- Open.check env ps (XLetRec (reverse reversed) (XConstructor "()" []));
-    ensure (eqList (\((,) n ty) ((,) m other) -> X.equalName n m && T.alphaEq ty other)
-      memberTypes (Open.bindings fragment)) "ground recursive export mismatch";
-    Right fragment
+    let {
+      importedBindings = map (\((,,) i n ty) -> (,,) i n (prepareGroundImport n ty)) imported;
+      complete rows = do {
+        let { bindings = append importedBindings (map groundRecursiveMemberBinding rows);
+          globals = groundRecursiveSlots bindings;
+          names = groundRecursiveNames bindings;
+          ps = map (\((,,) _ n ty) -> (,) n ty) imported;
+          memberTypes = map (\(GroundMember _ n ty _ _ _) -> (,) n ty) rows };
+        ensure (M.size globals == length bindings && M.size names == length bindings) "duplicate ground recursive binding";
+        (,) reversed _ <- foldM (groundRecursiveBody datatypes globals names)
+          ((,) [] (advanceIdentity count (length rows))) rows;
+        fragment <- Open.check env ps (XLetRec (reverse reversed) (XConstructor "()" []));
+        ensure (eqList (\((,) n ty) ((,) m other) -> X.equalName n m && T.alphaEq ty other)
+          memberTypes (Open.bindings fragment)) "ground recursive export mismatch";
+        Right fragment
+      }
+    };
+    selectRows datatypes declared count imported definitions complete
   };
-  groundMember declared count ((,) ordinal ((,) i ((,,) name mode rhs))) = case (,) mode (M.lookup compareInt (V.toInt i) declared) of {
+  groundRecursiveMemberBinding (GroundMember i n scheme ty prefix _) = (,,) i n
+    (if null prefix then GroundLocal n ty else prepareGroundImport n scheme);
+  groundRecursiveSlots rows = M.fromList compareInt (map (\((,,) i _ value) -> (,) i value) rows);
+  groundRecursiveNames rows = M.fromList compareString (map (\((,,) _ n value) -> (,) (X.nameHint n) value) rows);
+  -- The unknown member may use its signed peers but receives no constraints
+  -- from the rest of the SCC. Reject local generalization and class evidence.
+  groundMixedForwarderRows datatypes declared count imported definitions reason = do {
+    let {
+      pending = filter groundUnsignedMember definitions;
+      signed = filter (\value -> not (groundUnsignedMember value)) definitions
+    };
+    case pending of {
+      [(,) ordinal ((,) i ((,,) name InferRecursive rhs))] -> do {
+        ensure (not (null signed) && groundForwardingBody rhs) reason;
+        case M.lookup compareInt (V.toInt i) declared of {
+          Just ((,,) hint Nothing _) -> ensure (eqString name hint) reason;
+          _ -> Left reason
+        };
+        checked <- groundSignedRecursiveRows datatypes declared count signed;
+        ensure (all (\(GroundMember _ _ scheme _ prefix _) -> null prefix && monomorphicTarget scheme)
+          checked) reason;
+        let {
+          principalImports = mapMaybe (\((,,) slot binder scheme) ->
+            if groundPrincipalScheme scheme then Just ((,,) slot binder (prepareGroundImport binder scheme))
+            else Nothing) imported;
+          bindings = append principalImports (map groundRecursiveMemberBinding checked);
+          globals = groundRecursiveSlots bindings;
+          names = groundRecursiveNames bindings
+        };
+        ensure (M.size globals == length bindings && M.size names == length bindings) reason;
+        (,,) _ wanted solved <- groundInferIn (GroundContext GroundSingleUseLets datatypes []) globals names
+          (GroundState 0 IM.empty IM.empty (advanceIdentity count (length definitions))) rhs;
+        scheme <- groundClosed solved wanted;
+        ty <- groundType M.empty scheme;
+        let { member = GroundMember (V.toInt i) (XName (advanceIdentity count ordinal) name) scheme ty [] rhs;
+          pair = splitAt ordinal checked };
+        Right (append (fst pair) ((:) member (snd pair)))
+      };
+      _ -> Left reason
+    }
+  };
+  groundUnsignedMember declaration = case declaration of {
+    (,) _ ((,) _ ((,,) _ InferRecursive _)) -> True;
+    _ -> False
+  };
+  -- Rank-one inputs provide only equations here. Dependent bounds or a
+  -- result quantifier can choose a more specific instance and stay on the
+  -- general path when an unannotated member references them.
+  groundPrincipalScheme scheme = let {
+    prefix ty = case ty of {
+      XForall _ XBot body -> prefix body;
+      _ -> monotype ty
+    };
+    monotype ty = case ty of {
+      XVar _ -> True;
+      XArrow from to -> monotype from && monotype to;
+      XCon _ fields -> all monotype fields;
+      _ -> False
+    }
+  } in prefix scheme;
+  groundForwardingBody expression = case expression of {
+    SDeclScope [_] (SLam _ Nothing body) -> groundForwardingBody body;
+    SLam _ Nothing body -> groundForwardingBody body;
+    SApp f a -> groundForwardingBody f && groundForwardingBody a;
+    SCallSite _ _ body -> groundForwardingBody body;
+    SSourceDefinition body -> groundForwardingBody body;
+    SVar _ -> True;
+    SGlobal _ _ -> True;
+    SConstructor _ -> True;
+    _ -> False
+  };
+  groundMember datatypes declared count ((,) ordinal ((,) i ((,,) name mode rhs))) = case (,) mode (M.lookup compareInt (V.toInt i) declared) of {
     (,) (CheckRecursive annotation) (Just ((,,) hint (Just declaredType) _)) -> do {
-      expected <- monomorphicAnnotation declaredType;
-      actual <- monomorphicAnnotation annotation;
-      ensure (eqString name hint && T.alphaEq expected actual) "ground recursive signature mismatch";
-      ty <- groundType M.empty expected;
-      Right (GroundMember (V.toInt i) (XName (advanceIdentity count ordinal) name) expected ty rhs)
+      ensure (eqString name hint && SourceEquality.eqSAnnotation declaredType annotation) "ground recursive signature mismatch";
+      (,,) expected ty prefix <- groundDeclarationType datatypes annotation;
+      source <- groundDeclaredBody annotation rhs;
+      Right (GroundMember (V.toInt i) (XName (advanceIdentity count ordinal) name) expected ty prefix source)
     };
     _ -> Left "ground recursive member requires a closed monotype"
   };
-  groundRecursiveBody globals names ((,) reversed serial) (GroundMember _ binder expected wanted rhs) = do {
-    (,,) term actual initial <- groundInfer globals names (GroundState 0 IM.empty IM.empty serial) rhs;
-    solved <- groundUnify initial actual wanted;
-    sealed <- groundSeal solved term;
+  groundRecursiveBody datatypes globals names ((,) reversed serial) (GroundMember _ binder expected wanted prefix rhs) = do {
+    (,) term solved <- groundCheckBody (groundModuleContext datatypes globals rhs) globals names (GroundState 0 IM.empty IM.empty serial) wanted rhs;
+    sealed <- mapEither (groundAbstract prefix) (groundSealIn (M.fromList T.compareTyVar prefix) solved term);
     case solved of { GroundState _ _ _ next -> Right ((,) ((:) ((,,) binder expected sealed) reversed) next) }
   };
   -- Closed nonrecursive monotypes need no generalization. This deliberately
@@ -1280,7 +2154,8 @@ module Bootstrap.InferenceUnit where {
     XApply f a -> monomorphicTarget f && monomorphicTarget a;
     _ -> False
   };
-  monomorphicIndexed parameters members lowered = case (,) members lowered of {
+  monomorphicIndexed = monomorphicIndexedIn Nothing;
+  monomorphicIndexedIn known parameters members lowered = case (,) members lowered of {
     (,) [(,) identity ((,,) name annotation _)] ((,) (SProgram declarations expression) _) -> do {
       ensure (all (\((,,) _ _ ty) -> monomorphicTarget ty) parameters)
         "polymorphic import requires ordinary adaptation";
@@ -1309,7 +2184,7 @@ module Bootstrap.InferenceUnit where {
           (M.map (\binding -> MonoType (snd binding)) names) (MonoState 0 M.empty) rhs)
       };
       result <- monomorphicCheck globals names (length parameters + 1) expected rhs;
-      env <- Open.environment declarations;
+      env <- Open.environmentUsing known declarations;
       fragment <- Open.check env ps
         (XLet (XName (length parameters) name) (fst result) (XConstructor "()" []));
       ensure (case Open.bindings fragment of {
@@ -1488,8 +2363,100 @@ module Bootstrap.InferenceUnit where {
     result <- monomorphicCheck globals names serial ty body;
     Right ((,,) (fst result) ty (snd result))
   };
+  -- Factor nested rank-one applications when each inner call duplicates its
+  -- argument type and each outer call projects that type back. Every call
+  -- remains in order. Local polymorphic helpers check each pair at a fresh
+  -- type, so its proof can be shared across larger enclosing argument types.
+  factorUnaryMember parameters original@((,) owner ((,,) name annotation rhs)) = let {
+    strip term = case term of {
+      SCallSite _ _ body -> strip body;
+      SSourceDefinition body -> strip body;
+      _ -> term
+    };
+    global term = case strip term of {
+      SGlobal slot _ -> Just (V.toInt slot);
+      _ -> Nothing
+    };
+    collect term calls = case term of {
+      SApp f a -> case global f of {
+        Just i -> collect a ((:) ((,) i f) calls);
+        Nothing -> Nothing
+      };
+      leaf -> Just ((,) calls leaf)
+    };
+    scheme slot = mapOptional (\((,,) _ _ ty) -> ty)
+      (find (\((,,) i _ _) -> V.toInt i == slot) parameters);
+    argument v ty = case ty of { XVar w -> T.equalTyVar v w; _ -> False };
+    accepts tag width vars ty = case ty of {
+      XForall v XBot body -> accepts tag width ((:) v vars) body;
+      XArrow (XCon other fields) (XVar result) ->
+        eqString tag other && length fields == width && length vars == width &&
+        S.size (S.fromList T.compareTyVar vars) == width &&
+        and (zipWith argument (reverse vars) fields) && elem T.equalTyVar result vars;
+      _ -> False
+    };
+    paired inner outer = case (,) (scheme inner) (scheme outer) of {
+      (,) (Just (XForall v XBot (XArrow (XVar arg) (XCon tag fields)))) (Just consume) ->
+        T.equalTyVar arg v && length fields >= 2 && all (argument v) fields &&
+        accepts tag (length fields) [] consume;
+      _ -> False
+    };
+    build source calls leaf = let {
+      half = length calls / 2;
+      parts = splitAt half calls;
+      inner = fst parts; outer = snd parts;
+      -- All operators here are resolved globals. Pick a spelling distinct
+      -- from the source argument for the innermost generated reference.
+      local = case strip leaf of { SVar n -> n; _ -> source };
+      prefix = local ++ "$unary";
+      parameter = prefix ++ "Arg";
+      helper i = prefix ++ showInt i;
+      -- Ten nested binary applications already contain 1,024 type leaves.
+      -- Balance the sections and keep the last one inline; each local scheme
+      -- then bounds type growth without producing a lambda per source call.
+      sections = (half + 9) / 10;
+      width = (half + sections - 1) / sections;
+      go i previous rows = let {
+        block = splitAt width rows;
+        applySection base = let {
+          input = foldr (\row arg -> SApp (snd (fst row)) arg) base (fst block);
+          middle = case previous of { Just ref -> SApp ref input; Nothing -> input }
+        } in foldlStrict (\arg row -> SApp (snd (snd row)) arg) middle (fst block)
+      } in case snd block of {
+        [] -> applySection leaf;
+        rest -> let { next = helper i } in SLet next (SLam parameter Nothing (applySection (SVar parameter)))
+          (go (i + 1) (Just (SVar next)) rest)
+      }
+    } in case (,) inner outer of {
+      (,) ((:) f _) ((:) g _) -> if half > 10 && length outer == half &&
+        all (\row -> fst row == fst f) inner && all (\row -> fst row == fst g) outer &&
+        paired (fst f) (fst g) then Just (go 0 Nothing (zip (reverse inner) outer)) else Nothing;
+      _ -> Nothing
+    };
+    lambda slot hint body = do {
+      (,) calls leaf <- collect body [];
+      let { bound = case strip leaf of {
+        SVar n -> eqString n hint;
+        SGlobal i _ -> case slot of { Just j -> V.toInt i == V.toInt j; Nothing -> False };
+        _ -> False
+      } };
+      if bound then build hint calls leaf else Nothing
+    };
+    visit term = case term of {
+      SSourceDefinition body -> mapOptional SSourceDefinition (visit body);
+      SCallSite label span body -> mapOptional (SCallSite label span) (visit body);
+      SDeclScope [slot] (SLam hint Nothing body) ->
+        mapOptional (\next -> SDeclScope [slot] (SLam hint Nothing next)) (lambda (Just slot) hint body);
+      SLam hint Nothing body -> mapOptional (SLam hint Nothing) (lambda Nothing hint body);
+      _ -> Nothing
+    }
+  } in case visit rhs of {
+    Just body -> (,) owner ((,,) name annotation body);
+    Nothing -> original
+  };
   prepareIndexedGroup = prepareIndexedGroupWith Surface.bindIndexedMembers;
-  prepareIndexedGroupWith bindMembers parameters datatypes members = do {
+  prepareIndexedGroupWith = prepareIndexedGroupIn Nothing;
+  prepareIndexedGroupIn known bindMembers parameters datatypes members = do {
     ensure (not (null members)) "cannot infer an empty declaration group";
     let { parameterIds = M.fromList compareString (map (\((,,) i n _) -> (,) n i) parameters) };
     externalTypes <- foldM mergeExternal M.empty (map (\((,,) _ n ty) -> (,) n ty) parameters);
@@ -1498,9 +2465,16 @@ module Bootstrap.InferenceUnit where {
     ensure (length externalIds == IS.size (IS.fromList externalIds)) "duplicate inference parameter slot";
     ensure (not (any (\((,) i _) -> elem eqInt (V.toInt i) externalIds) members))
       "inference group also imports its own binding";
-    body <- bindMembers members (SConstructor "()");
+    body <- bindMembers (map (factorUnaryMember parameters) members) (SConstructor "()");
     let { externals = M.map (Separate.sourceSchemeIn M.empty False) externalTypes };
-    lowered <- Classes.lowerSeparateClasses externals [] (SProgram datatypes body);
+    let { lower program = case known of {
+      Nothing -> Surface.lowerSurface program;
+      Just _ -> do {
+        env <- Open.environmentUsing known datatypes;
+        Surface.lowerSurfaceIn (Open.dataEnvironment env) program
+      }
+    } };
+    lowered <- Classes.lowerSeparateClassesUsing lower M.empty externals [] (SProgram datatypes body);
     let { attached = case lowered of {
       (,) (SProgram ds (SLetRec defs rest)) registry -> if M.null externalTypes then lowered else
         (,) (SProgram ds (SDeclScope (map (\((,,) n _ _) -> M.get compareString n parameterIds) defs) (SLetRec defs rest))) registry;
@@ -1518,16 +2492,15 @@ module Bootstrap.InferenceUnit where {
             term -> (,) [] term
           }
       };
-      let {
-        declarations = fst coreAndData
-      };
-      let {
-        core = snd coreAndData
-      };
-      boundValueShared9 <-
-        if M.null externalTypes
-        then Right ((,) [] core)
-        else case core of {
+      (,) parameters body <- detachGroupParameters externalTypes (snd coreAndData);
+      Right ((,,) (fst coreAndData) parameters body)
+  };
+  detachGroupParameters externalTypes core =
+    if M.null externalTypes then Right ((,) [] core) else let {
+      under wrap inner = mapEither (\((,) ps body) -> (,) ps (wrap body)) (detachGroupParameters externalTypes inner)
+    } in case core of {
+               XTypeAbs v bound body -> under (XTypeAbs v bound) body;
+               XTypeApp body proof -> under (\term -> XTypeApp term proof) body;
                XLetRec bindings rest ->
                  do {
                    ensure
@@ -1547,12 +2520,14 @@ module Bootstrap.InferenceUnit where {
                  };
                _ -> Left "inference did not retain external parameters"
              };
-      Right ((,,) declarations (fst boundValueShared9) (snd boundValueShared9))
-  };
   finishOpenGroup = finishOpenGroupWith Compiler.finishCompilation;
   finishOpenGroupWith finish externalTypes members lowered = do {
-    (,,) declarations parameters implementation <- compileGroupBodyWith finish externalTypes lowered;
-    env <- Open.environment declarations;
+    compiled <- compileGroupBodyWith finish externalTypes lowered;
+    checkGroupBody members compiled
+  };
+  checkGroupBody = checkGroupBodyIn Nothing;
+  checkGroupBodyIn known members ((,,) declarations parameters implementation) = do {
+    env <- Open.environmentUsing known declarations;
     checked <- Open.check env parameters implementation;
     ensure
       (eqList eqString (sortBy compareString (map (\((,) n _) -> X.nameHint n) (Open.bindings checked)))

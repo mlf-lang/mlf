@@ -7,14 +7,10 @@ import os
 import re
 
 import open_file_comparison as Comparison
+from file_cases import FIXTURE, load_cases
 
 HERE = Path(__file__).resolve().parent
 SUFFIXES = ('.mlfci', '.mlfco')
-FROZEN_INPUTS = {
-    'run_controls.py': 'cf7b83d81db2a591fac5bb042b4e12e0effbab6239ecb8ef9a1f8741ffd6bb20',
-    'controls/FileControls.hs': '86fb166dabbff970025e5201a58905b220e73aa5f8e4d709be277a32256b755a',
-    'fixtures/file-cases.json': 'b7878c17609b3c7bf59e4b9a8942b0df61ea2d691edab7de97b102fabe1a94f8',
-}
 
 
 def raw_files(prefix):
@@ -226,57 +222,32 @@ def build_views(H, output, source, producer, auth, inputs, limits, run):
 
 
 def run_session_files(H, output, record, inputs, binaries, producer, source,
-                      auth, builtin, save, limits):
+                      auth, builtin, save, limits, *, selected=None):
     """Reuse the complete, already passed ordinary gate's exact sources/oracles."""
     output = output.resolve()
     baseline = record['routes']['crate']['file_cases']
-    fixture_path = HERE.parent / 'c4-local-transaction/fixtures/file-cases.json'
-    for relative, digest in FROZEN_INPUTS.items():
-        H.require(H.sha(HERE.parent / 'c4-local-transaction' / relative) == digest,
-                  'unchanged frozen C4 source: ' + relative)
-    authored = H.load(fixture_path)
-    H.require(len(baseline) == authored['case_count'] == len(authored['cases']) == 9 and
+    fixture_path = FIXTURE
+    authored = load_cases()
+    cases = [case for case in authored if selected is None or case['name'] == selected]
+    H.require(cases and len(baseline) == len(cases) and
               all(row['complete'] and row['actual_raw_artifact_bytes_equal']
-                  for row in baseline), 'the original nine-case raw byte gate passed first')
+                  for row in baseline), 'the selected ordinary raw byte gate passed first')
     for name, digest in Comparison.ORACLE_PINS.items():
         path = Comparison.ORACLE_DIRECTORY / name
         H.require(H.sha(path) == digest, 'fixed independent oracle: ' + name)
         inputs[str(path)] = digest
-    inputs[str(Comparison.DEPENDENCY_ORACLE_PATH)] = H.sha(Comparison.DEPENDENCY_ORACLE_PATH)
-    inputs[str(Comparison.CURRENT_DEPENDENCY_ORACLE_PATH)] = H.sha(Comparison.CURRENT_DEPENDENCY_ORACLE_PATH)
     for path in [Path(__file__), HERE / 'open_file_comparison.py',
-                 HERE / 'frozen_file_oracles.py', fixture_path]:
+                 HERE / 'frozen_file_oracles.py', HERE / 'file_cases.py', fixture_path]:
         inputs[str(path)] = H.sha(path)
     rows = {'complete': False, 'scope': 'explicit closed/open boundary; complete content and '
             'linked structures; exact same-format fresh/fresh, warm and audited bytes',
             'file_cases': [], 'commands': []}
     record['routes']['session'] = rows
-    rows['independent_dependency_schema_extension'] = {
+    rows['independent_dependency_schema'] = {
         'source_sha256': Comparison.ORACLE_PINS['artifact_binary_typed.py'],
-        'adapted_sha256': H.sha(Comparison.DEPENDENCY_ORACLE_PATH),
-        'scope': 'only dependency-interface primitive declarations 132/133 with exact Prelude owner and names; unchanged 0..131 reader for own artifacts and linked terms',
-        'exact_source_inverse_verified': True}
-    rows['current_independent_dependency_schema_extension'] = {
         'active_route': 'current_dependency_decoded',
         'fixed_primitive_abi': 'mlf-primitive-137-v12',
-        'registry_provenance': {
-            'introduced_commit': 'd8325d909c249fd82d4ad6173d44d8818cc6f8bf',
-            'parent_commit': '63fbd13d253a3f1a54170311dcbe076f1d0718f4',
-            'observed_failed_ci_commit': 'c9a8da4d5ab66cb8364adf884e42ff8644c92257',
-            'primitive_registry_git_blob': 'ff57ced14bc134f072422fb83c8e49576be1ed90',
-            'shared_sources_git_blob': 'a55105aa0d14418b97f8df0e633e15a717d0f58c',
-            'entity_owner_source_git_blob': 'a196fb45e145db5bf272fa9087c0134229ea2715',
-            'scope': 'fixed historical registry endpoints; not dynamic code-range discovery'},
         'scope': 'dependency interfaces only; exact bidirectional Prelude identities 132..136, per-container uniqueness; own/linked reader remains 0..131',
-        'historical_route_retained': 'dependency_decoded; 0..133; still rejects 134',
-        'source_chain': [
-            {'from_max': 131, 'to_max': 133,
-             'source_sha256': Comparison.ORACLE_PINS['artifact_binary_typed.py'],
-             'adapted_sha256': H.sha(Comparison.DEPENDENCY_ORACLE_PATH)},
-            {'from_max': 133, 'to_max': 136,
-             'source_sha256': H.sha(Comparison.DEPENDENCY_ORACLE_PATH),
-             'adapted_sha256': H.sha(Comparison.CURRENT_DEPENDENCY_ORACLE_PATH)}],
-        'each_complete_source_inverse_verified': True,
         'primitive_identities': {str(code): list(identity) for code, identity in
                                  Comparison.CURRENT_DEPENDENCY_PRIMITIVES.items()}}
     save()
@@ -295,7 +266,7 @@ def run_session_files(H, output, record, inputs, binaries, producer, source,
                                     inputs, limits, run)
     comparison_root = output / 'compare-session'
     comparison_root.mkdir()
-    for index, (case, original) in enumerate(zip(authored['cases'], baseline)):
+    for case, original in zip(cases, baseline):
         H.require(case['name'] == original['name'], 'original ordered case inventory')
         expected = original['outcomes'][0]
         H.require(expected['side'] == 'base', 'original reference outcome')
@@ -420,7 +391,7 @@ def run_session_files(H, output, record, inputs, binaries, producer, source,
             row['cross_format_raw_bytes_equal'] = raw_files(closed_prefix) == cold_files
             row['same_format_fresh_fresh_and_warm_bytes_equal'] = True
             row['audited_open_complete_bytes_equal'] = True
-            if index == 0:
+            if case['name'] == authored[0]['name']:
                 native_negative_controls(H, output, folder, viewer, source,
                                          raw_files(closed_prefix), cold_files, run, rows, save)
         H.require(all(not os.path.lexists(path) for path in missing),
@@ -429,7 +400,7 @@ def run_session_files(H, output, record, inputs, binaries, producer, source,
         H.check_pins(immutable)
         row['complete'] = True
         save()
-    H.require(len(rows['file_cases']) == 9 and all(row['complete'] for row in rows['file_cases']),
-              'all nine retained session cases completed')
+    H.require(len(rows['file_cases']) == len(cases) and all(row['complete'] for row in rows['file_cases']),
+              'all planned session cases completed')
     rows['complete'] = True
     save()

@@ -71,8 +71,13 @@ jobs:
           lock="$(dirname -- "$PACKAGE_MANIFEST")/mlf.lock"
           if [ ! -f "$lock" ]; then "$MLF_PACKAGE_MANAGER" --manifest "$PACKAGE_MANIFEST" lock; fi
           if jq -e '(.tests // {} | length) > 0' "$PACKAGE_MANIFEST" >/dev/null; then
-            "$MLF_PACKAGE_MANAGER" --manifest "$PACKAGE_MANIFEST" --compiler "$MLF_COMPILER" \
-              --build-dir .mlf-build/package-export --locked test
+            if test -f tools/testing/run.py; then
+              python3 -B tools/testing/run.py package-release-tests -- --manifest "$PACKAGE_MANIFEST" \
+                --manager "$MLF_PACKAGE_MANAGER" --compiler "$MLF_COMPILER" --build-dir .mlf-build/package-export
+            else
+              "$MLF_PACKAGE_MANAGER" --manifest "$PACKAGE_MANIFEST" --compiler "$MLF_COMPILER" \
+                --build-dir .mlf-build/package-export --locked test
+            fi
           fi
           "$MLF_PACKAGE_MANAGER" --manifest "$PACKAGE_MANIFEST" --compiler "$MLF_COMPILER" \
             --build-dir .mlf-build/package-export --locked release .mlf-build/checked-library
@@ -90,6 +95,8 @@ jobs:
           name: checked-package-bootstrap-evidence
           include-hidden-files: true
           path: |
+            .mlf-build/test-framework/
+            .mlf-build/package-export/tests/
             .mlf-build/package-manager-bootstrap/**/*.json
             .mlf-build/package-manager-bootstrap/**/*.sha256
             .mlf-build/package-manager-bootstrap/**/*.txt

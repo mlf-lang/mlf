@@ -1,7 +1,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Main where
 import Prelude
-import Control.Monad(forM_,unless)
+import Control.Monad(forM_,unless,when)
+import System.Environment (getArgs)
 import Control.Exception(SomeException,try,evaluate,displayException)
 import Data.List(isInfixOf)
 import qualified Data.Map.Lazy as M
@@ -11,7 +12,6 @@ import qualified Bootstrap.Graph as G
 import qualified Bootstrap.IntMap as IM
 import qualified Bootstrap.Std as L
 import qualified CandidateSession as C
-import qualified LegacySession as F
 import qualified SessionOracle as O
 import qualified RetainedSurvivors as Retained
 
@@ -51,4 +51,9 @@ demandControls=do
  assert "same first selected payload exception"(a==b&&case a of Left e->"first selected Node" `isInfixOf` e;_->False)
  putStrLn "PASS 9 projection view payload-demand and first-error observations"
 
-main=Retained.main>>viewControls>>demandControls
+main=do
+ selected <- getArgs
+ let wanted label = null selected || label `elem` selected
+ Retained.main
+ when (wanted "720 independent projection views and cached cardinalities") viewControls
+ when (wanted "9 projection view payload-demand and first-error observations") demandControls

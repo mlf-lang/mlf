@@ -12,6 +12,7 @@
       "Bootstrap.IntSet": "Bootstrap/IntSet.hs",
       "Bootstrap.IntTree": "Bootstrap/IntTree.hs",
       "Bootstrap.Map": "Bootstrap/Map.hs",
+      "Bootstrap.NameEncoding": "Bootstrap/NameEncoding.hs",
       "Bootstrap.Regex": "Bootstrap/Regex.hs",
       "Bootstrap.ST": "Bootstrap/ST.hs",
       "Bootstrap.Set": "Bootstrap/Set.hs",

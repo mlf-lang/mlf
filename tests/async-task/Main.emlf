@@ -1,5 +1,6 @@
 module Main where
 import Bootstrap.Types
+import qualified Bootstrap.Std as S
 import qualified Bootstrap.Std as L
 import qualified Async.Task as T
 import qualified Async.Process as P
@@ -145,16 +146,22 @@ escaped = do
  putStrLn "PASS escaped-and-cross-scope-rejection"
 
 main = do
- mixed
- queuedCancel
- sleepCancel
- completedCancel
- waitingCancel
- captureErrors
- nested
- ordered
- invalid
- deadlines
- scopeCancel
- jobsOne
- escaped
+ selection <- getEnv "MLF_ASYNC_CASE"
+ let cases =
+  (:) ((,) "mixed-values-functions-repeat-await" (mixed)) (
+  (:) ((,) "queued-cancellation" (queuedCancel)) (
+  (:) ((,) "sleeping-cancellation" (sleepCancel)) (
+  (:) ((,) "completed-cancellation" (completedCancel)) (
+  (:) ((,) "waiting-cancellation-shared-prerequisite" (waitingCancel)) (
+  (:) ((,) "capture-and-fail-fast" (captureErrors)) (
+  (:) ((,) "nested-failure-isolation" (nested)) (
+  (:) ((,) "bounded-ordered-combinators" (ordered)) (
+  (:) ((,) "explicit-admission-errors" (invalid)) (
+  (:) ((,) "monotonic-deadline-and-join" (deadlines)) (
+  (:) ((,) "scope-cancellation" (scopeCancel)) (
+  (:) ((,) "jobs-one-dynamic-dependencies" (jobsOne)) (
+  (:) ((,) "escaped-and-cross-scope-rejection" (escaped)) (
+  [])))))))))))))
+ if eqString selection "" || S.any (\entry -> eqString (S.fst entry) selection) cases then
+  S.mapM_ (\((,) label action) -> if eqString selection "" || eqString selection label then action else ioReturn ()) cases
+ else exitWith 2

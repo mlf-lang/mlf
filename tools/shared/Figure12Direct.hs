@@ -5,7 +5,11 @@ import qualified Prelude as P
 import Prelude
 import qualified Data.List as L
 import qualified Data.Set as Set
+import qualified Data.Map.Strict as Map
 import qualified System.Environment as Env
+import qualified System.Exit as Exit
+import qualified System.IO as IO
+import qualified System.Timeout as Timeout
 import qualified Control.Exception as Exception
 import qualified Bootstrap.IndexVec as V
 import qualified MLF.Host.Base as H
@@ -59,6 +63,8 @@ freeNames expression = case expression of
   T.SGlobal _ _ -> error "Figure12 signature oracle received a resolved global"
   T.SDeclScope _ _ -> error "Figure12 signature oracle received a declaration scope"
   T.SGivenScope _ _ -> error "Figure12 signature oracle received a given scope"
+  T.SApplyDictionaries _ _ -> error "Figure12 signature oracle received a dictionary application"
+  T.SBindDictionaries _ _ -> error "Figure12 signature oracle received dictionary binders"
   T.SWantedScope _ _ -> error "Figure12 signature oracle received resolved evidence"
   T.SWantedRefs _ _ -> error "Figure12 signature oracle received resolved evidence"
   T.SConstructor _ -> Set.empty
@@ -108,8 +114,8 @@ freeNames expression = case expression of
 
 -- The direct visitor is independent of the maintained guest visitor. These
 -- controls enforce its source-only phase boundary without trusting ID hints.
-oracleControls :: IO ()
-oracleControls = do
+oracleControls :: [(String, IO ())]
+oracleControls =
   let t = H.literal
       slot = V.fromInt 7
       variable = T.SVar . t
@@ -120,37 +126,42 @@ oracleControls = do
       legacy equality conversion = T.SOverloadedStringPattern
         (T.ScalarString (t "text")) (t equality) (t conversion)
       positive label expression expected =
-        ensure (Set.toAscList (freeNames expression) == expected) label
-      reject expression reason = do
+        (label, ensure (Set.toAscList (freeNames expression) == expected) label)
+      reject label expression reason = (label, do
         result <- Exception.try (Exception.evaluate (Set.size (freeNames expression)))
           :: IO (Either Exception.ErrorCall Int)
         case result of
           Left failure -> ensure (reason `L.isInfixOf` Exception.displayException failure)
             "source-only oracle rejected at the wrong boundary"
-          Right _ -> fail "source-only oracle accepted a resolved node"
-  positive "lexical binder subtraction changed"
-    (T.SLam (t "bound") T.Nothing (T.SApp (variable "bound") (variable "free"))) ["free"]
-  positive "legacy string-pattern references changed"
-    (match (legacy "eq" "from")) ["body", "eq", "from", "scrutinee"]
-  positive "builtin pattern references changed"
-    (match (legacy "$MLF.Primitive.==" "$MLF.Primitive.fromString")) ["body", "scrutinee"]
-  positive "legacy evidence candidate names changed"
-    (T.SWanted (t "wanted") [(,) T.GivenEvidence (t "local"), (,) T.InstanceEvidence (t "instance")])
-    ["instance", "local"]
-  reject (T.SLam (t "hint") T.Nothing (T.SGlobal slot (t "hint")))
-    "Figure12 signature oracle received a resolved global"
-  reject (T.SDeclScope [slot] (variable "free"))
-    "Figure12 signature oracle received a declaration scope"
-  reject (T.SGivenScope [] (variable "free")) "Figure12 signature oracle received a given scope"
-  reject (T.SWantedScope (t "wanted") (T.CandidateEnvironment 5 []))
-    "Figure12 signature oracle received resolved evidence"
-  reject (T.SWantedRefs (t "wanted") [(,) T.GivenEvidence (T.LexicalRef (t "local")),
-    (,) T.InstanceEvidence (T.DeclRef slot (t "hint"))])
-    "Figure12 signature oracle received resolved evidence"
-  mapM_ (\expression -> reject expression "Figure12 signature oracle received a resolved string pattern")
-    [match indexed, match (T.SNestedPattern (t "Wrap") [T.SAsPattern (t "whole") (T.SLazyPattern indexed)]),
-     T.SEquations [(,) [indexed] (variable "body")],
-     T.SSharedBind indexed (variable "action") (variable "continuation") (variable "binding") (variable "failure")]
+          Right _ -> fail "source-only oracle accepted a resolved node")
+      rejectPattern label expression =
+        reject label expression "Figure12 signature oracle received a resolved string pattern"
+  in
+    [ positive "lexical-binder" (T.SLam (t "bound") T.Nothing
+        (T.SApp (variable "bound") (variable "free"))) ["free"]
+    , positive "legacy-pattern" (match (legacy "eq" "from")) ["body", "eq", "from", "scrutinee"]
+    , positive "builtin-pattern" (match (legacy "$MLF.Primitive.==" "$MLF.Primitive.fromString"))
+        ["body", "scrutinee"]
+    , positive "legacy-evidence" (T.SWanted (t "wanted")
+        [(,) T.GivenEvidence (t "local"), (,) T.InstanceEvidence (t "instance")]) ["instance", "local"]
+    , reject "resolved-global" (T.SLam (t "hint") T.Nothing (T.SGlobal slot (t "hint")))
+        "Figure12 signature oracle received a resolved global"
+    , reject "declaration-scope" (T.SDeclScope [slot] (variable "free"))
+        "Figure12 signature oracle received a declaration scope"
+    , reject "given-scope" (T.SGivenScope [] (variable "free"))
+        "Figure12 signature oracle received a given scope"
+    , reject "wanted-scope" (T.SWantedScope (t "wanted") (T.CandidateEnvironment 5 []))
+        "Figure12 signature oracle received resolved evidence"
+    , reject "wanted-refs" (T.SWantedRefs (t "wanted") [(,) T.GivenEvidence (T.LexicalRef (t "local")),
+        (,) T.InstanceEvidence (T.DeclRef slot (t "hint"))])
+        "Figure12 signature oracle received resolved evidence"
+    , rejectPattern "indexed-pattern" (match indexed)
+    , rejectPattern "nested-indexed-pattern" (match (T.SNestedPattern (t "Wrap")
+        [T.SAsPattern (t "whole") (T.SLazyPattern indexed)]))
+    , rejectPattern "indexed-equation" (T.SEquations [(,) [indexed] (variable "body")])
+    , rejectPattern "indexed-shared-bind" (T.SSharedBind indexed (variable "action")
+        (variable "continuation") (variable "binding") (variable "failure"))
+    ]
 
 assumptions fixture c = do
   e <- right (Parser.parseExpr (H.literal (str "id" c)) (H.literal (str "expression" c)))
@@ -165,12 +176,13 @@ checkOutput result = do
   ty <- right (XC.checkClosed parsed)
   ensure (XT.alphaEq ty (C.inferredType result)) "Figure12 target roundtrip changed type"
   ensure (XS.equalErased (XS.erase parsed) (XS.erase (C.compiledTerm result))) "Figure12 target roundtrip changed erasure"
-compileSource source = case C.compile (H.literal "<Figure12 direct host>") (H.literal source) of
+compileSource source = C.compile (H.literal "<Figure12 direct host>") (H.literal source) >>= \outcome -> case outcome of
   T.Left e -> fail (H.unpack (C.prettyError e))
   T.Right result -> checkOutput result >> return result
 checkCase fixture c = do
   source <- program fixture c
-  case C.compile (H.literal ("<Figure12 " ++ str "id" c ++ ">")) (H.literal source) of
+  outcome <- C.compile (H.literal ("<Figure12 " ++ str "id" c ++ ">")) (H.literal source)
+  case outcome of
     T.Left e -> do
       ensure (not (boolean "expected_acceptance" c)) (H.unpack (C.prettyError e))
       ensure (case C.phase e of T.Inference -> True; _ -> False) "wrong rejection phase"
@@ -194,9 +206,10 @@ jsonArray = J.Array . mlist
 jsonPair (a,b) = jsonArray [jsonString a,jsonString b]
 object xs = J.Object (mlist [(,) (H.literal k) v | (k,v) <- xs])
 main = do
+  IO.hSetBuffering IO.stdout IO.LineBuffering
   args <- Env.getArgs
   case args of
-    [path,mode,index] -> do
+    [path,mode,request] -> do
       raw <- readFile path
       fixture <- right (J.parse (H.literal raw))
       let cases = items "cases" fixture
@@ -204,23 +217,55 @@ main = do
       programs <- mapM (program fixture) cases
       let keys = zipWith (\c p -> (boolean "expected_acceptance" c,p)) cases programs
           aliases = [(str "id" c,str "id" (cases !! first)) | (n,(c,k)) <- zip [0..] (zip cases keys), let Just first = L.elemIndex k keys, first < n]
+          types = zip ["A1-principal", "A2-principal", "A4-result", "A4-signature"] (items "type_checks" fixture)
+          oracleCases = [("oracle/" ++ label, action) | (label, action) <- oracleControls]
+          signatureCases = [("assumption/" ++ show n, compileSource ("\\(" ++ a ++ " :: " ++ t ++ ") -> " ++ a) >> return ())
+                           | (n,(a,t)) <- zip [0 :: Int ..] ss]
+          typeCases = [("type/" ++ name, do
+                        result <- compileSource (str "source" fixtureCase)
+                        ensure (XT.alphaEq (C.inferredType result) (xtype (field "expected" fixtureCase))) "principal type differs")
+                      | (name,fixtureCase) <- types]
+          repairCases = [("repair/" ++ str "id" c, checkCase fixture c) | c <- items "repairs" fixture]
+          paperCases = [("paper/" ++ str "id" c, checkCase fixture c) | c <- cases]
+          registry = Map.fromList (oracleCases ++ signatureCases ++ typeCases ++ repairCases ++ paperCases)
+          canonicalId name
+            | Just label <- L.stripPrefix "paper/" name
+            , Just original <- lookup label aliases = "paper/" ++ original
+            | otherwise = name
       ensure (length cases == 43 && length (L.nub keys) == 41 && length ss == 29) "Figure12 inventory changed"
       ensure (aliases == [("A12.1","A10.1"),("E3a","A12.2")]) "Figure12 execution sharing changed"
-      let ix = read index :: Int
+      ensure (Map.size registry == 92) "Figure12 registry size changed"
+      let emitInventory = putStrLn (H.unpack (J.render (object
+            [("assumptions",jsonArray (map jsonPair ss)),("programs",jsonArray (map jsonString programs)),
+             ("aliases",jsonArray (map jsonPair aliases))])))
       case mode of
-        "oracle-controls" -> oracleControls >> putStrLn "PASS oracle-controls"
-        "inventory" -> putStrLn (H.unpack (J.render (object
-          [("assumptions",jsonArray (map jsonPair ss)),("programs",jsonArray (map jsonString programs)),("aliases",jsonArray (map jsonPair aliases))])))
-        "case" -> checkCase fixture (cases !! ix) >> putStrLn "PASS case"
-        "assumption" -> do
-          let (n,s) = ss !! ix
-          _ <- compileSource ("\\(" ++ n ++ " :: " ++ s ++ ") -> " ++ n)
-          putStrLn "PASS assumption"
-        "type" -> do
-          let c = items "type_checks" fixture !! ix
-          result <- compileSource (str "source" c)
-          ensure (XT.alphaEq (C.inferredType result) (xtype (field "expected" c))) "principal type differs"
-          putStrLn "PASS type"
-        "repair" -> checkCase fixture (items "repairs" fixture !! ix) >> putStrLn "PASS repair"
+        "inventory" -> emitInventory
+        "batch" -> do
+          selected <- fmap lines (readFile request)
+          ensure (not (null selected) && length selected == length (L.nub selected)
+                  && all (`Map.member` registry) selected) "invalid selected Figure12 cases"
+          emitInventory
+          success <- runBatch registry canonicalId Map.empty True selected
+          if success then return () else Exit.exitFailure
         _ -> fail "unknown mode"
-    _ -> fail "usage: figure12-direct FIXTURE.json MODE INDEX"
+    _ -> fail "usage: figure12-direct FIXTURE.json (inventory 0 | batch REQUEST)"
+
+runBatch registry canonicalId seen allPassed selected = case selected of
+  [] -> return allPassed
+  label : rest -> do
+    let canonical = canonicalId label
+    result <- case Map.lookup canonical seen of
+      Just saved -> return saved
+      Nothing -> Exception.tryJust recoverable (Timeout.timeout 120000000 (registry Map.! canonical))
+    let (status, detail) = case result of
+          Left failure -> ("fail", Exception.displayException failure)
+          Right Nothing -> ("timeout", "case exceeded 120 seconds")
+          Right (Just ()) -> ("pass", "")
+        attributes = [("id",jsonString ("figure12-direct/" ++ label)),
+                      ("status",jsonString status),("detail",jsonString detail)]
+    putStrLn (H.unpack (J.render (object attributes)))
+    runBatch registry canonicalId (Map.insert canonical result seen) (allPassed && status == "pass") rest
+  where
+    recoverable failure = case Exception.fromException failure :: Maybe Exception.AsyncException of
+      Just _ -> Nothing
+      Nothing -> Just failure

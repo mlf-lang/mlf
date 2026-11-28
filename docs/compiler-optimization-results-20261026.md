@@ -58,7 +58,7 @@ ran again. No failed-cohort or diagnostic timing samples were pooled.
 
 ## Provenance and reproduction limits
 
-The compact companion evidence manifest records the producer source commit, tool versions, all three
+The [companion evidence manifest](https://github.com/mlf-lang/mlf/blob/0704d216b8cf6d887d3737efa30a2eae3c152f0a/docs/compiler-optimization-evidence-20261026.json) records the producer source commit, tool versions, all three
 rounds, policy and audit digests. Large scratch receipts, toolchains, snapshots,
 binaries and generated LLVM are deliberately not vendored. Those hashes identify
 retained research evidence; they are not a portable runnable harness by themselves.

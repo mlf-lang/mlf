@@ -112,7 +112,7 @@ This is evidence for exported-corpus type stabilization, not a general acceptanc
 
 ### Completed bounded evidence
 
-The committed evidence is [tools/shared/evidence/frontend-O0](../../tools/shared/evidence/frontend-O0/README.md). The reviewer independently checked each shard receipt against the committed summary, the exact stdout bytes and empty stderr, the current executable hash, all 127 recorded current input hashes, and the 125 shared/host/runtime input hashes in the producer receipt. All checks matched. The 127 inputs comprise the 94 shared files, 31 host/runtime files, `shared-sources.json`, and the retained `bootstrap/tests/shared-frontend.emlf` fixture.
+The committed evidence is [tools/shared/evidence/frontend-O0](https://github.com/mlf-lang/mlf/blob/0704d216b8cf6d887d3737efa30a2eae3c152f0a/tools/shared/evidence/frontend-O0/README.md). The reviewer independently checked each shard receipt against the committed summary, the exact stdout bytes and empty stderr, the current executable hash, all 127 recorded current input hashes, and the 125 shared/host/runtime input hashes in the producer receipt. All checks matched. The 127 inputs comprise the 94 shared files, 31 host/runtime files, `shared-sources.json`, and the retained `bootstrap/tests/shared-frontend.emlf` fixture.
 
 The common executable SHA-256 is `50728040aba323149be1f592847f73e9d7b7febdf90fdfe05465319d801fb211`.
 
@@ -151,7 +151,7 @@ The implementation reported an isolated patch-reproduction check for the earlier
 
 ## Evidence locations
 
-Committed final evidence: `tools/shared/evidence/frontend-O0/{README.md,summary.json}` and the four adjacent shard directories, each containing the exact command, receipt, stdout and stderr. The producer receipt is `.mlf-build/shared-ghc-O0/receipt.json`; the focused summary records its digest and explicitly incomplete overall status.
+The [archived frontend summary](https://github.com/mlf-lang/mlf/blob/0704d216b8cf6d887d3737efa30a2eae3c152f0a/tools/shared/evidence/frontend-O0/summary.json) and [four shard directories](https://github.com/mlf-lang/mlf/tree/0704d216b8cf6d887d3737efa30a2eae3c152f0a/tools/shared/evidence/frontend-O0) record the exact commands, receipts, stdout and stderr. The producer receipt is `.mlf-build/shared-ghc-O0/receipt.json`; the focused summary records its digest and explicitly incomplete overall status.
 
 Literal migration evidence: `tools/shared-migration/literal-signatures.json` and `tools/shared-migration/evidence/literal-annotation-adjustment.json`. Final GHC inferred-signature records are also present in the producer receipt.
 

@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Control-only receipt validation; this mock runner does not execute MLF.
 set -euo pipefail
+. "$(dirname -- "$0")/test-events.sh" release-direct-source-smoke
 root=$(cd -- "$(dirname -- "$0")/../.." && pwd)
 work=$(mktemp -d "${TMPDIR:-/tmp}/mlf-direct-smoke.XXXXXXXX")
 trap 'rm -rf "$work"' EXIT
@@ -42,33 +43,39 @@ jq -n --arg runner "$work/runner" --arg binary "$(sha256 "$work/runner")" \
     shared_inputs:{Example:{path:$source,sha256:$source_hash}},resolved_modules:{Example:{path:$source,sha256:$source_hash}},
     host_inputs:{"host/Adapter.hs":{path:$host,sha256:$host_hash}},outputs:{"source-smoke":{path:$runner,sha256:$binary}}}' > "$MLF_SOURCE_SMOKE_RECEIPT"
 cp "$MLF_SOURCE_SMOKE_RECEIPT" "$work/valid.json"
+release_begin release/direct-source-smoke/authenticated
 "$project/tools/release/source-smoke.sh" > "$work/success.log" 2>&1
 jq -e '.complete == true and .mode == "direct-GHC-checkout-source" and (.producer_receipt_sha256 | length) == 64' "$project/.mlf-build/source-smoke/result.json" >/dev/null
 test "$(wc -l < "$TEST_CALLS" | tr -d ' ')" -eq 1
+release_pass
 expect_rejected() {
+  release_begin "release/direct-source-smoke/$1"
   local status=0
   printf '{"complete":true}\n' > "$project/.mlf-build/source-smoke/result.json"
   "$project/tools/release/source-smoke.sh" > "$work/rejected.log" 2>&1 || status=$?
   test "$status" -ne 0
   jq -e '.complete == false' "$project/.mlf-build/source-smoke/result.json" >/dev/null
   test "$(wc -l < "$TEST_CALLS" | tr -d ' ')" -eq 1
+  release_pass
 }
 jq '.complete = false' "$work/valid.json" > "$MLF_SOURCE_SMOKE_RECEIPT"
-expect_rejected
+expect_rejected incomplete
 jq '.resolved_modules.Example.path = "/wrong/source.hs"' "$work/valid.json" > "$MLF_SOURCE_SMOKE_RECEIPT"
-expect_rejected
+expect_rejected source-path
 jq '.outputs["source-smoke"].sha256 = ("0" * 64)' "$work/valid.json" > "$MLF_SOURCE_SMOKE_RECEIPT"
-expect_rejected
+expect_rejected runner-hash
 jq '.host_inputs = {}' "$work/valid.json" > "$MLF_SOURCE_SMOKE_RECEIPT"
-expect_rejected
+expect_rejected missing-host-inputs
 jq '.flags = []' "$work/valid.json" > "$MLF_SOURCE_SMOKE_RECEIPT"
-expect_rejected
+expect_rejected missing-flags
 cp "$work/valid.json" "$MLF_SOURCE_SMOKE_RECEIPT"
 printf 'stale source\n' >> "$project/libraries/example/Main.hs"
-expect_rejected
+expect_rejected changed-source
 grep -F 'Stale direct-source input:' "$work/rejected.log" >/dev/null
+release_begin release/direct-source-smoke/native-route
 status=0
 "$project/tools/release/native-ci.sh" source-smoke > "$work/native.log" 2>&1 || status=$?
 test "$status" -eq 2
 grep -F 'separate from native CI' "$work/native.log" >/dev/null
+release_pass
 printf '%s\n' 'PASS direct smoke control: authenticated source paths/hashes, honest producer, stale or incomplete receipt rejection, native route separation.'

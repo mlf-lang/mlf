@@ -1,11 +1,14 @@
 module Tests.DenseNormalization where
+import Prelude hiding (Monad, return, bind)
+import MLF.Primitive (Monad, return, bind)
+import qualified Test.Assert as A
 import Bootstrap.Types
 import qualified Bootstrap.Std as S
 import qualified Bootstrap.IntMap as IM
 import qualified Bootstrap.Graph as G
 import qualified Tests.Helpers as H
 
-suite : [] ((,) String (IO ()))
+suite : [] ((,) String (A.Test ()))
 suite = (:) ((,) "dense normalization agrees with an independent list oracle" normalization) []
 
 -- Deliberately use list searches and recursive definitions, without the
@@ -56,15 +59,15 @@ fixture bits = Graph (IM.fromList (
 rename f graph = Graph
  (IM.fromList (S.map (\((,) n v) -> (,) (f n) (Node (G.mapTag f (G.tag v)) (S.mapOptional f (G.binder v)) (G.flag v))) (IM.toList (G.nodes graph))))
  (IM.fromList (S.map (\((,) a b) -> (,) (f a) (f b)) (IM.toList (G.links graph)))) (f (G.nextId graph))
-normalization : IO ()
+normalization : A.Test ()
 normalization = do
- H.assert (H.eq (G.normalize G.emptyGraph) G.emptyGraph) "empty normalization changed"
+ A.assert (H.eq (G.normalize G.emptyGraph) G.emptyGraph) "empty normalization changed"
  S.mapM_ (\bits -> S.mapM_ (\scale -> S.mapM_ (\shift -> do
   let graph = rename (\n -> shift + scale * n) (fixture bits)
-  _ <- H.right (G.validateGraph graph)
+  _ <- A.right H.show (G.validateGraph graph)
   let expected = reference graph
   let actual = G.normalize graph
-  _ <- H.right (G.validateGraph actual)
-  H.assert (H.eq actual expected && H.eq (G.normalize actual) actual) "normalization changed flags, identities, structure, aliases or binders")
+  _ <- A.right H.show (G.validateGraph actual)
+  A.assert (H.eq actual expected && H.eq (G.normalize actual) actual) "normalization changed flags, identities, structure, aliases or binders")
   ((:) 0 ((:) 1152921504606846976 ((:) (-1152921504606846976) []))))
   ((:) 1 ((:) 100003 []))) (S.range 0 31)

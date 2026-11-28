@@ -1,5 +1,8 @@
 module Tests.BackendSuite where
+import Prelude hiding (Monad, return, bind)
+import MLF.Primitive (Monad, return, bind)
 import Bootstrap.Types
+import qualified Bootstrap.Map as M
 import qualified Bootstrap.Std as S
 import qualified Tests.Backends as B
 import qualified Tests.Helpers as H
@@ -24,6 +27,9 @@ import qualified Tests.StateRuntime as Sr
 import qualified Tests.HigherOrderSpecialization as Hi
 import qualified Package.OS as O
 import qualified Tests.Selection as Selection
+import qualified Test.Case as Case
+import qualified Test.CaseSelection as Planned
+import qualified Test.Runner as Runner
 suite : B.Backends -> [] ((,) String (IO ()))
 suite backends = S.append (Wr.backendTests backends) (S.concat ((:) (Io.ioTests backends) ((:) (Pr.preludeTests backends) ((:) (Sn.snakeTests backends) ((:) (Ba.backendTests backends) ((:) (Na.nativeOptimizationTests backends) ((:) (Co.constructorProjectionTests backends) ((:) (Fo.forceReuseTests backends) ((:) (Bo.boolConditionTests backends) ((:) (En.environmentAccessTests backends) ((:) (St.strictFieldTests backends) ((:) (Nu.numericArrayTests backends) ((:) (By.byteArrayTests backends) ((:) (Dn.dnaTests backends) ((:) (Mo.moduleBackendTests backends) ((:) (Se.separateBackendTests backends) ((:) (Bs.bootstrapPrimitiveTests backends) ((:) (Sr.stateRuntimeTests backends) ((:) (Hi.higherOrderTests backends) [])))))))))))))))))))
 -- Each family is a contract boundary over existing fixture actions. Selection
@@ -76,38 +82,84 @@ families backends =
  ((:) ((,) "backends/strict-wrappers" (Wr.backendTests backends)) ((:) ((,) "backends/io-language" (casesWith isIOLanguage io)) ((:) ((,) "backends/io-runtime" (casesWith (\label -> S.not (isIOLanguage label || isIOTarget label || isIOLaw label || isIOFailure label)) io)) ((:) ((,) "backends/io-target-validation" (casesWith isIOTarget io)) ((:) ((,) "backends/io-monad-laws" (casesWith isIOLaw io)) ((:) ((,) "backends/io-failures" (casesWith isIOFailure io)) ((:) ((,) "backends/prelude-language" (casesWith (\label -> S.not (isPreludeRuntime label || isPreludeImports label)) prelude)) ((:) ((,) "backends/prelude-import-equivalence" (casesWith isPreludeImports prelude)) ((:) ((,) "backends/prelude-runtime" (casesWith isPreludeRuntime prelude)) ((:) ((,) "backends/snake" (Sn.snakeTests backends)) ((:) ((,) "backends/surface-language" (casesWith isBackendLanguage base)) ((:) ((,) "backends/guards" (casesWith isBackendGuards base)) ((:) ((,) "backends/target-validation" (casesWith isBackendTarget base)) ((:) ((,) "backends/target-runtime-input" (casesWith isBackendInput base)) ((:) ((,) "backends/target-semantics" (casesWith (\label -> S.not (isBackendLanguage label || isBackendGuards label || isBackendTarget label || isBackendInput label || isBackendExample label || isBackendWorkload label)) base)) ((:) ((,) "backends/example-corpus" (casesWith isBackendExample base)) ((:) ((,) "backends/tree-workload" (casesWith isBackendWorkload base)) ((:) ((,) "backends/native-arithmetic-boundaries" (casesWith isNativeArithmetic native)) ((:) ((,) "backends/native-optimization" (casesWith (\label -> S.not (isNativeArithmetic label)) native)) ((:) ((,) "backends/constructor-projection" (Co.constructorProjectionTests backends)) ((:) ((,) "backends/force-reuse" (Fo.forceReuseTests backends)) ((:) ((,) "backends/boolean-lowering" (Bo.boolConditionTests backends)) ((:) ((,) "backends/environment-slots" (En.environmentAccessTests backends)) ((:) ((,) "backends/strict-fields" (St.strictFieldTests backends)) ((:) ((,) "backends/numeric-language" (casesWith isNumericLanguage numeric)) ((:) ((,) "backends/numeric-specialization" (casesWith isNumericNative numeric)) ((:) ((,) "backends/numeric-target-validation" (casesWith isNumericTarget numeric)) ((:) ((,) "backends/numeric-runtime" (casesWith (\label -> S.not (isNumericLanguage label || isNumericNative label || isNumericTarget label || isNumericWorkload label)) numeric)) ((:) ((,) "backends/numeric-workloads" (casesWith isNumericWorkload numeric)) ((:) ((,) "backends/byte-language" (casesWith isByteLanguage bytes)) ((:) ((,) "backends/byte-specialization" (casesWith isByteNative bytes)) ((:) ((,) "backends/byte-target-validation" (casesWith isByteTarget bytes)) ((:) ((,) "backends/byte-io-failure" (casesWith isByteFailure bytes)) ((:) ((,) "backends/byte-runtime" (casesWith (\label -> S.not (isByteLanguage label || isByteNative label || isByteTarget label || isByteFailure label || isByteWorkload label)) bytes)) ((:) ((,) "backends/byte-workloads" (casesWith isByteWorkload bytes)) ((:) ((,) "backends/table-language" (casesWith isTableLanguage dna)) ((:) ((,) "backends/byte-input-runtime" (casesWith (O.starts "byte input: ") dna)) ((:) ((,) "backends/table-specialization" (casesWith isTableNative dna)) ((:) ((,) "backends/table-runtime" (casesWith (\label -> S.not (isTableLanguage label || O.starts "byte input: " label || isTableNative label || O.starts "DNA: " label)) dna)) ((:) ((,) "backends/dna-workloads" (casesWith (O.starts "DNA: ") dna)) ((:) ((,) "backends/module-execution" (casesWith (\label -> S.not (isModuleCLI label)) modules)) ((:) ((,) "backends/module-cli" (casesWith isModuleCLI modules)) ((:) ((,) "backends/crate-linking" (casesWith (\label -> S.not (isCrateCLI label || isCrateInvalidation label)) crates)) ((:) ((,) "backends/crate-cli" (casesWith isCrateCLI crates)) ((:) ((,) "backends/crate-invalidation" (casesWith isCrateInvalidation crates)) ((:) ((,) "backends/primitive-language" (casesWith isPrimitiveLanguage primitives)) ((:) ((,) "backends/primitive-runtime" (casesWith (\label -> S.not (isPrimitiveLanguage label)) primitives)) ((:) ((,) "backends/state-workers" (casesWith isStateWorker state)) ((:) ((,) "backends/state-runtime" (casesWith (\label -> S.not (isStateWorker label)) state)) ((:) ((,) "backends/higher-order-specialization" (Hi.higherOrderTests backends)) []))))))))))))))))))))))))))))))))))))))))))))))))))
 validateFamilies allCases entries = do
  let labels = S.map S.fst allCases
- let partitioned = S.concatMap (\entry -> S.map S.fst (S.snd entry)) entries
+ let bindings = S.concatMap (\((,) family fixtures) -> S.map (\entry -> (,) (S.fst entry) family) fixtures) entries
+ let owners = M.fromList compareString bindings
  H.assert (S.eqList eqString (S.map S.fst entries) familyNames) "backend family registry differs from discovery"
- H.assert (S.all (\entry -> S.not (S.null (S.snd entry))) entries && S.length partitioned == S.length labels && S.length partitioned == S.length (S.nubBy eqString partitioned) && S.eqList eqString (S.sortBy compareString partitioned) (S.sortBy compareString labels)) "backend families do not partition the preserved fixture actions"
-validateSuite allCases = do
- let labels = S.map S.fst allCases
- H.assert (S.length allCases == 541) "preserved backend fixture coverage changed"
- H.assert (S.length labels == S.length (S.nubBy eqString labels)) "duplicate backend fixture labels"
-runCases backends cases = S.mapM_ (\((,) label action) -> B.inCase backends label (do { putStrLn label; action })) cases
+ H.assert (S.length labels == 541) "preserved backend fixture coverage changed"
+ H.assert (S.all (\entry -> S.not (S.null (S.snd entry))) entries &&
+           S.length bindings == M.size owners &&
+           S.eqList eqString (S.sortBy compareString labels) (M.keys owners))
+          "backend families do not partition the preserved fixture actions"
+ return owners
+-- Escape semantic labels reversibly. Coordinates are local to a case, while
+-- the legacy global row indices remain in the compatibility receipt.
+caseId family label = family ++ "/" ++ S.concatMapString (\index ->
+ let code = stringCodeAt label index in
+ if H.isAlphaNum code || code == 45 || code == 46 then O.char label index
+ else "_" ++ showInt code ++ "_") (S.range 0 (stringLength label - 1))
+
+registry backends allCases owners =
+ S.map (\((,) label action) ->
+  let family = case M.lookup compareString label owners of { Just value -> value; Nothing -> panic "backend fixture has no family" } in
+  let identity = caseId family label in
+  Case.test identity label ((:) ("family:" ++ family) [])
+   (B.recoverCase (B.inRegisteredCase backends identity label (do { putStrLn label; action })))) allCases
+
+selectedCases cases args = case args of
+ (:) "--from" ((:) prefix []) -> do
+  options <- H.right (Runner.parse [])
+  let selected = S.dropWhile (\entry -> S.not (O.starts prefix (Case.name entry))) cases
+  H.assert (S.not (S.null selected)) ("unknown backend fixture prefix: " ++ prefix)
+  return ((,,) options selected Nothing)
+ (:) "--families" _ -> do
+  (,) _ names <- H.right (Selection.choose familyNames args)
+  options <- H.right (Runner.parse [])
+  let selected = S.filter (\entry -> S.any (\name -> S.elem eqString ("family:" ++ name) (Case.tags entry)) names) cases
+  return ((,,) options selected (Just names))
+ _ -> do
+  (,) options selected <- H.right (Runner.plan args cases)
+  let names = if S.null (Runner.selectors options) then Just familyNames else Nothing
+  return ((,,) options selected names)
+
 main : IO ()
 main = do
  args <- O.allArguments
- if Selection.listing args then putStr (S.unlines familyNames) else case args of
-  (:) "--from" ((:) prefix []) -> B.withBackends (\backends -> do
-   let allCases = suite backends
-   validateSuite allCases
-   let cases = S.dropWhile (\entry -> S.not (O.starts prefix (S.fst entry))) allCases
-   H.assert (S.not (S.null cases)) ("unknown backend fixture prefix: " ++ prefix)
-   runCases backends cases
-   count <- B.auditBackends backends
-   putStrLn (showInt (S.length cases) ++ " shared IO/prelude/backend fixtures; 0 failures"))
-  _ -> do
-   (,) full selected <- H.right (Selection.choose familyNames args)
-   Selection.begin "backends" full selected
-   B.withBackends (\backends -> do
-    let allCases = suite backends
-    let entries = families backends
-    validateSuite allCases
-    validateFamilies allCases entries
-    let labels = S.concatMap (\entry -> if S.elem eqString (S.fst entry) selected then S.map S.fst (S.snd entry) else []) entries
-    let cases = S.filter (\entry -> S.elem eqString (S.fst entry) labels) allCases
-    runCases backends cases
-    count <- if full then B.auditBackends backends else B.auditSelectedBackends backends
-    S.mapM_ (Selection.passed "backends") selected
-    putStrLn (showInt (S.length cases) ++ " shared IO/prelude/backend fixtures; 0 failures"))
-   Selection.finish "backends"
+ if Selection.listing args then putStr (S.unlines familyNames) else do
+  let allCases = suite B.inventoryContext
+  let entries = families B.inventoryContext
+  owners <- validateFamilies allCases entries
+  let cases = registry B.inventoryContext allCases owners
+  (,,) options selected selection <- selectedCases cases args
+  if Runner.listing options then do
+   plan <- H.right (Planned.project cases selected)
+   runRegistry B.inventoryContext args options selection plan
+  else B.withBackends (\backends -> do
+   let runnable = registry backends (suite backends) owners
+   plan <- H.right (Planned.rebind runnable selected)
+   runRegistry backends args options selection plan)
+
+runRegistry backends args options selection plan = do
+ let selected = Planned.cases plan
+ reported <- B.reportArgs (case args of
+  (:) "--from" _ -> []
+  (:) "--families" _ -> []
+  _ -> args)
+ reportOptions <- H.right (Runner.parse reported)
+ let wholeInvocation = case args of { (:) "--from" _ -> false; (:) "--families" _ -> false; _ -> true }
+ let full = S.length selected == Planned.total plan && S.null (Runner.selectors options) && wholeInvocation
+ if Runner.listing options then do
+  code <- Runner.runSelected (\_ -> return ()) reportOptions plan
+  if code == 0 then return () else exitWith code
+ else do
+  case selection of { Nothing -> return (); Just names -> Selection.begin "backends" full names }
+  code <- Runner.runSelected (\_ -> return ()) reportOptions plan
+  if code == 0 then do
+   _ <- if full then B.auditBackends backends else B.auditSelectedBackends backends
+   case selection of
+    Nothing -> return ()
+    Just names -> do { S.mapM_ (Selection.passed "backends") names; Selection.finish "backends" }
+   putStrLn (showInt (S.length selected) ++ " shared IO/prelude/backend fixtures; 0 failures")
+  else do
+   B.flushRows
+   case selection of { Nothing -> return (); Just _ -> Selection.flush }
+   exitWith code

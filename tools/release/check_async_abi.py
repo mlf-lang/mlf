@@ -1,31 +1,27 @@
 #!/usr/bin/env python3
-"""Require the exact current standalone LLVM entry's runtime ABI guards."""
+"""Require the exact current standalone LLVM entry's runtime ABI guard."""
 from pathlib import Path
 import sys
 
-GUARDS = (
-    b'mlf_require_haskell_boundary_v4_abi',
-    b'mlf_require_byte_file_v2_abi',
-    b'mlf_require_freeze_st_array_abi',
-    b'mlf_require_st_to_io_abi',
-)
+GUARD = b'mlf_require_runtime_v5_abi'
 
 
 def check(data):
     # Match emitted lines, not mentions in comments, strings or old symbol names.
-    # LLVM.hs entryCode emits these guards unconditionally, before evaluating root.
+    # LLVM.hs entryCode emits this guard unconditionally, before evaluating root.
     lines = data.split(b'\n')
-    for guard in GUARDS:
-        declaration = b'declare void @' + guard + b'()'
-        if lines.count(declaration) != 1:
-            raise ValueError('missing or duplicate ABI declaration: ' + guard.decode())
-    prefix = [b'define ptr @mlf_entry() {'] + [
-        b'  call void @' + guard + b'()' for guard in GUARDS]
+    declaration = b'declare void @' + GUARD + b'()'
+    call = b'  call void @' + GUARD + b'()'
+    if [line for line in lines if line.startswith(b'declare void @mlf_require_')] != [declaration]:
+        raise ValueError('expected one current ABI declaration: ' + GUARD.decode())
+    if [line for line in lines if line.startswith(b'  call void @mlf_require_')] != [call]:
+        raise ValueError('expected one current ABI call: ' + GUARD.decode())
+    prefix = [b'define ptr @mlf_entry() {', call]
     if lines.count(prefix[0]) != 1:
         raise ValueError('missing or duplicate standalone mlf_entry')
     start = lines.index(prefix[0])
     if lines[start:start + len(prefix)] != prefix:
-        raise ValueError('current ABI guards must begin mlf_entry before root evaluation')
+        raise ValueError('current ABI guard must begin mlf_entry before root evaluation')
 
 
 def main():

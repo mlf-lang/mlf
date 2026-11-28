@@ -6,9 +6,10 @@ module Test.Registry where {
   import MLF.Primitive;
   import Bootstrap.Types;
   import qualified Bootstrap.Std as S;
+  import qualified Bootstrap.Set as Set;
   import qualified Test.Descriptor as D;
   ensure condition message = if condition then Right () else Left message;
-  unique values = (S.length values == S.length (S.nubBy eqString values));
+  unique values = S.length values == Set.size (Set.fromList compareString values);
   validIds :: [] String -> Either String ();
   validIds values =
     do {
@@ -23,7 +24,7 @@ module Test.Registry where {
       validIds observed;
       ensure
         ((S.length expected == S.length observed) &&
-         S.all (\identity -> S.elem eqString identity expected) observed)
+         Set.isSubsetOf compareString (Set.fromList compareString observed) (Set.fromList compareString expected))
         "missing or unknown test ID"
     };
   validate :: [] D.Descriptor -> Either String ();
@@ -39,9 +40,11 @@ module Test.Registry where {
       validate entries;
       validIds identities;
       ensure (S.not (S.null identities)) "empty required test selection";
-      ensure
-        (S.all (\identity -> S.any (\entry -> eqString identity (D.id entry)) entries) identities)
-        "unknown test ID";
-      Right (S.filter (\entry -> S.elem eqString (D.id entry) identities) entries)
+      let {
+        selected = Set.fromList compareString identities;
+        available = Set.fromList compareString (S.map D.id entries)
+      };
+      ensure (Set.isSubsetOf compareString selected available) "unknown test ID";
+      Right (S.filter (\entry -> Set.member compareString (D.id entry) selected) entries)
     }
 }

@@ -1,6 +1,5 @@
 module RegexMain where
 import Bootstrap.Types
 import qualified Tests.Regex as Regex
-import qualified Tests.Coverage as Coverage
 main : IO ()
-main = do { Coverage.begin "regex" true; Regex.main; Coverage.finish "regex" }
+main = Regex.main

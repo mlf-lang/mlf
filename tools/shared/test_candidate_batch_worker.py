@@ -120,22 +120,20 @@ class WorkerControls(unittest.TestCase):
         args=list(self.fixture());args[0]['commands'][0]['unrecorded_difference']='changed'
         with self.assertRaises(ValueError):W.validate_inventory(*args)
 
-    def test_frozen_source_loader_executes_exact_bytes_not_pyc(self):
-        module=W.load(b'value=7\n','synthetic_source','/does-not-exist/source.py')
-        self.assertEqual(module.value,7)
-        self.assertEqual(module.__file__,'/does-not-exist/source.py')
-    def test_every_frozen_source_tamper_fails_snapshot(self):
+
+    def test_snapshot_records_current_inputs_without_historical_whitelist(self):
         raws,pins=W.snapshot()
-        self.assertEqual(set(raws),set(W.PINS)|set(W.HELPERS))
+        self.assertEqual(set(raws),set(W.INPUTS))
         with tempfile.TemporaryDirectory() as directory:
-            root=Path(directory)/'tools/shared'
-            root.mkdir(parents=True)
+            root=Path(directory)
             for name,raw in raws.items():
                 path=root/name;path.parent.mkdir(parents=True,exist_ok=True);path.write_bytes(raw)
             self.assertEqual(W.snapshot(root)[1],pins)
-            for name in W.PINS:
+            for name in W.INPUTS:
                 path=root/name;path.write_bytes(raws[name]+b'\n')
-                with self.subTest(name=name),self.assertRaises(ValueError):W.snapshot(root)
+                changed=W.snapshot(root)[1]
+                self.assertNotEqual(changed[name],pins[name])
+                self.assertEqual({key for key in pins if changed[key]!=pins[key]},{name})
                 path.write_bytes(raws[name])
 
 if __name__=='__main__':unittest.main()

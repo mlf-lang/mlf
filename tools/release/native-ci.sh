@@ -12,6 +12,9 @@ case "$group" in
 esac
 test "$#" -le 1 || { printf '%s\n' 'Expected one test group.' >&2; exit 2; }
 case "$group" in smoke|source-smoke|pr-smoke|extended-pr-smoke|unit|packages|self-host|parity|backends|port|port-prepare-StateTypes|port-prepare-SolverReuse|port-prepare-InferenceConformance|port-prepare-other) ;; *) exit 2 ;; esac
+if [ "$group" = self-host ] && [ "${MLF_TEST_SUITE:-}" != self-host-native ]; then
+  exec python3 -B tools/testing/run.py self-host-native
+fi
 test -z "${MLF_TEST_RUNTIME_PROFILE:-}" || test "$MLF_TEST_RUNTIME_PROFILE" = compact-gc || exit 2
 evidence_group=$group
 if [ -n "${MLF_SOURCE_SMOKE_RUNNER:-}" ]; then

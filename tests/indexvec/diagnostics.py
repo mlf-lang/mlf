@@ -5,6 +5,7 @@ import subprocess
 
 
 def check_diagnostics(folder: Path, compiler: Path, reference: Path | None = None):
+    from test_direct import dependency_diagnostics
     folder.mkdir()
     (folder / "A.emlf").write_text("module A (value) where\nvalue = 41\n")
     (folder / "B.emlf").write_text("module B (value) where\nvalue = True\n")
@@ -25,7 +26,7 @@ def check_diagnostics(folder: Path, compiler: Path, reference: Path | None = Non
         main.write_text("module Test where\n" + source)
         for exe in [compiler] if reference is None else [reference, compiler]:
             result = subprocess.run([exe, "--no-prelude", "--type", main], capture_output=True, timeout=360)
-            if result.returncode != 1 or result.stdout or result.stderr != expected:
+            if result.returncode != 1 or result.stdout or dependency_diagnostics(result.stderr)[1] != expected:
                 raise ValueError(f"{exe}: {label}: {result.returncode}, {result.stdout!r}, {result.stderr!r}")
         results[label] = expected.decode().rstrip()
     (folder / "diagnostics.json").write_text(json.dumps(results, indent=2) + "\n")

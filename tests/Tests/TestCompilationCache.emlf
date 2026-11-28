@@ -1,0 +1,381 @@
+module Tests.TestCompilationCache where
+import Bootstrap.Types
+import qualified Bootstrap.Std as S
+import qualified Package.OS as O
+import qualified Package.Json as J
+import qualified Package.Build as B
+import qualified Tests.Basic as H
+import qualified Tests.TestCompilation as TC
+import qualified Tests.Backends as Backends
+import qualified Test.Assert as Assert
+
+-- Real source, checked-target, LLVM and native actions exercise the service.
+-- A small executable emitter additionally counts invocations and injects a
+-- transient failure without replacing the assertions with stored test results.
+main : IO ()
+main = H.withScratch (\scratch -> do
+ root <- getEnv "MLF_TEST_SOURCE_ROOT"
+ actualRoot <- if eqString root "" then canonicalPath "." else canonicalPath root
+ compiler <- getEnv "MLF_BOOTSTRAP_COMPILER"
+ self <- getExecutablePath
+ let directory = scratch ++ "/compilation cache's λ"
+ O.mkdir directory
+ setEnv "MLF_COMPILATION_CACHE_TEST_ROOT" actualRoot
+ code <- O.exec directory [self, "--test-compilation-cache-case", compiler] ""
+   (directory ++ "/case.out") (directory ++ "/case.err") 1800
+ unsetEnv "MLF_COMPILATION_CACHE_TEST_ROOT"
+ out <- readFile (directory ++ "/case.out")
+ err <- readFile (directory ++ "/case.err")
+ H.assert (code == 0 && H.contains "PASS checked test compilation service" out)
+   ("test compilation service regression failed: " ++ out ++ err)
+ putStrLn "PASS checked test compilation service")
+
+artifact result = case result of
+ Left ((,,) code out err) -> H.fail ("unexpected compilation failure " ++ showInt code ++ ": " ++ out ++ err)
+ Right path -> return path
+successful action = ioBind action artifact
+expectHit service path expected = do
+ row <- TC.receipt service path
+ H.assert (H.eq (J.getBool "cached" false row) expected) ("unexpected artifact reuse: " ++ J.render row)
+ return row
+sameKey first second = eqString (J.getText "key" "" first) (J.getText "key" "" second)
+commands service = do
+ saved <- J.read (B.reportPath (TC.builder service))
+ return (S.length (J.values (J.get "commands" saved)))
+builds service = do
+ saved <- J.read (B.reportPath (TC.builder service))
+ return (S.length (J.values (J.get "builds" saved)))
+countCalls path = do
+ saved <- readFile path
+ return (S.length (O.nonempty (O.lines saved)))
+reject result = case result of
+ Left ((,,) code _ err) -> H.assert (code /= 0 && stringLength err > 0) "failed compilation lost its status or diagnostic"
+ Right _ -> H.fail "invalid compilation unexpectedly succeeded"
+
+runNative directory name path input expected = do
+ let stem = directory ++ "/" ++ name
+ writeFile (stem ++ ".stdin") input
+ binary <- O.executable (path ++ "/program")
+ code <- O.exec directory [binary] (stem ++ ".stdin") (stem ++ ".out") (stem ++ ".err") 60
+ out <- readFile (stem ++ ".out")
+ err <- readFile (stem ++ ".err")
+ H.assert (code == 0 && eqString out expected && eqString err "")
+   ("native execution did not observe this invocation's input: " ++ out ++ err)
+
+probeSource = S.unlines
+ ["#include <stdio.h>", "#include <stdlib.h>", "#include <string.h>",
+  "#ifdef _WIN32", "#include <fcntl.h>", "#include <io.h>", "#endif",
+  "int main(int argc, char **argv) {",
+  "  (void)argc; (void)argv;",
+  "#ifdef _WIN32",
+  "  _setmode(_fileno(stdout), _O_BINARY); _setmode(_fileno(stderr), _O_BINARY);",
+  "#endif",
+  "  const char *count = getenv(\"MLF_TEST_COMPILATION_PROBE_COUNT\");",
+  "  const char *llvm = getenv(\"MLF_TEST_COMPILATION_PROBE_LLVM\");",
+  "  const char *fail = getenv(\"MLF_TEST_COMPILATION_PROBE_FAIL\");",
+  "  if (!count || !llvm) return 2;",
+  "  FILE *calls = fopen(count, \"ab\"); if (!calls) return 2;",
+  "  fputs(\"call\\n\", calls); if (fclose(calls)) return 2;",
+  "  if (fail && !strcmp(fail, \"1\")) { fputs(\"probe rejected\\n\", stderr); return 1; }",
+  "  if (fail && !strcmp(fail, \"warning\")) fputs(\"probe diagnostic\\n\", stderr);",
+  "  FILE *input = fopen(llvm, \"rb\"); if (!input) return 2;",
+  "  printf(\"; probe version %d\\n\", PROBE_VERSION);",
+  "  int byte; while ((byte = fgetc(input)) != EOF) if (putchar(byte) == EOF) return 2;",
+  "  int error = ferror(input); if (fclose(input)) error = 1;",
+  "  return error || fflush(stdout) ? 2 : 0;", "}"]
+
+compileProbe service directory version = do
+ let source = directory ++ "/emitter-probe.c"
+ writeFile source probeSource
+ binary <- O.executable (directory ++ "/emitter-probe")
+ O.run directory [B.clang (TC.builder service), "-O0", "-std=c11",
+   "-DPROBE_VERSION=" ++ showInt version, source, "-o", binary]
+ return binary
+
+emitterControls service directory llvm target = do
+ let calls = directory ++ "/emitter.calls"
+ writeFile calls ""
+ setEnv "MLF_TEST_COMPILATION_PROBE_COUNT" calls
+ setEnv "MLF_TEST_COMPILATION_PROBE_LLVM" llvm
+ unsetEnv "MLF_TEST_COMPILATION_PROBE_FAIL"
+ producer <- compileProbe service directory 1
+ first <- successful (TC.emittedLLVM service producer "--probe-io" [] target 60)
+ firstRow <- expectHit service first false
+ repeated <- successful (TC.emittedLLVM service producer "--probe-io" [] target 60)
+ repeatedRow <- expectHit service repeated true
+ count <- countCalls calls
+ H.assert (sameKey firstRow repeatedRow && count == 1) "warm emission did not suppress exactly one producer invocation"
+
+ differentMode <- successful (TC.emittedLLVM service producer "--probe-program" [] target 60)
+ modeRow <- expectHit service differentMode false
+ options <- successful (TC.emittedLLVM service producer "--probe-io" ["--option-a", "--option-b"] target 60)
+ optionRow <- expectHit service options false
+ reversed <- successful (TC.emittedLLVM service producer "--probe-io" ["--option-b", "--option-a"] target 60)
+ reversedRow <- expectHit service reversed false
+ H.assert (S.not (sameKey firstRow modeRow) && S.not (sameKey optionRow reversedRow)) "emission mode or ordered options were absent from the cache key"
+
+ producer2 <- compileProbe service directory 2
+ changed <- successful (TC.emittedLLVM service producer2 "--probe-io" [] target 60)
+ changedRow <- expectHit service changed false
+ H.assert (S.not (sameKey firstRow changedRow)) "changed producer bytes reused the old emission"
+ count <- countCalls calls
+ H.assert (count == 5) "mode, options or producer controls skipped real emission"
+
+ let rejected = directory ++ "/rejected.xmlf"
+ writeFile rejected "transient rejected target"
+ setEnv "MLF_TEST_COMPILATION_PROBE_FAIL" "1"
+ before <- builds service
+ S.mapM_ (\_ -> do
+   result <- TC.emittedLLVM service producer2 "--probe-io" [] rejected 60
+   case result of
+    Left ((,,) code _ err) -> H.assert (code == 1 && eqString err "probe rejected\n") "emitter rejection changed"
+    Right _ -> H.fail "rejected emitter result was accepted") [0, 1]
+ after <- builds service
+ count <- countCalls calls
+ H.assert (count == 7 && before == after) "failed emission was cached or left the shared-key lock held"
+ unsetEnv "MLF_TEST_COMPILATION_PROBE_FAIL"
+ repaired <- successful (TC.emittedLLVM service producer2 "--probe-io" [] rejected 60)
+ ignored <- expectHit service repaired false
+ repairedAgain <- successful (TC.emittedLLVM service producer2 "--probe-io" [] rejected 60)
+ ignored <- expectHit service repairedAgain true
+ count <- countCalls calls
+ H.assert (count == 8) "transient failure did not recover on the same key"
+
+ let warning = directory ++ "/warning.xmlf"
+ writeFile warning "diagnostic target"
+ setEnv "MLF_TEST_COMPILATION_PROBE_FAIL" "warning"
+ S.mapM_ (\_ -> do
+   result <- TC.emittedLLVM service producer2 "--probe-io" [] warning 60
+   case result of
+    Left ((,,) code _ err) -> H.assert (code == 0 && eqString err "probe diagnostic\n") "successful emitter diagnostic was discarded"
+    Right _ -> H.fail "emitter diagnostic was cached as a clean success") [0, 1]
+ count <- countCalls calls
+ H.assert (count == 10) "emitter diagnostics were negatively cached"
+ S.mapM_ unsetEnv ["MLF_TEST_COMPILATION_PROBE_COUNT", "MLF_TEST_COMPILATION_PROBE_LLVM", "MLF_TEST_COMPILATION_PROBE_FAIL"]
+
+-- The registered fast path may avoid rehashing a large producer on a hit, but
+-- changing that producer must prevent the invocation from qualifying. Run this
+-- negative control in a child because Package.Build reports such changes by
+-- exiting, and require evidence that setup and the intended mutation occurred.
+registeredProducerControl directory compiler llvm = do
+ let work = directory ++ "/registered-producer-change"
+ O.mkdir work
+ self <- getExecutablePath
+ setEnv "MLF_TEST_COMPILATION_REGISTERED_LLVM" llvm
+ code <- O.exec work [self, "--test-compilation-producer-changed", compiler] ""
+   (work ++ "/case.out") (work ++ "/case.err") 1800
+ unsetEnv "MLF_TEST_COMPILATION_REGISTERED_LLVM"
+ err <- readFile (work ++ "/case.err")
+ mutation <- O.readOptional (work ++ "/producer-mutated")
+ H.assert (code /= 0 && eqString mutation "registered producer bytes changed\n" &&
+   H.contains "test compilation input changed:" err && H.contains "emitter-probe" err)
+   ("registered producer change was not rejected at the compilation boundary: " ++ err)
+ saved <- J.read (work ++ "/build/build-report.json")
+ H.assert (S.not (J.getBool "complete" false saved)) "changed registered producer completed its compilation report"
+
+producerChanged : String -> IO ()
+producerChanged compiler = do
+ directory <- canonicalPath "."
+ root <- getEnv "MLF_COMPILATION_CACHE_TEST_ROOT"
+ llvm <- getEnv "MLF_TEST_COMPILATION_REGISTERED_LLVM"
+ let calls = directory ++ "/emitter.calls"
+ let target = directory ++ "/target.xmlf"
+ writeFile calls ""
+ writeFile target "registered producer control"
+ setEnv "MLF_TEST_COMPILATION_PROBE_COUNT" calls
+ setEnv "MLF_TEST_COMPILATION_PROBE_LLVM" llvm
+ unsetEnv "MLF_TEST_COMPILATION_PROBE_FAIL"
+ service <- TC.open root compiler (directory ++ "/cache") (directory ++ "/build")
+ producer <- compileProbe service directory 1
+ identity <- TC.registerProducer service producer
+ first <- successful (TC.emittedLLVMWithIdentity service identity "--probe" [] target 60)
+ firstRow <- expectHit service first false
+ warm <- successful (TC.emittedLLVMWithIdentity service identity "--probe" [] target 60)
+ warmRow <- expectHit service warm true
+ count <- countCalls calls
+ H.assert (sameKey firstRow warmRow && count == 1) "registered producer warm setup did not reuse emission"
+ changed <- compileProbe service directory 2
+ digest <- fileDigest changed
+ H.assert (S.not (eqString digest (J.getText "sha256" "" identity))) "registered producer mutation did not change executable bytes"
+ writeFile (directory ++ "/producer-mutated") "registered producer bytes changed\n"
+ ignored <- TC.emittedLLVMWithIdentity service identity "--probe" [] target 60
+ TC.finish service
+ H.fail "changed registered producer was allowed to qualify"
+
+transport service root name = do
+ let source = root ++ "/tests/native/" ++ name ++ ".c"
+ dependencies <- B.hashFiles [source]
+ native <- TC.nativeIdentity service []
+ object <- TC.cObject service native source dependencies (O.words "-O2 -std=c11 -Wall -Wextra -Werror")
+ linked <- TC.linkObjects service native [object ++ "/object.o"] []
+ O.executable (linked ++ "/program")
+
+backendControls service root directory compiler flags native target = do
+ let builder = TC.builder service
+ let runtimeSource = root ++ "/runtime/mlf_runtime.c"
+ let cflags = S.append (O.words "-O2 -std=c11 -Wall -Wextra -Werror") (S.filter (O.starts "-I") flags)
+ let interpose = O.words "-Dgetline=mlf_test_getline -Dfwrite=mlf_test_fwrite -Dfputc=mlf_test_fputc -Dfflush=mlf_test_fflush"
+ runtime <- TC.cObject service native runtimeSource (J.get "runtime" (B.tools builder)) (S.append cflags interpose)
+ let traceSource = root ++ "/tests/native/native_trace.c"
+ traceInputs <- B.hashFiles [traceSource]
+ trace <- TC.cObject service native traceSource traceInputs (O.words "-O2 -std=c11 -Wall -Wextra -Werror")
+ host <- transport service root "host_support"
+ binaryFiles <- transport service root "binary_files"
+ setEnv "MLF_TEST_HOST_SUPPORT" host
+ setEnv "MLF_TEST_BINARY_FILES" binaryFiles
+ setEnv "MLF_TEST_SOURCE_ROOT" root
+ setEnv "MLF_TEST_COMPILATION_CACHE" (directory ++ "/backend-cache")
+ setEnv "MLF_BOOTSTRAP_COMPILER" compiler
+ setEnv "MLF_BOOTSTRAP_LLVM" compiler
+ setEnv "MLF_LLVM_TEST_ABI" "compact-gc"
+ setEnv "MLF_BOOTSTRAP_TIMEOUT_SECONDS" "60"
+ source <- readFile target
+ let runGroup name input expected cached = do
+       let work = directory ++ "/" ++ name
+       let matrix = work ++ "/matrix-compact-gc"
+       O.mkdir matrix
+       O.copy (runtime ++ "/object.o") (matrix ++ "/runtime.o")
+       O.copy (trace ++ "/object.o") (work ++ "/trace.o")
+       writeFile (work ++ "/flags.bin") (O.pack flags)
+       setEnv "MLF_TEST_WORK" work
+       setEnv "MLF_TEST_ROOT" work
+       setEnv "MLF_TEST_LINK_FLAGS_FILE" (work ++ "/flags.bin")
+       Backends.withBackends (\context -> do
+         Backends.inRegisteredCase context "compilation-cache/runtime" "independent runtime observation" (do
+           observed <- Backends.executeNativeSerialized context Backends.IOEntry (Backends.Input input false) source
+           case Backends.outcome observed of { Left _ -> H.fail "backend cache probe failed"; Right _ -> return () }
+           H.assert (eqString (Backends.output observed) expected && eqString (Backends.remaining observed) "")
+             "warm backend reused an old runtime observation"
+           -- A warm artifact cannot turn a deliberately wrong independent
+           -- expectation into a pass.
+           failure <- Assert.run (Backends.recoverCase
+             (Backends.assertCase (eqString (Backends.output observed) "wrong output") "deliberate cache oracle mismatch"))
+           case failure of
+             Left message -> H.assert (eqString (Assert.message message) "deliberate cache oracle mismatch") "warm assertion reported the wrong failure"
+             Right _ -> H.fail "warm compilation suppressed an assertion")
+         count <- Backends.auditNativeBackends context
+         H.assert (count == 1) "backend cache probe lost a runtime coordinate")
+       emission <- J.read (matrix ++ "/case-0.emission.json")
+       linked <- J.read (matrix ++ "/case-0.native.json")
+       H.assert (H.eq (J.getBool "cached" false emission) cached && H.eq (J.getBool "cached" false linked) cached)
+         "actual backend wrapper did not share checked compilation across groups"
+       observation <- J.read (matrix ++ "/case-0-llvm.observation.json")
+       H.assert (eqString (J.getText "status" "" observation) "observed") "backend execution did not retain its own observation"
+       status <- J.read (matrix ++ "/case-0-llvm.status.json")
+       H.assert (J.equal (J.get "exit_code" status) (J.num 0)) "backend observation has no successful process receipt"
+       report <- J.read (matrix ++ "/compilation/build-report.json")
+       H.assert (J.getBool "complete" false report) "backend compilation report did not finish"
+       return ((,) emission linked)
+ (,) firstEmission firstNative <- runGroup "backend-first" "11\n" "12\n" false
+ (,) secondEmission secondNative <- runGroup "backend-second" "21\n" "22\n" true
+ H.assert (sameKey firstEmission secondEmission && sameKey firstNative secondNative)
+   "backend artifact keys retained their invocation directory"
+
+run : String -> IO ()
+run compiler = do
+ directory <- canonicalPath "."
+ root <- getEnv "MLF_COMPILATION_CACHE_TEST_ROOT"
+ let cache = directory ++ "/shared-cache"
+ let source = directory ++ "/Main.emlf"
+ let sourceText = "module Main where\nmain = do { line <- getLine; printInt (readInt line + 1) }\n"
+ writeFile source sourceText
+ cold <- TC.open root compiler cache (directory ++ "/first-group")
+ checked <- TC.checkedSource cold [] source
+ checkedRow <- expectHit cold checked false
+ emitted <- successful (TC.emittedLLVM cold compiler "--xmlf-to-llvm-io" [] (checked ++ "/target.xmlf") 60)
+ emittedRow <- expectHit cold emitted false
+ let builder = TC.builder cold
+ gc <- TC.gcFlags cold
+ windows <- O.isWindows
+ let hostFlags = S.append (B.stackFlags builder) (if windows then ["-lshell32"] else [])
+ let flags = S.append (J.getStrings "flags" (J.get "gmp" (B.tools builder)))
+       (S.append (J.getStrings "flags" gc) (S.append hostFlags ["-lm"]))
+ native <- TC.nativeIdentity cold flags
+ let runtimeSource = root ++ "/runtime/mlf_runtime.c"
+ runtime <- TC.cObject cold native runtimeSource (J.get "runtime" (B.tools builder))
+   (S.append (O.words "-O2 -std=c11 -Wall -Wextra -Werror") (S.filter (O.starts "-I") flags))
+ linked <- successful (TC.nativeLLVMWithIdentityResult cold native (emitted ++ "/program.ll") [runtime ++ "/object.o"] flags)
+ linkedRow <- expectHit cold linked false
+ runNative directory "first-run" linked "41\n" "42\n"
+ TC.finish cold
+
+ -- A new report/output directory must reuse the same checked store. Relocated
+ -- xMLF, LLVM and runtime object inputs retain content identities.
+ warm <- TC.open root compiler cache (directory ++ "/second-group")
+ checkedAgain <- TC.checkedSource warm [] source
+ checkedWarm <- expectHit warm checkedAgain true
+ let target = directory ++ "/relocated.xmlf"
+ O.copy (checkedAgain ++ "/target.xmlf") target
+ emittedAgain <- successful (TC.emittedLLVM warm compiler "--xmlf-to-llvm-io" [] target 60)
+ emittedWarm <- expectHit warm emittedAgain true
+ let llvm = directory ++ "/relocated.ll"
+ let object = directory ++ "/relocated-runtime.o"
+ O.copy (emittedAgain ++ "/program.ll") llvm
+ O.copy (runtime ++ "/object.o") object
+ warmNative <- TC.nativeIdentity warm flags
+ linkedAgain <- successful (TC.nativeLLVMWithIdentityResult warm warmNative llvm [object] flags)
+ linkedWarm <- expectHit warm linkedAgain true
+ H.assert (sameKey checkedRow checkedWarm && sameKey emittedRow emittedWarm && sameKey linkedRow linkedWarm)
+   "cross-directory checked products did not retain their identities"
+ runNative directory "second-run" linkedAgain "99\n" "100\n"
+
+ writeFile (emittedAgain ++ "/program.ll") "corrupt LLVM"
+ emissionRepair <- successful (TC.emittedLLVM warm compiler "--xmlf-to-llvm-io" [] target 60)
+ emissionRepairRow <- expectHit warm emissionRepair false
+ H.assert (sameKey emittedRow emissionRepairRow) "LLVM corruption did not rebuild the same artifact"
+ executable <- O.executable (linkedAgain ++ "/program")
+ writeFile executable "corrupt native program"
+ nativeRepair <- successful (TC.nativeLLVMWithIdentityResult warm warmNative llvm [object] flags)
+ nativeRepairRow <- expectHit warm nativeRepair false
+ H.assert (sameKey linkedRow nativeRepairRow) "native corruption did not rebuild the same artifact"
+ runNative directory "repaired-run" nativeRepair "6\n" "7\n"
+
+ let o0flags = S.append flags ["-O0"]
+ o0native <- TC.nativeIdentity warm o0flags
+ o0 <- successful (TC.nativeLLVMWithIdentityResult warm o0native llvm [object] o0flags)
+ o0row <- expectHit warm o0 false
+ H.assert (S.not (sameKey linkedRow o0row)) "different native optimization reused an old executable"
+ runNative directory "o0-run" o0 "16\n" "17\n"
+
+ let extraSource = directory ++ "/linked-input.c"
+ let extra = directory ++ "/linked-input.o"
+ writeFile extraSource "int mlf_compilation_cache_probe = 1;\n"
+ O.run directory [B.clang (TC.builder warm), "-c", extraSource, "-o", extra]
+ added <- successful (TC.nativeLLVMWithIdentityResult warm warmNative llvm [object, extra] flags)
+ addedRow <- expectHit warm added false
+ writeFile extraSource "int mlf_compilation_cache_probe = 2;\n"
+ O.run directory [B.clang (TC.builder warm), "-c", extraSource, "-o", extra]
+ changed <- successful (TC.nativeLLVMWithIdentityResult warm warmNative llvm [object, extra] flags)
+ changedRow <- expectHit warm changed false
+ H.assert (S.not (sameKey addedRow changedRow)) "changed runtime/helper object bytes reused an executable"
+ runNative directory "object-change-run" changed "20\n" "21\n"
+
+ let invalid = directory ++ "/invalid.ll"
+ writeFile invalid "not an LLVM module\n"
+ beforeCommands <- commands warm
+ beforeBuilds <- builds warm
+ S.mapM_ (\_ -> ioBind (TC.nativeLLVMWithIdentityResult warm warmNative invalid [object] flags) reject) [0, 1]
+ afterCommands <- commands warm
+ afterBuilds <- builds warm
+ H.assert (afterCommands == beforeCommands + 2 && afterBuilds == beforeBuilds)
+   "native failure was cached or prevented a second same-key attempt"
+
+ emitterControls warm directory llvm target
+ registeredProducerControl directory compiler llvm
+ backendControls warm root directory compiler flags warmNative target
+ writeFile source "module Main where\nmain = do { line <- getLine; printInt (readInt line + 2) }\n"
+ sourceChanged <- TC.checkedSource warm [] source
+ sourceChangedRow <- expectHit warm sourceChanged false
+ H.assert (S.not (sameKey checkedRow sourceChangedRow)) "source edit reused the checked target"
+ writeFile source sourceText
+ sourceRestored <- TC.checkedSource warm [] source
+ restoredRow <- expectHit warm sourceRestored true
+ H.assert (sameKey checkedRow restoredRow) "restored source did not reuse its checked target"
+ TC.finish warm
+
+ fresh <- TC.open root compiler (directory ++ "/private-cold-cache") (directory ++ "/fresh-group")
+ freshChecked <- TC.checkedSource fresh [] source
+ freshRow <- expectHit fresh freshChecked false
+ H.assert (sameKey checkedRow freshRow) "fresh-store control changed the semantic key"
+ TC.finish fresh
+ putStrLn "PASS checked test compilation service"

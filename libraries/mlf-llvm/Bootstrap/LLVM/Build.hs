@@ -9,16 +9,30 @@ module Bootstrap.LLVM.Build where {
   import qualified Bootstrap.Map as M;
   import qualified Bootstrap.Set as S;
   import qualified Bootstrap.Primitive as P;
+  import qualified Bootstrap.LLVM.FunctionPolicy as Policy;
   import qualified Bootstrap.LLVM.Analysis as A;
   import qualified Bootstrap.LLVM.Optimize as O;
   import qualified Bootstrap.LLVM.Result as R;
   import qualified Bootstrap.LLVM.LazyProducer as V;
-  data CGBinding = CGBinding String Bool | CGSlot String Bool;
+  -- A boxed worker parameter can carry an evaluated indirection between calls.
+  data CGBinding = CGBinding String Bool | CGWorkerArgument String Bool | CGSlot String Bool;
   data Scalar = Boxed String | Floating String;
   data NativeMode = General | UnboxedDouble | NonnegativeInt | SmallIndex;
-  data FunctionScope = FunctionScope (Map XName A.WorkerFunction) (Map XName (Maybe (Set XName)));
+  data WorkerEscapes = WorkerEscapes IntSet IntSet IntSet;
+  data FunctionScope = FunctionScope (Map XName A.WorkerFunction)
+    (Map XName (Maybe (Set XName))) (Maybe WorkerEscapes);
+  data CaseDispatch = SingleCase | HeapCases | ImmediateCases | BinaryCase Int Int;
+  data ConstructorLayout = ConstructorLayout (Map String ((,) Int Int)) (Map Int ((,,) Int Int CaseDispatch));
+  data FunctionInstructions = FunctionInstructions Int ([] String) Policy.Facts;
+  emptyInstructions name = FunctionInstructions 0 [] (Policy.empty name);
+  instructionFacts state = case functionInstructions state of { FunctionInstructions _ _ facts -> facts };
+  markInstruction update = modify (\state -> case functionInstructions state of {
+    FunctionInstructions slot lines facts -> let { next = update facts } in
+      seq next (withInstructions (FunctionInstructions slot lines next) state)
+  });
+  emittedCount state = Policy.instructionCount (instructionFacts state);
   data Output =
-    Output Int ([] String) String ([] String) ([] String) (Map String ((,) Int Int)) FunctionScope (Set
+    Output Int FunctionInstructions String ([] String) ([] String) ConstructorLayout FunctionScope (Set
                                                                                                                 String) (Map
                                                                                                                         XName
                                                                                                                         String) (Set
@@ -61,8 +75,10 @@ module Bootstrap.LLVM.Build where {
   withSerial value (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 f21 f22) =
     seq value (Output value f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 f21 f22);
   instructions :: Output -> [] String;
-  instructions (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 f21 f22) = f1;
-  withInstructions :: [] String -> Output -> Output;
+  instructions state = case functionInstructions state of { FunctionInstructions _ lines _ -> lines };
+  functionInstructions :: Output -> FunctionInstructions;
+  functionInstructions (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 f21 f22) = f1;
+  withInstructions :: FunctionInstructions -> Output -> Output;
   withInstructions value (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 f21 f22) =
     Output f0 value f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 f21 f22;
   block :: Output -> String;
@@ -81,18 +97,25 @@ module Bootstrap.LLVM.Build where {
   withConstants value (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 f21 f22) =
     Output f0 f1 f2 f3 value f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 f21 f22;
   constructors :: Output -> Map String ((,) Int Int);
-  constructors (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 f21 f22) = f5;
+  constructors state = case constructorLayout state of { ConstructorLayout tags _ -> tags };
+  caseDispatches :: Output -> Map Int ((,,) Int Int CaseDispatch);
+  caseDispatches state = case constructorLayout state of { ConstructorLayout _ plans -> plans };
+  constructorLayout :: Output -> ConstructorLayout;
+  constructorLayout (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 f21 f22) = f5;
   withConstructors :: Map String ((,) Int Int) -> Output -> Output;
   withConstructors value (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 f21 f22) =
-    Output f0 f1 f2 f3 f4 value f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 f21 f22;
+    Output f0 f1 f2 f3 f4 (ConstructorLayout value M.empty) f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 f21 f22;
   functions :: Output -> Map XName A.WorkerFunction;
-  functions (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 f21 f22) = case f6 of { FunctionScope fs _ -> fs };
+  functions (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 f21 f22) = case f6 of { FunctionScope fs _ _ -> fs };
+  largeWorkerModule state = M.size (functions state) > 128;
   withFunctions :: Map XName A.WorkerFunction -> Output -> Output;
   withFunctions value (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 f21 f22) =
-    case f6 of { FunctionScope _ names ->
-      Output f0 f1 f2 f3 f4 f5 (FunctionScope value names) f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 f21 f22 };
+    case f6 of { FunctionScope _ names _ ->
+      Output f0 f1 f2 f3 f4 f5 (FunctionScope value names Nothing) f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 f21 f22 };
+  workerEscapeIndex :: Output -> Maybe WorkerEscapes;
+  workerEscapeIndex (Output _ _ _ _ _ _ (FunctionScope _ _ index) _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) = index;
   callbackNames :: Output -> XName -> XErased -> [] XName;
-  callbackNames (Output _ _ _ _ _ _ (FunctionScope fs names) _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) binder body =
+  callbackNames (Output _ _ _ _ _ _ (FunctionScope fs names _) _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) binder body =
     S.toList (A.lambdaNeeded fs names binder body);
 
   workers :: Output -> Set String;
@@ -225,9 +248,9 @@ module Bootstrap.LLVM.Build where {
   compareKernel :: (,) XName ([] NativeMode) -> (,) XName ([] NativeMode) -> Int;
   compareKernel = L.comparePair O.compareName (L.compareList compareMode);
   operand :: CGBinding -> String;
-  operand binding = case binding of { CGBinding value _ -> value; CGSlot _ _ -> panic "LLVM slot operand must be loaded" };
+  operand binding = case binding of { CGBinding value _ -> value; CGWorkerArgument value _ -> value; CGSlot _ _ -> panic "LLVM slot operand must be loaded" };
   evaluated :: CGBinding -> Bool;
-  evaluated binding = case binding of { CGBinding _ forced -> forced; CGSlot _ forced -> forced };
+  evaluated binding = case binding of { CGBinding _ forced -> forced; CGWorkerArgument _ forced -> forced; CGSlot _ forced -> forced };
   fresh :: String -> Build String;
   fresh prefix =
     do {
@@ -236,25 +259,41 @@ module Bootstrap.LLVM.Build where {
       cgPure (prefix ++ showInt n)
     };
   emit :: String -> Build ();
-  emit line = modify (\state -> withInstructions ((:) line (instructions state)) state);
+  emit line = modify (\state -> case functionInstructions state of {
+    FunctionInstructions next lines facts -> let { updated = Policy.instruction facts } in
+      seq updated (withInstructions (FunctionInstructions next ((:) line lines) updated) state)
+  });
   label :: String -> Build ();
   label name =
     do {
       emit (name ++ ":");
       modify (withBlock name)
     };
+  loopLabel name = do { markInstruction Policy.markLoop; label name };
+  mustTailPointer target arguments = do {
+    markInstruction Policy.markTail;
+    result ("musttail call ptr " ++ target ++ "(" ++ L.intercalate ", " arguments ++ ")")
+  };
   result :: String -> Build String;
   result expression =
-    do {
-      register <- fresh "%v";
-      emit ("  " ++ (register ++ (" = " ++ expression)));
-      cgPure register
-    };
+    Build (\state -> case functionInstructions state of {
+      FunctionInstructions slot lines facts -> let {
+        updated = Policy.instruction facts;
+        register = "%" ++ showInt slot;
+        line = "  " ++ register ++ " = " ++ expression;
+        next = L.advanceIdentity slot 1;
+        -- Keep module symbols stable when an instruction switches to a local slot.
+        after = withSerial (L.advanceIdentity (serial state) 1)
+          (withInstructions (FunctionInstructions next ((:) line lines) updated) state)
+      } in seq updated (seq next (seq after (Right ((,) register after))))
+    });
   call :: String -> [] String -> Build String;
   call name arguments = callTyped "ptr" name arguments;
   callTyped :: String -> String -> [] String -> Build String;
-  callTyped ty name arguments =
-    result ("call " ++ (ty ++ (" " ++ (name ++ ("(" ++ (L.intercalate ", " arguments ++ ")"))))));
+  callTyped ty name arguments = do {
+    if eqString ty "ptr" then markInstruction (Policy.pointerCall name) else cgPure ();
+    result ("call " ++ (ty ++ (" " ++ (name ++ ("(" ++ (L.intercalate ", " arguments ++ ")"))))))
+  };
   pointer :: String -> String;
   pointer value = ("ptr " ++ value);
   number :: Int -> String;
@@ -306,8 +345,9 @@ module Bootstrap.LLVM.Build where {
   -- Definition and branch boundaries below restrict facts to dominated uses.
   forceBinding :: CGBinding -> Build String;
   forceBinding (CGSlot slot forced) = do { value <- result ("load volatile ptr, ptr " ++ slot ++ ", align 8"); forceBinding (CGBinding value forced) };
-  forceBinding (CGBinding value forced) =
-    if forced
+  forceBinding binding =
+    let { value = operand binding } in
+    if evaluated binding
     then cgPure value
     else do {
            previous <- gets (\state -> M.lookup compareString value (forcedValues state));
@@ -315,7 +355,10 @@ module Bootstrap.LLVM.Build where {
              Just result -> cgPure result;
              Nothing ->
                do {
-                 result <- forceValue value;
+                 result <- case binding of {
+                   CGWorkerArgument _ _ -> call "@mlf.force.worker" (args1 (pointer value));
+                   _ -> forceValue value
+                 };
                  modify
                    (\state ->
                       withForcedValues
@@ -333,8 +376,8 @@ module Bootstrap.LLVM.Build where {
     };
   bindingOperand :: CGBinding -> Build String;
   bindingOperand (CGSlot slot _) = result ("load volatile ptr, ptr " ++ slot ++ ", align 8");
-  bindingOperand (CGBinding value forced) =
-    gets (\state -> L.fromMaybe value (M.lookup compareString value (forcedValues state)));
+  bindingOperand binding =
+    let { value = operand binding } in gets (\state -> L.fromMaybe value (M.lookup compareString value (forcedValues state)));
   definition :: String -> [] String -> Build String -> Build ();
   definition name args body = definitionTyped "ptr" name args body;
   definitionTyped :: String -> String -> [] String -> Build String -> Build ();
@@ -354,26 +397,26 @@ module Bootstrap.LLVM.Build where {
       saved <- get;
       modify
         (\state ->
-           withInstructions []
+           withInstructions (emptyInstructions name)
              (withBlock "entry"
                 (withScalarRanges M.empty
                    (withArrayViews M.empty
                       (withUnboxedDoubles M.empty (withForcedValues M.empty state))))));
       body;
       code <- gets (\state -> L.reverse (instructions state));
+      facts <- gets instructionFacts;
       collectors <- gets collectingKernels;
       let {
         collectingWorker =
           L.any (\n -> eqString (showInt (O.nameId n)) (symbolIdentity name)) (S.toList collectors)
       };
       let {
-        attributes =
-          if (startsWith "@mlf.numeric." name &&
-              (L.not (startsWith "@mlf.numeric.entry." name) && L.not collectingWorker))
-          then " alwaysinline"
-          else if startsWith "@mlf.worker." name && (keepWorker || workerBodyLimit 64 code)
-               then " noinline"
-               else ""
+        attributes = Policy.attributes (largeWorkerModule saved) keepWorker collectingWorker name facts;
+        -- An optnone closure must execute even a pure worker that never returns.
+        -- LLVM lowers sideeffect without a runtime call, while retaining the
+        -- observable transfer during interprocedural optimization and codegen.
+        workerCode = if startsWith "@mlf.worker." name
+          then (:) "  call void @llvm.sideeffect()" code else code
       };
       let {
         text =
@@ -383,32 +426,21 @@ module Bootstrap.LLVM.Build where {
                   ("define private " ++ (ty ++ (" " ++
                    (name ++ ("(" ++ (L.intercalate ", " args ++ (")" ++ (attributes ++ " {"))))))))
                   "entry:")
-               (L.snoc code "}"))
+               (L.snoc workerCode "}"))
       };
-      modify
+      -- Store the completed function text while its instruction stream is local.
+      seq text (modify
         (\state ->
-           withInstructions (instructions saved)
+           withInstructions (functionInstructions saved)
              (withBlock (block saved)
                 (withScalarRanges (scalarRanges saved)
                    (withArrayViews (arrayViews saved)
                       (withUnboxedDoubles (unboxedDoubles saved)
                          (withForcedValues (forcedValues saved)
-                            (withDefinitions ((:) text (definitions state)) state)))))))
-    };
-  -- Keep large ordinary workers as optimization boundaries. Their bodies are
-  -- still compiled at the caller's normal optimization level; avoiding repeated
-  -- interprocedural cloning bounds code generation work. Numeric kernels retain
-  -- their independently established always-inline policy above.
-  workerBodyLimit :: Int -> [] String -> Bool;
-  workerBodyLimit remaining lines =
-    if remaining <= 0 then True else case lines of {
-      [] -> False;
-      (:) _ rest -> workerBodyLimit (remaining - 1) rest
+                            (withDefinitions ((:) text (definitions state)) state))))))))
     };
   startsWith :: String -> String -> Bool;
-  startsWith prefix value =
-    ((stringLength prefix <= stringLength value) &&
-     eqString prefix (stringSlice value 0 (stringLength prefix)));
+  startsWith = Policy.startsWith;
   symbolIdentity :: String -> String;
   symbolIdentity name = if (stringLength name < 13) then "" else symbolIdentityAt name 13 13;
   symbolIdentityAt :: String -> Int -> Int -> String;
@@ -681,16 +713,15 @@ module Bootstrap.LLVM.Build where {
            literal <- stringConstant (showInt value);
            call "@mlf_integer" (args1 (pointer (L.fst literal)))
          };
-  -- Compact constructor initialization uses shared allocation helpers. Refill,
-  -- allocator debugging and constructor audits remain runtime responsibilities.
-  -- Constructor allocation functions are private to each LLVM module.
-  -- Record their symbols with the other module-wide worker definitions.
-  callConstructor :: String -> [] String -> Build String;
-  callConstructor symbol arguments = do {
+  -- Record private allocation helpers alongside the module's worker definitions.
+  callCompactAllocation :: String -> [] String -> Build String;
+  callCompactAllocation symbol arguments = do {
     modify (\state -> let { known = workers state } in if S.member compareString symbol known
       then state else withWorkers (S.insert compareString symbol known) state);
     call symbol arguments
   };
+  callConstructor :: String -> [] String -> Build String;
+  callConstructor = callCompactAllocation;
   compactConstructor :: Int -> [] String -> Build String;
   compactConstructor tag fields =
     case fields of {

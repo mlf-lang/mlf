@@ -5,6 +5,7 @@ import MLF.Primitive (Monad, return, bind)
 import Bootstrap.Types
 import qualified Bootstrap.Std as S
 import qualified Package.OS as O
+import qualified Package.Json as J
 import qualified Tests.Helpers as H
 import qualified Tests.Coverage as Coverage
 import qualified Tests.Selection as Selection
@@ -12,11 +13,12 @@ import qualified Tests.CorePartitions as P
 import qualified Tests.CoreRegistry as Registry
 import qualified Test.Assert as A
 import qualified Test.Case as C
+import qualified Test.CaseSelection as Planned
 import qualified Test.Runner as Runner
 import qualified Test.Process as Process
+import qualified Test.Outcome as Outcome
 
--- One stimulus definition feeds both the preserved legacy counted metric and
--- the opt-in named leaves. Thirteen observations are not thirteen new oracles.
+-- Thirteen named observations retain the original counted substring metric.
 substringInputs : [] ((,) String ((,,) String String Bool))
 substringInputs =
  (:) ((,) "empty-in-empty" ((,,) "" "" true)) (
@@ -34,95 +36,233 @@ substringInputs =
  (:) ((,) "nul-miss" ((,,) "a\0c" "xa\0by" false)) (
  [])))))))))))))
 
-substringChecks : IO ()
-substringChecks =
- Coverage.mapCounted "core" "substring-executed" (\((,,) needle text expected) -> O.require (H.eq (H.contains needle text) expected) "substring adapter differs from scalar substring semantics")
-  (S.map S.snd substringInputs)
 substringCases : String -> Bool -> [] C.Case
 substringCases target complete = S.map (\((,) name ((,,) needle text expected)) ->
  Registry.scope target complete (C.test ("core/substring-adapter/" ++ name) ("substring " ++ name)
   ((:) "family:core/substring-adapter" [])
   (A.assert (H.eq (H.contains needle text) expected) "substring adapter differs from scalar substring semantics"))) substringInputs
 
--- Opt-in protocol only. Version-1 scope=full means this physical registry,
--- NEVER full logical Core qualification. All leaves are qualification:ineligible
--- until a separate exact logical union and original oracle metrics are verified.
--- Legacy campaigns below stay the default and retain their existing evidence.
+substringFamily : String
+substringFamily = "core/substring-adapter"
+
+frameworkCases : String -> Bool -> [] ((,) String ([] ((,) String Registry.Action))) -> Either String ([] C.Case)
 frameworkCases target complete families = do
  entries <- Registry.register target complete families
- let substrings = if S.elem eqString "core/substring-adapter" (S.map S.fst families) then substringCases target complete else []
- let all = S.append substrings entries
- Runner.validate all
- Right all
-frameworkChild target complete families args = do
- entries <- case frameworkCases target complete families of { Left error -> O.fatal error; Right value -> return value }
- (,) options selected <- case Runner.plan args entries of { Left error -> O.fatal error; Right value -> return value }
- -- Fatal legacy actions must never run as a multi-case child. The process
- -- supervisor performs discovery, then invokes exactly one leaf per child.
- let exact = S.any (\selector -> case selector of { Runner.Exact _ -> true; _ -> false }) (Runner.selectors options)
- O.require (Runner.listing options || exact && S.length selected == 1) "core framework child requires --list or one --exact leaf ID"
- if Runner.listing options then do
-  code <- Runner.run args entries
-  if code == 0 then return () else exitWith code
- else do
+ let substrings = if S.elem eqString substringFamily (S.map S.fst families) then substringCases target complete else []
+ Right (S.append substrings entries)
+
+inFamily : String -> C.Case -> Bool
+inFamily family entry = S.elem eqString ("family:" ++ family) (C.tags entry)
+
+-- Adapter switches belong to the parent. Both the ordinary command and the
+-- older --framework route share selection, evidence, and execution.
+data Settings = Settings String String Int
+settings : [] String -> Either String ((,) Settings ([] String))
+settings = extract (Settings "" "" 21600) []
+extract settings args remaining = case remaining of
+ (:) "--work-dir" ((:) directory rest) -> case settings of
+  Settings _ helper bound -> extract (Settings directory helper bound) args rest
+ (:) "--host-tool" ((:) helper rest) -> case settings of
+  Settings directory _ bound -> extract (Settings directory helper bound) args rest
+ (:) "--timeout" ((:) value rest) -> case settings of
+  Settings directory helper _ -> do
+   Process.ensure (Process.natural value && stringLength value <= 10) "invalid Core timeout"
+   let bound = readInt value
+   Process.ensure (bound > 0 && bound <= 2147483587) "Core timeout must be between 1 and 2147483587 seconds"
+   extract (Settings directory helper bound) args rest
+ (:) flag ((:) value rest) ->
+  if S.elem eqString flag (O.words "--exact --filter --report --format --tag --group --level --input --oracle --purpose --category --technique") then
+   extract settings ((:) value ((:) flag args)) rest
+  else extract settings ((:) flag args) ((:) value rest)
+ (:) flag [] -> Right ((,) settings (S.reverse ((:) flag args)))
+ [] -> Right ((,) settings (S.reverse args))
+
+plan : Bool -> [] String -> [] C.Case -> [] String -> Either String ((,,) Runner.Options Planned.CaseSelection Bool)
+plan complete names entries args = case args of
+ (:) "--families" _ -> do
+  (,) _ selectedFamilies <- Selection.choose names args
+  options <- Runner.parse []
+  selected <- Planned.matching (\entry -> S.any (\family -> inFamily family entry) selectedFamilies) entries
+  Right ((,,) options selected false)
+ (:) "--from" ((:) prefix []) -> do
+  Process.ensure complete "--from is supported by the complete core entry only"
+  options <- Runner.parse []
+  let substrings = S.filter (inFamily substringFamily) entries
+  let actions = S.filter (\entry -> S.not (inFamily substringFamily entry)) entries
+  let remaining = S.dropWhile (\entry -> S.not (O.starts prefix (C.name entry))) actions
+  Process.ensure (S.not (S.null remaining)) ("unknown test prefix: " ++ prefix)
+  selected <- Planned.project entries (S.append substrings remaining)
+  Right ((,,) options selected false)
+ _ -> do
+  (,) options selected <- Runner.executionPlan args entries
+  Right ((,,) options selected (complete && S.null (Runner.selectors options)))
+
+-- The older exact child route still supports read-only discovery. The case
+-- worker owns a fresh report and coverage destination set by the supervisor.
+frameworkChild : [] C.Case -> [] String -> IO ()
+frameworkChild entries args = do
+ (,) options planned <- case Runner.executionPlan args entries of { Left error -> O.fatal error; Right value -> return value }
+ if Runner.listing options then finishCode (Runner.runSelected (\_ -> return ()) options planned) else do
+  let selected = Planned.cases planned
+  reportMode options
+  let exact = S.any (\selector -> case selector of { Runner.Exact _ -> true; _ -> false }) (Runner.selectors options)
+  O.require (exact && S.length selected == 1) "core framework child requires --list or one --exact leaf ID"
   directory <- getEnv "MLF_TEST_CASE_WORK"
   O.require (stringLength directory > 0) "core framework child requires the process supervisor work directory"
-  -- Never append a leaf's metrics into a parent's full-campaign coverage file.
   setEnv "MLF_TEST_COVERAGE_REPORT" (directory ++ "/legacy-coverage.jsonl")
   unsetEnv "MLF_TEST_FAMILY_REPORT"
   Coverage.begin "core" false
-  code <- Runner.run args entries
+  code <- Runner.runSelected observe options planned
   if code == 0 then do
-   let entry = S.head selected
-   if S.elem eqString "family:core/substring-adapter" (C.tags entry) then Coverage.metric "core" "substring-executed" 1
-   else Coverage.passed "core" (C.name entry)
+   if inFamily substringFamily (S.head selected) then Coverage.metric "core" "substring-executed" 1 else return ()
    Coverage.finish "core"
-  else return ()
-  if code == 0 then return () else exitWith code
-framework target complete families args = do
- self <- getExecutablePath
- code <- Process.run (S.append args ((:) "--" ((:) self ((:) "--framework-child" []))))
+  else do { Coverage.flush; exitWith code }
+
+observe : Runner.Result -> IO ()
+observe (Runner.Result entry result) = case result of
+ Right () -> if inFamily substringFamily entry then return () else Coverage.passed "core" (C.name entry)
+ Left _ -> return ()
+
+reportMode : Runner.Options -> IO ()
+reportMode options = if Runner.json options then setEnv "MLF_TEST_CORE_JSON" "1" else unsetEnv "MLF_TEST_CORE_JSON"
+
+finishCode : IO Int -> IO ()
+finishCode operation = do
+ code <- operation
  if code == 0 then return () else exitWith code
 
-runCases : [] ((,) String (IO ())) -> IO ()
-runCases cases = S.mapM_ (\((,) label action) -> do { action; Coverage.passed "core" label; putStrLn ("PASS " ++ label) }) cases
-runFamily : [] ((,) String ([] ((,) String (IO ())))) -> String -> IO ()
-runFamily families identity = do
- if eqString identity "core/substring-adapter" then substringChecks else
-  case S.lookup eqString identity families of { Just cases -> runCases cases; Nothing -> O.fatal "unknown core family" }
- Selection.passed "core" identity
-main : String -> Bool -> Int -> [] ((,) String ([] ((,) String (IO ())))) -> IO ()
+-- Verify the ordinary result and the independent legacy evidence transport.
+-- Generated-loop metrics are copied only after validation against the frozen
+-- inventory; no counts are inferred from a scheduled or interrupted case.
+expectedCoverage : J.Json -> C.Case -> J.Json
+expectedCoverage inventory entry =
+ let metrics = J.get "metrics" (J.get "core" (J.get "suites" inventory)) in
+ let owned name =
+      (inFamily "core/hm-oracle" entry && O.starts "hm-" name) ||
+      (inFamily "core/annotation-corpus" entry && eqString "annotation-executed" name) in
+ J.set "executions" (J.stringArray ((:) (C.name entry) []))
+  (J.set "aliases" J.empty
+   (J.set "metrics" (J.Object (S.filter (\((,) name _) -> owned name) (J.items metrics))) J.empty))
+
+isolatedCase : Settings -> String -> String -> String -> String -> J.Json -> Int -> C.Case -> C.Case
+isolatedCase (Settings _ _ bound) self cwd helper runDir inventory total entry =
+ C.test (C.id entry) (C.name entry) (C.tags entry) (A.Test (do
+  let directory = runDir ++ "/" ++ C.id entry
+  let report = directory ++ "/report.jsonl"
+  let argv = (:) self ((:) "--framework-child" ((:) "--exact" ((:) (C.id entry)
+             ((:) "--format" ((:) "json" ((:) "--report" ((:) report [])))))))
+  measured <- Process.measure helper bound cwd directory argv
+  rawReport <- O.readOptional report
+  let child = Process.classifyTyped total entry measured rawReport
+  outcome <- case child of
+   Outcome.Pass -> do
+    coverage <- O.readOptional (directory ++ "/legacy-coverage.jsonl")
+    case Coverage.validateProjection inventory "core" (expectedCoverage inventory entry) coverage of
+     Left error -> return (Outcome.ProtocolError error)
+     Right checked -> do
+      S.mapM_ (\((,) name value) -> Coverage.append "core" "metric" ((:) ((,) "name" (J.str name)) ((:) ((,) "value" value) []))) (J.items (J.get "metrics" checked))
+      return Outcome.Pass
+   _ -> return child
+  raw <- Process.rawEvidence directory
+  coverageFile <- Process.rawFile directory "legacy-coverage.jsonl"
+  let artifacts = case coverageFile of { Nothing -> raw; Just file -> S.snoc raw file }
+  let result = J.set "id" (J.str (C.id entry)) (J.set "status" (J.str (Outcome.status outcome))
+       (J.set "message" (J.str (Outcome.message outcome))
+        (J.set "raw_evidence" (J.Array (S.map Process.rawJson artifacts))
+         (J.set "cleanup_status" (J.str "unverified-v1-transport") J.empty))))
+  writeFile (directory ++ "/outcome.json") (J.render result ++ "\n")
+  case outcome of
+   Outcome.Pass -> return (Right ())
+   Outcome.Cancelled _ -> do { Coverage.flush; exitWith 130 }
+   _ -> return (Left (A.Failure (Outcome.status outcome ++ ": " ++ Outcome.message outcome ++ "; evidence: " ++ directory) Nothing))))
+
+prepareProcesses : Settings -> String -> Int -> [] C.Case -> IO ([] C.Case)
+prepareProcesses settings target total selected = case settings of
+  Settings requestedWork requestedHelper _ -> do
+   workspace <- O.envDefault "MLF_TEST_WORK" ".mlf-build/test-framework"
+   let work = if eqString requestedWork "" then workspace ++ "/core-process/" ++ target else requestedWork
+   runDir <- Process.newRun work
+   self <- getExecutablePath
+   cwd <- canonicalPath "."
+   configured <- if eqString requestedHelper "" then getEnv "MLF_TEST_HOST_SUPPORT" else return requestedHelper
+   helper <- if eqString configured "" then do
+    let binary = runDir ++ "/host-support"
+    let command = S.append (O.words "clang -O2 -std=c11 -Wall -Wextra -Werror tests/native/host_support.c -o") ((:) binary [])
+    code <- O.exec cwd command "" (runDir ++ "/build.stdout") (runDir ++ "/build.stderr") 1800
+    O.require (code == 0) ("cannot build the Core process helper; see " ++ runDir ++ "/build.stderr")
+    return binary
+   else O.which configured
+   inventory <- J.read "tests/golden/unit-inventory.json"
+   return (S.map (\entry -> if Registry.isIsolated entry then isolatedCase settings self cwd helper runDir inventory total entry else entry) selected)
+
+runSelected : String -> Settings -> [] String -> [] C.Case -> Runner.Options -> Planned.CaseSelection -> Bool -> IO ()
+runSelected target settings names entries requested planned full = do
+ let selected = Planned.cases planned
+ options <- reportDestination requested
+ if Runner.listing options then finishCode (Runner.runSelected (\_ -> return ()) options planned) else do
+  let completedFamilies = S.filter (\family ->
+       let all = S.filter (inFamily family) entries in
+       S.not (S.null all) && S.length (S.filter (inFamily family) selected) == S.length all) names
+  reportMode options
+  let start = Runner.prefix "start" ++ Runner.selectionFields (S.length entries) (S.length selected) ++
+        (",\"ids\":" ++ Runner.strings (S.map C.id selected) ++ "}\n")
+  Runner.saveReport options start
+  -- A leaf selection can execute cases without completing a family.
+  let reportsFamilies = S.not (S.null completedFamilies)
+  if reportsFamilies then Selection.begin "core" full completedFamilies else return ()
+  Coverage.begin "core" full
+  workspace <- getEnv "MLF_TEST_WORK"
+  let needsScratch entry = Registry.isIsolated entry || inFamily "core/separate-compilation" entry
+  if eqString workspace "" && S.any needsScratch selected then do
+   fresh <- Process.newRun (".mlf-build/test-framework/core-fixtures/" ++ target)
+   setEnv "MLF_TEST_WORK" fresh
+  else return ()
+  code <- if S.any Registry.isIsolated selected then do
+   runnable <- prepareProcesses settings target (Planned.total planned) selected
+   Runner.runOptionsObserved observe options entries runnable
+  else Runner.runSelected observe options planned
+  if code == 0 then do
+   let substrings = S.filter (inFamily substringFamily) selected
+   if S.null substrings then return () else Coverage.metric "core" "substring-executed" (S.length substrings)
+   S.mapM_ (Selection.passed "core") completedFamilies
+   Coverage.finish "core"
+   if reportsFamilies then Selection.finish "core" else return ()
+  else do
+   Coverage.flush
+   if reportsFamilies then Selection.flush else return ()
+   exitWith code
+
+reportDestination : Runner.Options -> IO Runner.Options
+reportDestination options = case options of
+ Runner.Options listing machine path selectors ->
+  if eqString path "" then do
+   fallback <- getEnv "MLF_TEST_CASE_REPORT"
+   return (Runner.Options listing machine fallback selectors)
+  else return options
+
+main : String -> Bool -> Int -> [] ((,) String ([] ((,) String Registry.Action))) -> IO ()
 main target complete count families = do
  args <- O.allArguments
  let names = S.map S.fst families
- let cases = S.concatMap S.snd families
  let expected = if complete then P.familyNames else P.forTarget target
- O.require (S.eqList eqString names expected && Selection.validIds names && S.length cases == count) "core compilation registry changed"
- case args of
-  (:) "--framework" rest -> framework target complete families rest
-  (:) "--framework-child" rest -> frameworkChild target complete families rest
-  (:) "--framework-list" rest -> frameworkChild target complete families ((:) "--list" rest)
-  _ -> legacyMain target complete families args names cases
+ let actions = S.concatMap S.snd families
+ O.require (S.eqList eqString names expected && Selection.validIds names && S.length actions == count) "core compilation registry changed"
+ entries <- case frameworkCases target complete families of { Left error -> O.fatal error; Right value -> return value }
+ if Selection.listing args then do
+  case Runner.validate entries of { Left error -> O.fatal error; Right () -> putStr (S.unlines names) }
+ else case args of
+  (:) "--framework-child" rest -> frameworkChild entries rest
+  (:) "--framework-list" rest -> dispatch target complete names entries ((:) "--list" rest)
+  (:) "--framework" rest -> dispatch target complete names entries rest
+  _ -> dispatch target complete names entries args
 
-legacyMain target complete families args names cases =
- if Selection.listing args then putStr (S.unlines names) else case args of
-  (:) "--from" ((:) prefix []) -> do
-   O.require complete "--from is supported by the complete core entry only"
-   Coverage.begin "core" false
-   substringChecks
-   let remaining = S.dropWhile (\entry -> S.not (O.starts prefix (S.fst entry))) cases
-   O.require (S.not (S.null remaining)) ("unknown test prefix: " ++ prefix)
-   runCases remaining
-   putStrLn (showInt (S.length remaining) ++ " checks; 0 failures")
-   Coverage.finish "core"
-  _ -> do
-   (,) all selected <- case Selection.choose names args of { Left message -> O.fatal message; Right value -> return value }
-   -- Even a whole physical target is only partial evidence for logical core.
-   let full = all && complete
-   Selection.begin "core" full selected
-   Coverage.begin "core" full
-   S.mapM_ (runFamily families) selected
-   let executed = S.concatMap S.snd (S.filter (\entry -> S.elem eqString (S.fst entry) selected) families)
-   putStrLn (showInt (S.length executed) ++ " checks; 0 failures")
-   Coverage.finish "core"
-   Selection.finish "core"
+dispatch target complete names entries args =
+ case settings args of
+  Left error -> exitWithError error
+  Right ((,) configured runnerArgs) -> case plan complete names entries runnerArgs of
+   Left error -> exitWithError error
+   Right ((,,) options selected full) -> runSelected target configured names entries options selected full
+
+exitWithError error = do
+ putErr ("core: " ++ error ++ "\n")
+ exitWith 2

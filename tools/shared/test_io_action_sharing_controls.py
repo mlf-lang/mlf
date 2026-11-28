@@ -3,7 +3,6 @@
 import contextlib
 import io
 import json
-import re
 from pathlib import Path
 import subprocess
 import sys
@@ -278,60 +277,8 @@ class AdmissionControls(unittest.TestCase):
         self.assertFalse(json.loads((self.output / 'receipt.json').read_text())['complete'])
 
 
-class WorkflowControls(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        cls.workflow = (gate.ROOT / '.github/workflows/ci.yml').read_text()
-        match = re.search(r'^  native:\n(.*?)(?=^  [a-zA-Z0-9_-]+:|\Z)',
-                          cls.workflow, re.MULTILINE | re.DOTALL)
-        if match is None:
-            raise AssertionError('existing direct-host native job missing')
-        cls.job = match.group(1)
-        matches = re.findall(r'^      - name: Check lazy IO action specialization with native execution\n'
-                             r'(.*?)(?=^      - |\Z)', cls.job, re.MULTILINE | re.DOTALL)
-        if len(matches) != 1:
-            raise AssertionError('expected exactly one lazy IO regression step')
-        cls.step = matches[0]
-
-    def test_one_existing_o2_only_native_gate_without_new_matrix_or_caps(self):
-        self.assertEqual(self.workflow.count('tools/shared/test_io_action_sharing.py'), 1)
-        self.assertIn("        if: matrix.optimization == '2'\n", self.step)
-        matrix = re.findall(r"          - optimization: '([02])'\n            suite: ([a-z]+)", self.job)
-        self.assertEqual(matrix, [('2', 'all'), ('0', 'direct'), ('0', 'default'), ('0', 'framework')])
-        self.assertIn('    timeout-minutes: 120\n', self.job)
-        self.assertNotIn('timeout-minutes:', self.step)
-        self.assertNotIn('--run-timeout', self.step)
-        self.assertNotIn('--build-timeout', self.step)
-        self.assertNotIn('continue-on-error', self.step)
-
-    def test_native_step_uses_authenticated_producer_and_matching_static_gc(self):
-        for command in [
-            'set -euo pipefail',
-            'sudo apt-get install -y libgc-dev',
-            'prefix="$PWD/.mlf-build/io-action-gc"',
-            'cp /usr/include/gc.h "$prefix/include/gc.h"',
-            'cp -R /usr/include/gc "$prefix/include/gc"',
-            'archive="$(cc -print-file-name=libgc.a)"',
-            'test -f "$archive"',
-            'cp "$archive" "$prefix/lib/libgc.a"',
-            'dpkg-query -W libgc-dev > "$prefix/dependency-version.txt"',
-            '--build-receipt .mlf-build/shared-ghc/receipt.json',
-            '--output .mlf-build/io-action-sharing --clang clang --gc-prefix "$prefix"',
-        ]:
-            with self.subTest(command=command):
-                self.assertIn(command, self.step)
-        self.assertLess(self.step.index('sudo apt-get install'), self.step.index('cp /usr/include/gc.h'))
-        self.assertLess(self.step.index('cp "$archive"'), self.step.index('python3 tools/shared/test_io_action_sharing.py'))
-
-    def test_evidence_and_metadata_controls_are_retained(self):
-        for suffix in ['json', 'stdout', 'stderr', 'll', 'xmlf']:
-            self.assertIn('.mlf-build/io-action-sharing/**/*.' + suffix, self.job)
-        self.assertIn('.mlf-build/io-action-gc/dependency-version.txt', self.job)
-        upload = self.job[self.job.index('      - uses: actions/upload-artifact@'):]
-        self.assertIn('        if: always()\n', upload)
-        self.assertIn('          include-hidden-files: true\n', upload)
-        check = (gate.ROOT / 'tools/release/check.sh').read_text()
-        self.assertEqual(check.count('python3 tools/shared/test_io_action_sharing_controls.py'), 1)
+# Workflow selection, GC preparation, failure propagation and evidence uploads are
+# exercised against the parsed workflow in test-native-ci-partition.mjs.
 
 
 if __name__ == '__main__':

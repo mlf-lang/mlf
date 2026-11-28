@@ -29,6 +29,13 @@ Per-command 600-second, 6 GiB address-space, 5 GiB sampled-RSS and 2 GiB work
 limits, plus the enclosing CI watchdog, are unchanged. No retry, smaller key
 sample, relaxed oracle, or compiler optimization flag is introduced.
 
+The installed batches require `MLF-NATIVE-PROGRAM-BUILD-3` receipts with at
+least one selected native crate provider. Their `native_providers` must match
+the native `dependency_modes` entries and the installed provider contracts.
+The runner verifies the selected object and runtime digests, checks the actual
+link command against `link_objects`, and requires `runtime_reused`. These checks
+do not replace the independent output and payload-demand oracles above.
+
 ## Deliberate remaining gap
 
 This is test organization, **not a compiler-memory fix**. It no longer qualifies

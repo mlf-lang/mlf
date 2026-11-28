@@ -14,36 +14,20 @@ import hashlib
 import importlib.util
 import json
 from pathlib import Path
+from runpy import run_path
 import stat
 import sys
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / 'tools/testing'))
+from receipt_selection import identity, select
+
+PREFIX = 'source-context-cache/'
+CONTROL_PLAN = Path(__file__).with_name('context_control_plan.py')
+plan = run_path(str(CONTROL_PLAN))
+commands_for = plan['commands_for']
 BINARY_HELPER_NAMES = ('artifact_binary_reference.py', 'artifact_binary_typed.py',
                        'artifact_structure_contract.json')
-EXPECTED_COMMANDS = ["helper", "raw-final"]
-for _kind in ("query", "session"):
-    EXPECTED_COMMANDS += [_kind + "-cold", _kind + "-warm"]
-    if _kind == "query":
-        EXPECTED_COMMANDS += ["query-install-legacy", "query-mixed-old-new"]
-    EXPECTED_COMMANDS += [_kind + "-one-value-change", _kind + "-changed-warm"]
-    EXPECTED_COMMANDS += [_kind + "-" + suffix for suffix in
-                          ("missing-context", "corrupt-context", "corrupt-record")]
-
-EXPECTED_COMMANDS += ["left-legacy", "lock-after-legacy", "left-source", "lock-after-source",
-                      "left-session", "lock-after-session", "empty-stale-success",
-                      "empty-directory-failure", "lock-after-empty-directory", "cleanup-dual-failure",
-                      "lock-after-cleanup-dual", "concurrent-a", "concurrent-b"]
-
-EXPECTED_COMMANDS += ["memo-helper", "memo-query", "memo-session"]
-
-EXPECTED_COMMANDS += ["context-directory-setup", "context-directory-reject", "context-stage-cleanup-failure"]
-
-EXPECTED_COMMANDS += ["decoder-differential"]
-
-EXPECTED_COMMANDS += ["window-helper", "session-window-raw-final"]
-LEGACY_QUERY_COMMANDS = [name for name in EXPECTED_COMMANDS
-                         if not (name.startswith('session-') or name in
-                                 ('left-session', 'lock-after-session', 'memo-session'))]
 
 def require(ok, message):
     if not ok:
@@ -87,18 +71,20 @@ def closed_tree(root):
     return result
 
 
-def verify_control_receipt(path, binary, python, controls, inspector_hashes, legacy_query_only=False):
+def verify_control_receipt(path, binary, python, controls, inspector_hashes,
+                           selected=None):
     receipt = json.loads(path.read_text())
     require(receipt.get('complete') is True and receipt.get('fixture_sha256') == sha(binary),
             'controls did not complete against this fixture')
     require(receipt.get('binary_inspector_inputs') == inspector_hashes,
             'controls did not use the pinned independent binary/typed inspectors')
     rows = receipt.get('commands', [])
-    expected = LEGACY_QUERY_COMMANDS if legacy_query_only else EXPECTED_COMMANDS
-    require(receipt.get('legacy_query_only') is legacy_query_only, 'control scope mismatch')
+    expected = commands_for(selected)
+    if selected is not None or 'planned_commands' in receipt:
+        require(receipt.get('selected_case') == selected and receipt.get('planned_commands') == expected,
+                'inner selected phase or prerequisite plan differs')
     require([r.get('name') for r in rows] == expected, 'fixed selected command inventory differs')
-    require(set(receipt.get('drivers', {})) == ({'query'} if legacy_query_only else {'query', 'session'}),
-            'selected actual drivers required')
+    require(set(receipt.get('drivers', {})) == set(drivers_for(expected)), 'selected actual drivers required')
     for row in rows:
         require(row.get('state') == 'passed' and row.get('exit_code') == 0,
                 'nonpassing inner command: ' + str(row.get('name')))
@@ -120,18 +106,30 @@ def verify_control_receipt(path, binary, python, controls, inspector_hashes, leg
     return receipt
 
 
+def drivers_for(command_names):
+    return ['query'] if 'query-cold' in command_names else []
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--source-root', type=Path, default=ROOT)
-    parser.add_argument('--build-receipt', type=Path, required=True)
+    parser.add_argument('--build-receipt', type=Path)
+    parser.add_argument('--framework-list', action='store_true')
     parser.add_argument('--fixture', type=Path)
     parser.add_argument('--controls', type=Path)
-    parser.add_argument('--output', type=Path, required=True)
-    parser.add_argument('--legacy-query-only', action='store_true',
-                        help='Run the 29 retained legacy Query/codec commands; graph CLI controls run separately.')
+    parser.add_argument('--output', type=Path)
     parser.add_argument('--controls-timeout', type=int, default=900,
-                        help='One bound for the whole 40-command runner; not a guarantee of each per-command ceiling.')
+                        help='One bound for the whole per-group cache runner; not a guarantee of each per-command ceiling.')
     args = parser.parse_args()
+    available = commands_for()
+    focused = select(PREFIX, available)
+    selected = [focused] if focused is not None else available
+    if args.framework_list:
+        print(json.dumps([identity(PREFIX, label) for label in selected]))
+        return
+    if args.build_receipt is None or args.output is None:
+        parser.error('--build-receipt and --output are required')
+    executed = commands_for(focused)
     require(1 <= args.controls_timeout <= 1800, 'controls timeout outside 1..1800')
     source = args.source_root.absolute()
     require(source.resolve(strict=True) == source and source.is_dir(), 'real source root required')
@@ -160,18 +158,27 @@ def main():
     sys.dont_write_bytecode = True
     python = regular(Path(sys.executable).resolve(strict=True))
     witness = regular(source / 'tools/shared/fixtures/item4/SourceKeyWitness.hs')
-    inputs = [regular(__file__), fixture, witness, controls, *inspectors, build_path, direct_path,
+    scheduler = regular(CONTROL_PLAN)
+    sibling_plan = controls.with_name(CONTROL_PLAN.name)
+    if sibling_plan.exists():
+        require(sha(regular(sibling_plan)) == sha(scheduler), 'control scheduler does not match the outer scheduler')
+    inputs = [regular(__file__), fixture, witness, controls, scheduler, *inspectors, build_path, direct_path,
+              regular(ROOT / 'tools/testing/receipt_selection.py'),
               regular(source / 'host/ghc/cbits/host.c'),
               regular(source / 'runtime/mlf_process_supervisor.c'),
               regular(source / 'runtime/mlf_byte_file.h'),
               python]
+    if sibling_plan != scheduler and sibling_plan.exists():
+        inputs.append(regular(sibling_plan))
     input_hashes = {str(path): sha(path) for path in inputs}
     build = load_actual('source_context_actual_build', build_path, source)
     td = load_actual('source_context_actual_direct', direct_path, source)
     output.mkdir()
+    inner = output / 'controls'
+    controls_receipt = inner / 'receipt.json'
     record = {'format': 1, 'complete': False, 'commands': [],
+              'selected_cases': selected, 'framework_cases': [], 'planned_controls_commands': executed,
               'mode': 'authenticated-production-source-context', 'source_root': str(source),
-              'legacy_query_only': args.legacy_query_only,
               'inputs': input_hashes, 'producer_receipt': str(receipt_path),
               'binary_inspector_inputs': inspector_hashes,
               'python_invocation': sys.executable, 'canonical_python': str(python),
@@ -259,21 +266,29 @@ def main():
         artifacts.update({str(path): sha(path) for path in [binary, main_object, main_interface, witness_object, witness_interface, *transport]})
         record['artifacts'] = artifacts
         save()
-        inner = output / 'controls'
-        selected = LEGACY_QUERY_COMMANDS if args.legacy_query_only else EXPECTED_COMMANDS
         result = runner.run('source-context-controls', [python, '-I', '-B', controls,
                             '--fixture', binary, '--output', inner,
-                            *(['--legacy-query-only'] if args.legacy_query_only else [])], timeout=args.controls_timeout)
-        require(json.loads(result.stdout) == {'complete': True, 'commands': len(selected),
-                                             'drivers': ['query'] if args.legacy_query_only else ['query', 'session']},
+                            *(['--case', focused] if focused is not None else [])], timeout=args.controls_timeout)
+        require(json.loads(result.stdout) == {'complete': True, 'commands': len(executed),
+                                             'drivers': drivers_for(executed)},
                 'controls completion summary differs')
-        verify_control_receipt(inner / 'receipt.json', binary, python, controls, inspector_hashes, args.legacy_query_only)
-        record['controls_receipt'] = {'path': str(inner / 'receipt.json'), 'sha256': sha(inner / 'receipt.json')}
-        record['controls_commands'] = selected
+        checked = verify_control_receipt(controls_receipt, binary, python, controls, inspector_hashes,
+                                         focused)
+        record['controls_receipt'] = {'path': str(controls_receipt), 'sha256': sha(controls_receipt)}
+        record['controls_commands'] = executed
         postcheck()
+        record['framework_cases'] = [row for row in checked['commands'] if row['name'] in selected]
         record.update(complete=True, producer_objects_verified_after=True, post_integrity=True)
     except BaseException as error:
         record.update(error=type(error).__name__ + ': ' + str(error), complete=False)
+        if controls_receipt.is_file():
+            try:
+                observed = json.loads(controls_receipt.read_text())
+                record['controls_receipt'] = {'path': str(controls_receipt), 'sha256': sha(controls_receipt)}
+                record['framework_cases'] = [row for row in observed.get('commands', [])
+                                             if row.get('name') in selected and row.get('state') == 'failed']
+            except (OSError, ValueError, TypeError, AttributeError) as receipt_error:
+                record['partial_receipt_error'] = str(receipt_error)
         # Always attempt the original read-only post-audit after target failure.
         if before is not None:
             try:

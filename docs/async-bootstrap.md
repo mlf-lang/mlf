@@ -41,11 +41,12 @@ the released manager; it changes no production package metadata.
 Use the matching manager for subsequent package builds with the new compiler;
 switching back to the released manager would reintroduce the interface mismatch.
 
-The compiler emits a new runtime ABI guard. Linking new output with an old
-runtime fails rather than indexing past the old primitive table. Old seed
-output retains the old compact guard and still links with the new runtime.
-The runtime includes the supervisor implementation directly, so existing
-single-runtime-object build and package paths remain usable.
+The runtime used during the v0.3.0 seed transition accepted the seed's compact
+ABI guard. The frozen bridge links its output against its bundled runtime.
+The current compiler emits `mlf_require_runtime_v5_abi`. Rebuild older
+objects before linking them with the current runtime.
+The runtime includes the supervisor implementation directly and supports
+single-runtime-object builds.
 
 The existing static runner remains available to released-seed package-manager
 workflows. The new `mlf-async` package is separate from compiler/package-manager

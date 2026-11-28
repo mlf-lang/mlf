@@ -318,7 +318,9 @@ module Bootstrap.Crate where {
     };
     Right ((,) inputs (PreparedCrate full))
   });
-  prepareFileCrate finish = prepareCrateUsing (\mode external definition sources -> let {
+  prepareFileCrate finish = prepareCrateUsing (resolveFileCrate finish);
+  prepareFileCratePhased finish = prepareCratePhasedUsing (resolveFileCrate finish);
+  resolveFileCrate finish mode external definition sources = let {
     capture bindings source env exported renamed = let {
       owner = Modules.moduleIdentity source;
       hasMain = any (\v -> eqString (Modules.valueName v) "main") (Modules.sourceValues source);
@@ -329,53 +331,49 @@ module Bootstrap.Crate where {
       result = CompilationModules bindings units reach
     } in seq (M.foldlWithKeyStrict (\_ name reachable -> seq name (seq (Set.size reachable) ())) () reach) ((,) result (finish result));
     run = Modules.resolveModuleRows (Modules.resolveFileModuleUsing capture) collect
-  } in Modules.resolveWithTermKeyUsing run mode external definition definition sources);
-  prepareCrateUsing resolve spec interfaces sources =
-    do {
-      traverseEither
-        (\source ->
-           ensure
-             (eqString (Modules.moduleIdentity source) (specEntry spec) ||
-              (case Modules.sourceBody source of {
-                 Nothing -> True;
-                 Just _ -> False
-               }))
-             ("imported module contains a top-level expression: " ++ Modules.moduleIdentity source))
-        sources;
-      external <- externalNamespaces (specDependencies spec) interfaces;
-      owners <- moduleOwners (specIdentity spec) sources interfaces;
-      let {
-        -- All names owned by a crate share this exact encoded prefix.
-        encodedOwners = M.map Separate.compactName owners;
-        encodedDefault = Separate.compactName (specIdentity spec);
-        mangle =
-          \entity ->
-            Artifact.definitionNameEncoded
-              (M.findWithDefault compareString encodedDefault (Modules.owner entity) encodedOwners)
-              entity
-      };
-      (,) inputs@(CompilationModules table resolved ownedReach) complete <- resolve (specMode spec) external mangle sources;
+  } in Modules.resolveWithTermKeyUsing run mode external definition definition sources;
+  prepareCrateUsing resolve spec interfaces sources = mapLeft (\(CompileError _ message) -> message)
+    (prepareCratePhasedUsing resolve spec interfaces sources);
+  prepareCratePhasedUsing resolve spec interfaces sources = do {
+      (,) inputs@(CompilationModules table resolved ownedReach) complete <- mapLeft (CompileError ModuleResolution) (do {
+        traverseEither
+          (\source ->
+             ensure
+               (eqString (Modules.moduleIdentity source) (specEntry spec) ||
+                (case Modules.sourceBody source of {
+                   Nothing -> True;
+                   Just _ -> False
+                 }))
+               ("imported module contains a top-level expression: " ++ Modules.moduleIdentity source))
+          sources;
+        external <- externalNamespaces (specDependencies spec) interfaces;
+        owners <- moduleOwners (specIdentity spec) sources interfaces;
+        let {
+          -- All names owned by a crate share this exact encoded prefix.
+          encodedOwners = M.map Separate.compactName owners;
+          encodedDefault = Separate.compactName (specIdentity spec);
+          mangle =
+            \entity ->
+              Artifact.definitionNameEncoded
+                (M.findWithDefault compareString encodedDefault (Modules.owner entity) encodedOwners)
+                entity
+        };
+        resolve (specMode spec) external mangle sources
+      });
       let { symbols = Modules.bindingSymbols table;
             ownBindings = Dependency.BoundValues symbols (concatMap compilationBindings resolved) };
-      -- Canonicalize only this crate's freshly resolved source declarations.
-      -- Imported checked layouts are validation context, never rewrite input.
-      -- Do this before SourcePlan, dictionary inventory and cache-key creation.
-      ownData <- D.canonicalSourceDeclarations
-        (concatMap (\p -> Artifact.crateData (snd p)) interfaces)
-        (concatMap (\r -> Modules.renamedDatatypes (compilationContents r)) resolved);
-      -- Checked class headers are ABI context. Canonicalize only this crate's
-      -- fresh headers, before selectors, dictionary inventory and saved metadata.
-      ownClasses <- Classes.canonicalSourceClasses Set.empty
-        (append (concatMap (\p -> Artifact.crateData (snd p)) interfaces) ownData)
-        (concatMap (\p -> Artifact.crateClasses (snd p)) interfaces)
-        (concatMap (\r -> Modules.renamedClasses (compilationContents r)) resolved);
+      (,) ownData ownClasses <- mapLeft (CompileError Inference) (Classes.canonicalSourceHeaders Set.empty
+        (concatMap (compose Artifact.crateData snd) interfaces)
+        (concatMap (compose Artifact.crateClasses snd) interfaces)
+        (concatMap (compose Modules.renamedDatatypes compilationContents) resolved)
+        (concatMap (compose Modules.renamedClasses compilationContents) resolved));
       let { expression = case find (\unit -> eqString (compilationName unit) (specEntry spec)) resolved of {
         Nothing -> Left "crate entry module was not resolved"; Just unit -> compilationEntry unit
       } };
-      entryAndBindings <- entryBindingsFor spec ownBindings expression;
-      case entryAndBindings of {
-        (,) entry bindings ->
-          do {
+      (,) entry bindings <- mapLeft (CompileError ModuleResolution) (entryBindingsFor spec ownBindings expression);
+      let { parts = Source.sourcePlanParts (Source.ResolvedInput bindings) };
+      body <- mapLeft (\message -> CompileError ModuleResolution (Modules.displayNames (compilationNames inputs) message)) (fst parts);
+      mapLeft (CompileError Inference) (do {
             let {
               localRows = concatMap (\unit -> map (\inst -> (,) (compilationName unit) inst)
                 (Modules.resolvedInstances (compilationContents unit))) resolved;
@@ -462,7 +460,7 @@ module Bootstrap.Crate where {
               let { closeLocal = Surface.closeIndexedInstance (Surface.helperScope bindings) };
               local <- traverseEither (\((,) metadata row) -> mapEither ((,) (fst (snd metadata))) (closeLocal (snd row)))
                 (zip localInstances localRows);
-              Source.prepareResolvedSourcePlanWithImports conventions bindings imported allData allClasses (map snd instances)
+              Source.sourcePlanFromBody conventions body (snd parts) imported allData allClasses (map snd instances)
                 (append importedInstances local) valueScopes (map (\((,) owner _) -> candidates owner) instances)
             });
             lowered <- case sourcePlan of {
@@ -479,11 +477,11 @@ module Bootstrap.Crate where {
                  lowered
                  entry
                  reach sourcePlan)
-          }
-      }
+      })
     };
-  -- Query compilation consumes only metadata-derived schemes. Upstream checked
-  -- bodies are opened later by the linker and never enter an inference key.
+  -- Retained low-level artifact-format oracles use this closed-fragment
+  -- compiler. Production source/file producers belong to CrateSession and
+  -- publish checked open groups. Upstream bodies never enter an inference key.
   compilePrepared spec interfaces prepared =
     compilePreparedWith (\object _ report -> (,) object report) spec interfaces prepared;
   -- Preserve compilePrepared's public result while allowing the file producer
@@ -494,13 +492,15 @@ module Bootstrap.Crate where {
     IO (Either String a);
   compilePreparedWith complete spec interfaces prepared =
     compilePreparedWithEncoding False complete spec interfaces prepared;
-  -- Only compileSpecFile enables this internal parsed-source encoding path.
-  -- Generic prepared/source APIs retain their original no-pool demand behavior.
+  -- Historical encoding oracles explicitly select this parsed-source path.
+  -- Both modes retain their original payload and demand behavior.
   compilePreparedWithEncoding :: forall a. Bool ->
     (Artifact.CrateObject -> String -> Query.QueryReport -> a) ->
     CrateSpec -> [] ((,) String Artifact.CrateInterface) -> PreparedCrate ->
     IO (Either String a);
-  compilePreparedWithEncoding shareEncoding complete spec interfaces prepared =
+  compilePreparedWithEncoding shareEncoding = compilePreparedUsing
+    (if shareEncoding then Query.compileParsedSourceGroups else Query.compileSourceGroups);
+  compilePreparedUsing compileGroups complete spec interfaces prepared =
     do {
       let {
         lowered = preparedLowered prepared
@@ -521,11 +521,7 @@ module Bootstrap.Crate where {
           M.empty (concatMap (\p -> Artifact.crateProtection (snd p)) interfaces)
       };
       compiled <- case preparedSourcePlan prepared of {
-        Just plan -> if shareEncoding
-          then Query.compileParsedSourceGroups (specIdentity spec) (specCache spec)
-            imported protected plan
-          else Query.compileSourceGroups (specIdentity spec) (specCache spec)
-            imported protected plan;
+        Just plan -> compileGroups (specIdentity spec) (specCache spec) imported protected plan;
         Nothing -> do {
           result <- Query.compileLoweredFileGroups (specIdentity spec) (specCache spec) imported lowered;
           ioReturn (mapEither (\((,) fragments report) -> (,,) fragments report
@@ -678,12 +674,12 @@ module Bootstrap.Crate where {
   withPreludeUsing = withPreludeLoading Artifact.loadInterfaces;
   withPreludeLoading = withPreludeMetadata (\((,) path iface) ->
     mapEither (\_ -> path) (Artifact.validateInterface iface));
+  needsBuiltin :: PreludeMode -> [] SourceModule -> Bool;
+  needsBuiltin mode = any (\source ->
+    Lexer.isSharedSyntax (Modules.sourceSyntax source) ||
+    any (\entry -> Modules.isBuiltinModule (Modules.importedModule entry)) (Modules.importsFor mode source));
   withPreludeMetadata existing load install spec sources interfaces =
-    if any
-         (\source ->
-            (Lexer.isSharedSyntax (Modules.sourceSyntax source) || any (\entry -> Modules.isBuiltinModule (Modules.importedModule entry))
-              (Modules.importsFor (specMode spec) source)))
-         sources
+    if needsBuiltin (specMode spec) sources
     then do {
            builtin <-
              case find
@@ -708,88 +704,23 @@ module Bootstrap.Crate where {
            }
          }
     else ioReturn (Right ((,) spec interfaces));
-  compileSources spec sources interfaces prefix =
-    compileSourcesWithEncoding False spec sources interfaces prefix;
-  compileSourcesWithEncoding :: Bool -> CrateSpec -> [] SourceModule ->
-    [] ((,) String Artifact.CrateInterface) -> String -> IO (Either String ());
-  compileSourcesWithEncoding shareEncoding spec sources interfaces prefix =
-    do {
-      dependencies <- withPrelude spec sources interfaces;
-      case do {
-             boundValueShared20 <- dependencies;
-             case boundValueShared20 of {
-               (,) updated loaded ->
-                 do {
-                   prepared <- prepareCrate updated loaded sources;
-                   Right ((,,) updated loaded prepared)
-                 }
-             }
-           } of {
+  loadSpecFile load file = do {
+    present <- fileExists file;
+    if not present then ioReturn (Left ("crate specification does not exist: " ++ file)) else do {
+      text <- readFile file;
+      case decodeSpec text of {
         Left message -> ioReturn (Left message);
-        Right ((,,) updated loaded prepared) ->
-          do {
-            result <- compilePreparedWithEncoding shareEncoding
-              (\object payload report -> (,,) object payload report) updated loaded prepared;
-            case result of {
-              Left message ->
-                let {
-                  names = Modules.resolvedCrateDisplayNames (preparedResolution prepared)
-                } in
-                let {
-                  diagnostics =
-                    M.union compareString
-                      (M.map (Modules.displayNames names)
-                         (preparedNames prepared))
-                      names
-                } in
-                ioReturn (Left (Modules.displayNames diagnostics message));
-              Right ((,,) object payload report) ->
-                do {
-                  written <- Artifact.writeObjectWithPayloadEither prefix object payload;
-                  case written of {
-                    Left message -> ioReturn (Left message);
-                    Right _ -> do {
-                      writeFile (prefix ++ ".queries")
-                        (Query.reportJSON (specIdentity spec)
-                           (Artifact.semanticFingerprint (Artifact.objectInterface object)) report);
-                      ioReturn (Right ())
-                    }
-                  }
-                }
-            }
-          }
+        Right spec -> do {
+          sourceResult <- loadSourcesInPackage (specIdentity spec) (specSources spec);
+          paths <- mapM canonicalPath (specDependencies spec);
+          dependencies <- load paths;
+          ioReturn (do {
+            sources <- sourceResult;
+            interfaces <- dependencies;
+            Right ((,,) (withDependencies spec paths) sources interfaces)
+          })
+        }
       }
-    };
-  compileSpecFile file prefix =
-    do {
-      present <- fileExists file;
-      if not present
-      then ioReturn (Left ("crate specification does not exist: " ++ file))
-      else do {
-             text <- readFile file;
-             case decodeSpec text of {
-               Left message -> ioReturn (Left message);
-               Right spec ->
-                 do {
-                   sourceResult <- loadSourcesInPackage (specIdentity spec) (specSources spec);
-                   paths <- mapM canonicalPath (specDependencies spec);
-                   let {
-                     normalized = withDependencies spec paths
-                   };
-                   dependencies <- Artifact.loadInterfaces paths;
-                   case do {
-                          sources <- sourceResult;
-                          interfaces <- dependencies;
-                          Right ((,) sources interfaces)
-                        } of {
-                     Left message -> ioReturn (Left message);
-                     Right ((,) sources interfaces) ->
-                       -- Both source and dependency values originate in the
-                       -- parsers/decoders above, not caller-supplied lazy ASTs.
-                       compileSourcesWithEncoding True normalized sources interfaces prefix
-                   }
-                 }
-             }
-           }
     }
+  }
 }

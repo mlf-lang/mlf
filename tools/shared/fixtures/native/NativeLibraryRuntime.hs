@@ -2,7 +2,7 @@
 -- Public checked-library API only: no copied lowering or forged receipts.
 module Main where
 import Prelude
-import Control.Monad (forM_)
+import Control.Monad (forM_, when)
 import System.Environment (getArgs)
 import qualified Bootstrap.Types as T
 import qualified Bootstrap.X.Checked as C
@@ -24,9 +24,9 @@ emit directory label values = do
      linked = foldl (\prior (i,(_,value)) -> right (C.appendSpine prior
        (right (C.check (T.XLet (T.XName i (key i)) value unit)))))
        C.emptySpine (zip [0..] values)
-     llvm = right (N.emitLibrary layout linked)
+     llvm = right (N.emitCrateLibrary layout (right (N.libraryTerm layout linked)))
  writeFile (directory ++ "/" ++ label ++ ".ll") (concatMap P.textToChars llvm)
-emitExtension directory = do
+emitExtension directory selected = do
  let saved = T.DataDecl "Saved" [] [T.ConstructorDecl "SavedValue" [T.Applied "Int" []]]
      user = T.DataDecl "User" [] [T.ConstructorDecl "UserBox" [T.Applied "Int" []]]
      ty = T.XCon "Saved" []
@@ -48,11 +48,13 @@ emitExtension directory = do
          (T.XCase (T.XApp (T.XConstructor "UserBox" []) (T.XVarTerm field)) ioUnit
            [T.XAlternative (T.XConstructorPattern "UserBox" [T.Just result])
              (T.XApp (T.XPrimitive T.PPrintInt []) (T.XVarTerm result))])])
- writeFile (directory ++ "/extension-library.ll") (concatMap P.textToChars (right (N.emitLibrary layout linked)))
+ writeFile (directory ++ "/extension-library.ll") (concatMap P.textToChars
+   (right (N.emitCrateLibrary layout (right (N.libraryTerm layout linked)))))
  forM_ [("extension-user-first",[user,saved]),("extension-saved-first",[saved,user])] $ \(label,ds) ->
-   writeFile (directory ++ "/" ++ label ++ ".ll") (concatMap P.textToChars
-     (right (N.emitRootIds consumer [V.fromInt 12] (right (C.check (T.XWithData ds body))))))
-emitOpenFields directory = do
+   when (maybe True (== label) selected) $
+     writeFile (directory ++ "/" ++ label ++ ".ll") (concatMap P.textToChars
+       (right (N.emitCrateProgram [(consumer,"saved")] (right (C.check (T.XWithData ds body))))))
+emitOpenFields directory selected = do
  let box = T.DataDecl "DoubleBox" [] [T.ConstructorDecl "MkDoubleBox" [T.Applied "Double" []]]
      boxTy = T.XCon "DoubleBox" []; boolTy = T.XCon "Bool" []; doubleTy = T.XCon "Double" []
      x = T.XName 10 "box"; field = T.XName 11 "field"
@@ -72,24 +74,39 @@ emitOpenFields directory = do
      poisonDouble = T.XApp (T.XPrimitive T.PPanic [doubleTy]) (T.XStringTerm "lazy-field-demanded")
      ioUnit = T.XCon "IO" [T.XCon "()" []]
      printInt n = T.XApp (T.XPrimitive T.PPrintInt []) (T.XIntTerm n)
- writeFile (directory ++ "/open-fields-library.ll") (concatMap P.textToChars (right (N.emitLibrary layout linked)))
+ writeFile (directory ++ "/open-fields-library.ll") (concatMap P.textToChars
+   (right (N.emitCrateLibrary layout (right (N.libraryTerm layout linked)))))
  forM_ [("open-fields-delayed","inspect",delayed),("open-fields-unused","ignore",poisonDouble),
-        ("open-fields-demanded","inspect",poisonDouble)] $ \(label,key,value) -> do
+        ("open-fields-demanded","inspect",poisonDouble)] $ \(label,key,value) ->
+  when (maybe True (== label) selected) $ do
    let function = T.XName 20 key
        condition = T.XApp (T.XVarTerm function) (T.XApp (T.XConstructor "MkDoubleBox" []) value)
        body = T.XAbs function (T.XArrow boxTy boolTy)
          (T.XApp (T.XApp (T.XApp (T.XPrimitive T.PIfThenElse [ioUnit]) condition) (printInt 1)) (printInt 0))
    writeFile (directory ++ "/" ++ label ++ ".ll") (concatMap P.textToChars
-     (right (N.emitRoot layout [key] (right (C.check (T.XWithData [box] body))))))
+     (right (N.emitCrateProgram [(layout,key)] (right (C.check (T.XWithData [box] body))))))
+poisonCases = [("poison" ++ show count, replicate count (int,poison)) | count <- [0,1,7,65]]
+ioValues = [(T.XCon "IO" [T.XCon "()" []],action),(int,poison)]
+
 main = do
  args <- getArgs
  case args of
   [directory] -> do
-   forM_ [0,1,7,65] $ \count -> emit directory ("poison" ++ show count) (replicate count (int,poison))
-   emit directory "io" [(T.XCon "IO" [T.XCon "()" []],action),(int,poison)]
-   emitExtension directory
-   emitOpenFields directory
+   forM_ poisonCases $ \(label, values) -> emit directory label values
+   emit directory "io" ioValues
+   emitExtension directory Nothing
+   emitOpenFields directory Nothing
    putStrLn "PASS emitted checked native libraries: poison0 poison1 poison7 poison65 io"
    putStrLn "PASS emitted native datatype extension: user-first saved-first"
    putStrLn "PASS emitted native open fields: delayed unused demanded"
-  _ -> error "expected output directory"
+  [directory, label] -> do
+   case lookup label (("io", ioValues) : poisonCases) of
+    Just values -> emit directory label values
+    Nothing
+      | label `elem` ["extension-user-first", "extension-saved-first"] ->
+          emitExtension directory (Just label)
+      | label `elem` ["open-fields-delayed", "open-fields-unused", "open-fields-demanded"] ->
+          emitOpenFields directory (Just label)
+      | otherwise -> fail "unknown native library fixture"
+   putStrLn "PASS emitted selected native library"
+  _ -> fail "expected output directory and optional native library label"

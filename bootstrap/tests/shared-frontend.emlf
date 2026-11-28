@@ -41,17 +41,20 @@ importedHook = case parse "main = 1" of
       Right bad -> isRight (Modules.linkModules ImplicitPrelude (Cons bad (Cons root Nil)))
 linkRaw text = case P.parseModule "Example.hs" (prologue ++ text) of { Left _ -> False; Right m -> isRight (Modules.linkModules ImplicitPrelude (Cons m Nil)) }
 
-evaluated : String -> Either String Runtime.RValue
-evaluated body = bindEither (mapLeft C.prettyError (C.compile "Example.hs" (source body))) (\result ->
-  bindEither (Runtime.prepare False (C.compiledTerm result)) (\state ->
-    Runtime.evaluate (fst state) (Runtime.REnv M.empty) (X.erase (C.compiledTerm result))))
-evaluatesInt : String -> Int -> Bool
-evaluatesInt body expected = case evaluated body of {
-  Right (Runtime.RInteger actual) -> actual == expected;
-  _ -> False
-}
-failsWith : String -> String -> Bool
-failsWith body expected = case evaluated body of { Left actual -> eqString actual expected; Right _ -> False }
+evaluated : String -> IO (Either String Runtime.RValue)
+evaluated body = do
+  compilation <- C.compile "Example.hs" (source body)
+  ioReturn (bindEither (mapLeft C.prettyError compilation) (\result ->
+    bindEither (Runtime.prepare False (C.compiledTerm result)) (\state ->
+      Runtime.evaluate (fst state) (Runtime.REnv M.empty) (X.erase (C.compiledTerm result)))))
+evaluatesInt : String -> Int -> IO Bool
+evaluatesInt body expected = do
+  result <- evaluated body
+  ioReturn (case result of { Right (Runtime.RInteger actual) -> actual == expected; _ -> False })
+failsWith : String -> String -> IO Bool
+failsWith body expected = do
+  result <- evaluated body
+  ioReturn (case result of { Left actual -> eqString actual expected; Right _ -> False })
 boxFunctor : String
 boxFunctor = "data Box a = Box a\ninstance Functor Box where { fmap f (Box x) = Box (f x) }\nunBox (Box x) = x\n"
 boxApplicative : String
@@ -60,6 +63,8 @@ boxMonad : String
 boxMonad = boxApplicative ++ "instance Monad Box where { (>>=) (Box x) f = f x }\n"
 check : String -> Bool -> IO Unit
 check name okay = if okay then ioReturn Unit else do {putErr ("shared frontend failure: " ++ name ++ "\n"); exitWith 1}
+checkIO : String -> IO Bool -> IO Unit
+checkIO name action = ioBind action (check name)
 frontendChecks : IO Unit
 frontendChecks = do
   check "legacy malformed pragma comment" (isRight (P.parseModule "Legacy.emlf" "{-# LANGUAGE X, #-}\nmodule Legacy where\nmain = 1\n"))
@@ -161,19 +166,19 @@ frontendChecks = do
   putStrLn "shared frontend: parser and namespace checks passed"
 nativeFirst : IO Unit
 nativeFirst = do
-  check "native standard hierarchy inference" (evaluatesInt (boxMonad ++ "main = unBox (do { x <- pure 40; return (x + 2) })") 42)
-  check "native Applicative defaults" (evaluatesInt (boxApplicative ++ "main = unBox (liftA2 addInt (Box 30) (Box 12))") 42)
-  check "native Applicative liftA2 minimum" (evaluatesInt (boxFunctor ++ "instance Applicative Box where { pure = Box; liftA2 f (Box x) (Box y) = Box (f x y) }\nmain = unBox (Box (addInt 30) <*> Box 12)") 42)
-  check "native do preserves overridden sequencing" (failsWith (boxApplicative ++ "instance Monad Box where { (>>=) (Box x) f = f x; (>>) a b = panic \"overridden sequence\" }\nmain = unBox (do { Box 1; Box 2 })") "overridden sequence")
-  check "native fmap default partial demand" (failsWith "data Box a = Box a\ninstance Functor Box where { fmap = panic \"fmap bottom\" }\nmain = seq (((<$) 1) :: Box Int -> Box Int) 7" "fmap bottom")
+  checkIO "native standard hierarchy inference" (evaluatesInt (boxMonad ++ "main = unBox (do { x <- pure 40; return (x + 2) })") 42)
+  checkIO "native Applicative defaults" (evaluatesInt (boxApplicative ++ "main = unBox (liftA2 addInt (Box 30) (Box 12))") 42)
+  checkIO "native Applicative liftA2 minimum" (evaluatesInt (boxFunctor ++ "instance Applicative Box where { pure = Box; liftA2 f (Box x) (Box y) = Box (f x y) }\nmain = unBox (Box (addInt 30) <*> Box 12)") 42)
+  checkIO "native do preserves overridden sequencing" (failsWith (boxApplicative ++ "instance Monad Box where { (>>=) (Box x) f = f x; (>>) a b = panic \"overridden sequence\" }\nmain = unBox (do { Box 1; Box 2 })") "overridden sequence")
+  checkIO "native fmap default partial demand" (failsWith "data Box a = Box a\ninstance Functor Box where { fmap = panic \"fmap bottom\" }\nmain = seq (((<$) 1) :: Box Int -> Box Int) 7" "fmap bottom")
   putStrLn "shared frontend: first native semantics checks passed"
 nativeSecond : IO Unit
 nativeSecond = do
-  check "native ap default function demand" (failsWith (boxFunctor ++ "instance Applicative Box where { pure = Box; liftA2 = panic \"liftA2 bottom\" }\nmain = seq ((<*>) :: Box (Int -> Int) -> Box Int -> Box Int) 7") "liftA2 bottom")
-  check "native left default function demand" (failsWith (boxFunctor ++ "instance Applicative Box where { pure = Box; liftA2 = panic \"liftA2 bottom\" }\nmain = seq ((<*) :: Box Int -> Box Int -> Box Int) 7") "liftA2 bottom")
-  check "native liftA2 default partial demand" (failsWith (boxFunctor ++ "instance Applicative Box where { pure = Box; (<*>) = panic \"ap bottom\" }\nmain = seq (liftA2 addInt (Box 1) :: Box Int -> Box Int) 7") "ap bottom")
-  check "native return default function demand" (failsWith (boxFunctor ++ "instance Applicative Box where { pure = panic \"pure bottom\"; (<*>) (Box f) (Box x) = Box (f x) }\ninstance Monad Box where { (>>=) (Box x) f = f x }\nmain = seq (return :: Int -> Box Int) 7") "pure bottom")
-  check "native sequencing default partial WHNF" (evaluatesInt (boxApplicative ++ "instance Monad Box where { (>>=) = panic \"bind bottom\" }\nmain = seq (((>>) (Box 1)) :: Box Int -> Box Int) 7") 7)
+  checkIO "native ap default function demand" (failsWith (boxFunctor ++ "instance Applicative Box where { pure = Box; liftA2 = panic \"liftA2 bottom\" }\nmain = seq ((<*>) :: Box (Int -> Int) -> Box Int -> Box Int) 7") "liftA2 bottom")
+  checkIO "native left default function demand" (failsWith (boxFunctor ++ "instance Applicative Box where { pure = Box; liftA2 = panic \"liftA2 bottom\" }\nmain = seq ((<*) :: Box Int -> Box Int -> Box Int) 7") "liftA2 bottom")
+  checkIO "native liftA2 default partial demand" (failsWith (boxFunctor ++ "instance Applicative Box where { pure = Box; (<*>) = panic \"ap bottom\" }\nmain = seq (liftA2 addInt (Box 1) :: Box Int -> Box Int) 7") "ap bottom")
+  checkIO "native return default function demand" (failsWith (boxFunctor ++ "instance Applicative Box where { pure = panic \"pure bottom\"; (<*>) (Box f) (Box x) = Box (f x) }\ninstance Monad Box where { (>>=) (Box x) f = f x }\nmain = seq (return :: Int -> Box Int) 7") "pure bottom")
+  checkIO "native sequencing default partial WHNF" (evaluatesInt (boxApplicative ++ "instance Monad Box where { (>>=) = panic \"bind bottom\" }\nmain = seq (((>>) (Box 1)) :: Box Int -> Box Int) 7") 7)
   putStrLn "shared frontend: checks passed"
 
 

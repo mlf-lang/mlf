@@ -35,12 +35,12 @@ test -x "$MLF_COMPILER" && test -x "$MLF_PACKAGE_MANAGER" && test -x "$runner"
   --compiler "$MLF_COMPILER" --runtime "$PWD/runtime/mlf_runtime.c" \
   --jobs 2 --timeout 1800 --build-dir "$build/tests/suite-build" \
   --cache-dir "$build/candidate/cache" build \
-  --target int-set-unions --target test-framework --target pr-smoke \
+  --target int-set-unions --target test-framework --target figure12 --target pr-smoke \
   2>&1 | tee "$build/tests-prebuild.log"
 jq -e '
   .complete == true and .implementation == "MLF" and
   ([.builds[] | select(.kind | startswith("executable mlf-tests:")) | .kind] | sort) ==
-    ["executable mlf-tests:int-set-unions","executable mlf-tests:pr-smoke","executable mlf-tests:test-framework"]
+    ["executable mlf-tests:figure12","executable mlf-tests:int-set-unions","executable mlf-tests:pr-smoke","executable mlf-tests:test-framework"]
 ' "$build/tests/suite-build/build-report.json" >/dev/null
 cp "$build/tests/suite-build/build-report.json" "$build/tests-prebuild-report.json"
 # Direct invocation avoids building another root generation just to run tests.
@@ -93,7 +93,7 @@ jq -se --arg group pr-smoke --arg driver_hash "$driver_hash" '
     ($v.drivers | keys) == (if $group == "port" then ["LLVMDriver"] else ["LLVMDriver","RuntimeDriver"] end) and
     all($v.drivers | to_entries[];
       .key as $name | .value as $driver |
-      $driver.frontend == "source" and
+      $driver.frontend == "crate" and
       ($driver.sha256 | digest) and ($driver.llvm_sha256 | digest) and
       ($driver.artifacts | keys) ==
         (if $name == "RuntimeDriver" then ["linked","llvm","object","runtime","trace"] else ["linked","llvm","object","runtime"] end) and
@@ -104,7 +104,7 @@ jq -se --arg group pr-smoke --arg driver_hash "$driver_hash" '
         ($receipt.cached | type == "boolean") and
         $receipt.directory == ($b.cache_directory + "/" + $receipt.key) and
         $receipt.kind ==
-          (if $stage == "llvm" then "source " + $name + " LLVM" elif $stage == "object" then "LLVM object" elif $stage == "linked" then "test driver native link" else "test driver C object" end) and
+          (if $stage == "llvm" then $driver.frontend + " " + $name + " LLVM" elif $stage == "object" then "LLVM object" elif $stage == "linked" then "test native link" else "test driver C object" end) and
         any($b.builds[]; . == ($receipt | {kind,key,cached})) and
         ($receipt.files | keys) ==
           [if $stage == "llvm" then "program.ll" elif $stage == "object" then "program.o" elif $stage == "linked" then "program" else "object.o" end] and

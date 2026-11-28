@@ -1,7 +1,11 @@
 # Source query fingerprints
 
-The input identity is SHA-256 of the exact UTF-8 serialization of the full
-canonical v7 inference key. Both source SCC drivers already compute this SHA
+The retained per-group source cache stores one checked result per `.mlfq` file.
+The current compiler CLI publishes a persistent query graph. Both paths have
+[registered cache checks](../source-key-builtins/README.md#current-checks).
+
+The per-group input identity is SHA-256 of the exact UTF-8 serialization of
+the full canonical v7 inference key. Both source SCC drivers already compute this SHA
 under the cache lock for the .mlfq address. The new records compare their
 stored fingerprint with that independently computed value. The full syntax,
 observed dependency types and contracts, ordered evidence scopes, compiler
@@ -15,7 +19,7 @@ record. Use a fresh private cache for untrusted input caches.
 
 ## Format and checks
 
-The wire stays at MLFBIN v1, schema 2. Local source records have two ordered
+The wire uses MLFBIN v1, schema 2. Addressed source records have two ordered
 roots, the input SHA text followed by the raw query record. The same input
 text occurs in the second root. Each SHA has 64 lowercase hexadecimal digits.
 
@@ -26,7 +30,7 @@ text occurs in the second root. Each SHA has 64 lowercase hexadecimal digits.
 | 305 | input SHA, result SHA, raw unit | template of this addressed record |
 | 306 | input SHA, result SHA, context SHA, contextual header, body | template of this addressed record |
 
-The ordinary compiler writes 305/306. To hash the result, it encodes both
+The per-group writer normally emits 305/306. To hash the result, it encodes both
 roots with 64 ASCII tildes in place of the result SHA. The SHA-256 covers the
 complete canonical template, including its CRC and the input SHA. In these
 layouts the result is symbol 1. Before patching the 64 bytes in the private
@@ -39,11 +43,10 @@ or the template exceeds a limit, the writer uses the independently encoded
 302/303 layout and its existing limit fallback.
 
 The key material stays at v7. A compiler executable change changes the input
-and normally causes a cold miss. Older compilers reject the new tags. Current
-compilers retain the original checks for matching 300/301 full-key records and
-302/303 records, including the original single-root representation. A 305/306
-record must have the separate address root. An unsupported tag or damaged
-record misses and is replaced after successful inference.
+and normally causes a cold miss. The source reader accepts 302/303 records with
+one or two roots. A 305/306 record requires a separate address root. Text
+records, exact-key 300/301 records and damaged records cause a miss. After
+successful inference the writer replaces that group's entry.
 
 For 302/303 the SHA covers the bounded canonical root 304 with the expected
 input and raw value. For 305/306 it covers the template described above. On verification
@@ -54,12 +57,11 @@ reinfers the group. The resource/graph gates, wire CRC, actual datatype
 carrier checks, metadata and term checksums, xMLF checker and PreparedRaw
 checks still apply to every hit.
 
-`emlf -Zincremental-verify-ich --compile-crate SPEC -o PREFIX` rechecks all
-loaded **source SCC** values. Source records without a result fingerprint are
-recomputed and upgraded in this mode. Default sampling is reproducible: an
-input whose SHA starts with 00 through 07 is selected (1/32 under uniform
-hashing). An unchanged input stays in the same bucket on later runs. The
-option is outside the key, so switching it on audits the existing cache.
+Full fingerprint verification rechecks every loaded source SCC result. The
+default per-group reader selects inputs whose SHA starts with 00 through 07
+(1/32 under uniform hashing). An unchanged input stays in the same bucket
+on later runs. The verification option is outside the key, so switching it on
+audits the existing cache.
 A genuinely colliding input SHA can still reuse the old result under full
 verification when that value rehashes to its stored ICH.
 Context blobs, formal interface/object files and lowered-only QUERY4 have
@@ -85,9 +87,8 @@ a wrong address can now be reported before a CRC failure. A matching address
 preserves the full integrity checks and their errors.
 
 Old single-root 302/303 records use their checked reader, including strict ICH
-mode. Older exact-key and text records retain their existing migration rules.
-Earlier compilers safely reject two-root queries. The extra address root counts
-toward expanded work and file size. If it alone would exceed either cap, the
+mode. Earlier compilers safely reject two-root queries. The extra address
+root counts toward expanded work and file size. If it alone would exceed either cap, the
 writer tries the single-root fingerprint record under the same limits. Invalid
 payloads and publication failures still propagate to the caller. Source keys
 stay at v7 and the separately shared datatype context format is unchanged.
@@ -219,16 +220,18 @@ python3 tools/performance/foundation-query/compare.py --baseline-label 29 "$pr29
 python3 tools/performance/source-fingerprints/compare-decode.py --addresses "$candidate" "$candidate" "$study/1-candidate" "$wire"
 ```
 
-## Reproduction
+## Reproducing the historical measurements
 
-Use verify-built producer directories and a fresh output directory. The
-Foundation argument is the libraries/mlf-foundation directory from PR 25.
+Use the producer revisions recorded for each experiment and a fresh output
+directory. The Foundation argument is the libraries/mlf-foundation directory
+from PR 25. The commands below expect the historical CLI's per-group cache.
+Set `archive` to a checkout of the [raw-record inspector and its matching decoders](https://github.com/mlf-lang/mlf/tree/0704d216b8cf6d887d3737efa30a2eae3c152f0a/tools/performance/foundation-query).
 
 ```sh
 python3 tools/performance/foundation-query/compare.py --baseline-label 32 "$pr32/bin/emlf" "$candidate/bin/emlf" "$foundation" "$study"
 python3 tools/performance/source-fingerprints/compare-decode.py "$pr32" "$candidate" "$study/1-candidate" "$wire"
 python3 tools/performance/source-fingerprints/verify-cost.py "$candidate/bin/emlf" "$study" "$audit"
-python3 tools/performance/foundation-query/check-raw.py "$study/0-32" "$study/1-candidate" "$pr32/bin/emlf" "$candidate/bin/emlf"
+python3 "$archive/tools/performance/foundation-query/check-raw.py" "$study/0-32" "$study/1-candidate" "$pr32/bin/emlf" "$candidate/bin/emlf"
 python3 tools/shared/test_source_fingerprints.py "$candidate/bin/emlf" "$controls"
 ```
 

@@ -8,6 +8,8 @@ module Bootstrap.LLVM.Codegen where {
   import Bootstrap.LLVM.Build;
   import qualified Bootstrap.Std as L;
   import qualified Bootstrap.Map as M;
+  import qualified Bootstrap.IntMap as IM;
+  import qualified Bootstrap.IntSet as IS;
   import qualified Bootstrap.Set as S;
   import qualified Bootstrap.Primitive as P;
   import qualified Bootstrap.LLVM.Analysis as A;
@@ -17,6 +19,7 @@ module Bootstrap.LLVM.Codegen where {
   import qualified Bootstrap.LLVM.Native as N;
   import qualified Bootstrap.LLVM.Result as R;
   import qualified Bootstrap.LLVM.LazyProducer as V;
+  import qualified Bootstrap.X.Syntax as X;
   generate :: Map String ((,) Int Int) -> XErased -> Either String ((,) String ([] String));
   generate = generateWithClosedConstructors True;
   -- Separately compiled units can receive constructor fields allocated by
@@ -31,7 +34,47 @@ module Bootstrap.LLVM.Codegen where {
   generateWithPrivate :: Set String -> Map String ((,) Int Int) -> XErased -> Either String ((,) String ([] String));
   generateWithPrivate names = generateWithConstructorPolicy False names;
   generateWithConstructorPolicy :: Bool -> Set String -> Map String ((,) Int Int) -> XErased -> Either String ((,) String ([] String));
-  generateWithConstructorPolicy closed names cs term =
+  generateWithConstructorPolicy closed names cs = generateProgram closed names cs M.empty;
+  generateCheckedFamilies :: Map String ((,) Int Int) -> [] ([] String) -> XErased ->
+                             Either String ((,) String ([] String));
+  -- The family proof covers constructor dispatch. Raw erased terms may
+  -- still shadow an outer binder identity.
+  generateCheckedFamilies cs groups = generateProgram True S.empty cs (familyPlans cs groups);
+  familyPlans :: Map String ((,) Int Int) -> [] ([] String) -> Map Int ((,,) Int Int CaseDispatch);
+  familyPlans cs groups = M.fromList L.compareInt (L.concatMap (familyDispatch cs) groups);
+  -- All names in each group come from one complete, checked declaration.
+  -- The runtime encodes a nullary constructor below 2^60 as (tag * 8 + 4).
+  familyDispatch :: Map String ((,) Int Int) -> [] String -> [] ((,) Int ((,,) Int Int CaseDispatch));
+  familyDispatch cs names = case L.mapM (\name -> M.lookup compareString name cs) names of {
+    Just ((:) first rest) -> let {
+      members = (:) first rest;
+      valid entry = L.fst entry >= 0 && L.fst entry < 1152921504606846976 && L.snd entry >= 0;
+      select plan = L.map (\entry -> (,) (L.fst entry) ((,,) (L.fst first) (L.length members) plan)) members
+    } in if L.not (L.all valid members) then [] else case rest of {
+      [] -> select SingleCase;
+      _ -> case L.partition (\entry -> L.snd entry == 0) members of {
+        (,) [] _ -> select HeapCases;
+        (,) _ [] -> select ImmediateCases;
+        (,) ((:) immediate []) ((:) boxed []) -> select (BinaryCase (L.fst immediate) (L.fst boxed));
+        _ -> []
+      }
+    };
+    _ -> []
+  };
+  generateProgram :: Bool -> Set String -> Map String ((,) Int Int) -> Map Int ((,,) Int Int CaseDispatch) ->
+                     XErased -> Either String ((,) String ([] String));
+  generateProgram = generateWithWorkerAliases (\_ -> M.empty);
+  generateWithWorkerAliases :: (Output -> Map XName XName) -> Bool -> Set String -> Map String ((,) Int Int) ->
+    Map Int ((,,) Int Int CaseDispatch) -> XErased -> Either String ((,) String ([] String));
+  generateWithWorkerAliases = generateWorkerProgram False;
+  -- Only prepared checked terms have canonical binders. Raw clients keep their
+  -- established erased-term lowering and their original worker symbol policy.
+  generatePreparedProgram :: Bool -> Set String -> Map String ((,) Int Int) ->
+    Map Int ((,,) Int Int CaseDispatch) -> XErased -> Either String ((,) String ([] String));
+  generatePreparedProgram = generateWorkerProgram True recursiveWorkerAliases;
+  generateWorkerProgram :: Bool -> (Output -> Map XName XName) -> Bool -> Set String -> Map String ((,) Int Int) ->
+    Map Int ((,,) Int Int CaseDispatch) -> XErased -> Either String ((,) String ([] String));
+  generateWorkerProgram chains aliases closed names cs plans term =
     let {
       fs = A.analyze term
     } in
@@ -43,7 +86,9 @@ module Bootstrap.LLVM.Codegen where {
     } in
     let {
       output =
-        Output 0 [] "entry" [] [] cs (FunctionScope fs (A.lambdaFreeTable term)) S.empty M.empty ks S.empty (K.collecting fs ks) M.empty
+        Output 0 (emptyInstructions "") "entry" [] [] (ConstructorLayout cs plans)
+          (FunctionScope fs (A.lambdaFreeTable term) (Just (indexWorkerEscapes fs term)))
+          S.empty M.empty ks S.empty (K.collecting fs ks) M.empty
           True
           M.empty
           M.empty
@@ -56,16 +101,22 @@ module Bootstrap.LLVM.Codegen where {
           rs
           (V.plan cs fs (S.union O.compareName ks (M.keysSet rs)) term) M.empty
     } in
-    case runBuild (callback [] Nothing term) output of {
+    let { policy = if chains then withWorkers (S.insert compareString closureChainPolicy (workers output)) output
+                   else output;
+          initial = withCallbacks (workerSymbols (aliases output)) policy } in
+    case runBuild (callback [] Nothing term) initial of {
       Left error -> Left error;
-      Right ((,) entry out) ->
+      Right ((,) entry out) -> let {
+        needs symbol = S.member compareString symbol (workers out);
+        support = L.concat [constructorDefinitions needs, thunkAllocationDefinition,
+          thunkCaptureDefinitions needs, closureChainDefinition needs, forceDefinition]
+      } in
         Right
           ((,) entry
              (L.concat
                 ((:) ((:) "declare ptr @mlf_thunk_new(ptr, i64)" runtimeDeclarations)
                    (args4
-                      (L.append (constructorDefinitions (\symbol -> S.member compareString symbol (workers out)))
-                         (L.append thunkAllocationDefinition forceDefinition))
+                      support
                       aliasMetadata
                       (L.reverse (constants out))
                       (L.reverse (definitions out))))))
@@ -239,7 +290,95 @@ module Bootstrap.LLVM.Codegen where {
       (L.map (\optional -> case optional of { Nothing -> "ignored"; Just _ -> "bound" }) names) fields))
   };
   callbackFresh :: Bool -> [] XName -> Maybe XName -> XErased -> Build String;
-  callbackFresh private captures argument body =
+  callbackFresh private captured argument body = case (,,) private argument body of {
+    (,,) False (Just supplied) (XEAbs _ _) -> do {
+      state <- get;
+      if closureChainsEnabled state then
+        case extensionTail state captured supplied body of {
+          (,,) final binder terminal -> let { width = L.length captured; end = L.length final } in
+            if useClosureChain width (end - width) then do {
+              symbol <- fresh "@mlf.code.";
+              child <- callback final (Just binder) terminal;
+              startClosureChain symbol width end child;
+              cgPure symbol
+            } else callbackFreshWith evaluate private captured argument body
+        }
+      else callbackFreshWith evaluate private captured argument body
+    };
+    _ -> callbackFreshWith evaluate private captured argument body
+  };
+  closureChainPolicy :: String;
+  closureChainPolicy = "prepared closure chains";
+  closureChainsEnabled :: Output -> Bool;
+  closureChainsEnabled state = S.member compareString closureChainPolicy (workers state);
+  useClosureChain :: Int -> Int -> Bool;
+  useClosureChain width stages = stages >= 2 && (width >= 4 || stages >= 4);
+  -- Each accepted lambda adds just its supplied argument to the child's
+  -- complete ordered captures. Stop at the first change of layout.
+  extensionTail :: Output -> [] XName -> XName -> XErased -> (,,) ([] XName) XName XErased;
+  extensionTail state captures argument body = case body of {
+    XEAbs next inner -> let { fields = callbackNames state next inner } in
+      if L.eqList O.eqName fields (L.snoc captures argument)
+      then extensionTail state fields next inner
+      else (,,) captures argument body;
+    _ -> (,,) captures argument body
+  };
+  -- A private descriptor is shared by intermediate closures in this chain.
+  -- The first entry and the terminal callback use their ordinary environments.
+  startClosureChain :: String -> Int -> Int -> String -> Build ();
+  startClosureChain symbol width end terminal = do {
+    descriptor <- fresh "@mlf.curry.layout.";
+    let { dataRow = descriptor ++ " = private unnamed_addr constant { ptr, i64 } { ptr " ++
+      terminal ++ ", i64 " ++ showInt end ++ " }, align 8" };
+    modify (\state -> withConstants ((:) dataRow (constants state))
+      (withWorkers (S.insert compareString "@mlf.closure.chain" (workers state)) state));
+    definition symbol (args2 "ptr %env" "ptr %arg") (result
+      ("tail call ptr @mlf.closure.chain(ptr %env, ptr %arg, i64 " ++ showInt width ++ ", ptr " ++ descriptor ++ ")"))
+  };
+  closureChainDefinition :: (String -> Bool) -> [] String;
+  closureChainDefinition needs = if needs "@mlf.closure.chain" then [
+    "declare void @llvm.memcpy.p0.p0.i64(ptr, ptr, i64, i1 immarg)",
+    "define private ptr @mlf.closure.chain.next(ptr %env, ptr %arg) {",
+    "entry:",
+    "  %size = load i64, ptr %env, align 8",
+    "  %width = sub i64 %size, 1",
+    "  %slot = getelementptr ptr, ptr %env, i64 %size",
+    "  %layout = load ptr, ptr %slot, align 8",
+    "  %closure = tail call ptr @mlf.closure.chain(ptr %env, ptr %arg, i64 %width, ptr %layout)",
+    "  ret ptr %closure",
+    "}",
+    "define private ptr @mlf.closure.chain(ptr %parent, ptr %arg, i64 %width, ptr %layout) noinline {",
+    "entry:",
+    "  %endptr = getelementptr i8, ptr %layout, i64 8",
+    "  %end = load i64, ptr %endptr, align 8",
+    "  %count = add i64 %width, 1",
+    "  %last = icmp eq i64 %count, %end",
+    "  %extra = add i64 %count, 1",
+    "  %slots = select i1 %last, i64 %count, i64 %extra",
+    "  %next = call ptr @mlf_env_new(i64 %slots)",
+    "  %destination = getelementptr i8, ptr %next, i64 8",
+    "  %empty = icmp eq i64 %width, 0",
+    "  br i1 %empty, label %append, label %copy",
+    "copy:",
+    "  %source = getelementptr i8, ptr %parent, i64 8",
+    "  %bytes = shl i64 %width, 3",
+    "  call void @llvm.memcpy.p0.p0.i64(ptr align 8 %destination, ptr align 8 %source, i64 %bytes, i1 false)",
+    "  br label %append",
+    "append:",
+    "  %slot = getelementptr ptr, ptr %destination, i64 %width",
+    "  store ptr %arg, ptr %slot, align 8",
+    "  br i1 %last, label %finish, label %continue",
+    "finish:",
+    "  %terminal = load ptr, ptr %layout, align 8",
+    "  %final = tail call ptr @mlf_closure(ptr %terminal, ptr %next)",
+    "  ret ptr %final",
+    "continue:",
+    "  %descriptor = getelementptr ptr, ptr %destination, i64 %count",
+    "  store ptr %layout, ptr %descriptor, align 8",
+    "  %partial = tail call ptr @mlf_closure(ptr @mlf.closure.chain.next, ptr %next)",
+    "  ret ptr %partial",
+    "}"] else [];
+  callbackFreshWith finish private captures argument body =
     do {
       name <- fresh "@mlf.code.";
       definition name (args2 "ptr %env" "ptr %arg")
@@ -256,7 +395,7 @@ module Bootstrap.LLVM.Codegen where {
                  Just n -> M.insert O.compareName n (CGBinding "%arg" False) scope
                }
            };
-           evaluate local body
+           finish local body
          });
       cgPure name
     };
@@ -275,7 +414,7 @@ module Bootstrap.LLVM.Codegen where {
       let { names = L.append (A.captures f) (A.parameters f) };
       let { registers = L.map (\i -> "%a" ++ showInt i) (L.range 0 (L.length names - 1)) };
       let { scope = M.fromList O.compareName
-              (L.zipWith (\n register -> (,) n (CGBinding register (S.member O.compareName n (A.strict f)))) names registers) };
+              (L.zipWith (\n register -> (,) n (CGWorkerArgument register (S.member O.compareName n (A.strict f)))) names registers) };
       definitionTyped resultType symbol (L.map pointer registers) (evaluateResult scope (A.functionBody f))
     };
     cgPure symbol
@@ -294,13 +433,12 @@ module Bootstrap.LLVM.Codegen where {
     result ("insertvalue " ++ (resultType ++ (" " ++ (first ++ (", ptr " ++ (payload ++ ", 1"))))))
   };
   evaluateResult :: Map XName CGBinding -> XErased -> Build String;
-  evaluateResult scope expression = case expression of {
+  evaluateResult = evaluateResultWithDemands Nothing;
+  evaluateResultWithDemands demands scope expression = case expression of {
     XELet n rhs body -> do {
       fs <- gets functions;
       if M.member O.compareName n fs then evaluateResult scope body else do {
-        strict <- letDemanded scope n body;
-        value <- if strict then evaluate scope rhs else thunk scope rhs;
-        evaluateResult (M.insert O.compareName n (CGBinding value strict) scope) body
+        emitDemandedLet demands fs scope n rhs body evaluateResultWithDemands
       }
     };
     XECase subject alternatives -> evaluateCaseTyped resultType evaluateResult scope subject alternatives;
@@ -399,11 +537,57 @@ module Bootstrap.LLVM.Codegen where {
     _ -> failure "LLVM invalid admitted result pattern"
   };
   worker :: XName -> A.WorkerFunction -> Build String;
-  worker name f =
+  worker name f = do {
+    state <- get;
+    let { own = workerSymbol name;
+      symbol = M.findWithDefault (L.compareList compareString) own [own] (callbacks state) } in
+      emitWorkerAt symbol name f
+  };
+  workerSymbol name = "@mlf.worker." ++ showInt (O.nameId name);
+  -- A singleton worker symbol and a callback's structured body key are
+  -- disjoint. Seed the canonical symbols before their first demand so recursive
+  -- and forward calls use the same private entry regardless of emission order.
+  workerSymbols :: Map XName XName -> Map ([] String) String;
+  workerSymbols = M.foldlWithKeyStrict
+    (\table name target -> M.insert (L.compareList compareString) [workerSymbol name] (workerSymbol target) table) M.empty;
+  -- The checked optimizer gives each binder a fresh identity before this
+  -- classifier runs. Only its private boxed entry is shared. Each function keeps its
+  -- own captures, wrapper and argument preparation. A self reference occupies
+  -- its own lexical slot. Other workers retain their exact identity and their
+  -- implicit capture mapping through the callback key.
+  recursiveWorkerAliases :: Output -> Map XName XName;
+  recursiveWorkerAliases state = let {
+    add ((,) known aliases) name f = case recursiveWorkerKey state name f of {
+      Nothing -> (,) known aliases;
+      Just key -> case M.lookup (L.compareList compareString) key known of {
+        Nothing -> (,) (M.insert (L.compareList compareString) key name known) aliases;
+        Just representative -> (,) known (M.insert O.compareName name representative aliases)
+      }
+    }
+  } in L.snd (M.foldlWithKeyStrict add ((,) M.empty M.empty) (functions state));
+  recursiveWorkerKey :: Output -> XName -> A.WorkerFunction -> Maybe ([] String);
+  recursiveWorkerKey state name f = let {
+    body = A.functionBody f;
+    captured = A.captures f;
+    parameters = A.parameters f;
+    names = (:) name (L.append captured parameters);
+    scope = M.fromList O.compareName (L.zip names (L.range 0 (L.length names - 1)));
+    order = A.entryOrder f
+  } in if S.member O.compareName name (numericKernels state) ||
+    M.member O.compareName name (resultPlans state) || M.member O.compareName name (producerPlans state) ||
+    O.remainingSize 128 body < 0 || O.occurrences 1 name body == 0 ||
+    L.not (O.uniformStaticRecursion name (L.map (\n -> (,) n Nothing) parameters) body) ||
+    L.any (\n -> M.member O.compareName n (functions state)) (L.append captured parameters)
+  then Nothing else do {
+    fields <- callbackTerm (withFunctions (M.delete O.compareName name (functions state)) state) scope body;
+    slots <- L.mapM (\n -> M.lookup O.compareName n scope) order;
+    Just (L.concat [[showInt (L.length captured), showInt (L.length parameters),
+      if A.demandComplete (A.entrySummary f) then "total" else "barrier", showInt (L.length slots)],
+      L.map showInt slots, fields])
+  };
+  emitWorkerAt :: String -> XName -> A.WorkerFunction -> Build String;
+  emitWorkerAt symbol name f =
     do {
-      let {
-        symbol = ("@mlf.worker." ++ showInt (O.nameId name))
-      };
       let {
         names = L.append (A.captures f) (A.parameters f)
       };
@@ -423,19 +607,139 @@ module Bootstrap.LLVM.Codegen where {
                  M.fromList O.compareName
                    (L.zipWith
                       (\n register ->
-                         (,) n (CGBinding register (S.member O.compareName n (A.strict f))))
+                         (,) n (CGWorkerArgument register (S.member O.compareName n (A.strict f))))
                       names
                       registers)
              };
              state <- get;
-             let { keepWorker = M.size (functions state) > 128 &&
-                     hasBranchTailTransfer state name (L.length names) (A.functionBody f) };
+             let { keepWorker = wrapsCapturedFunction state names (A.functionBody f) ||
+                     (largeWorkerModule state &&
+                       hasBranchTailTransfer state name (L.length names) (A.functionBody f)) };
              definitionBodyWithPolicy keepWorker "ptr" symbol (L.map pointer registers)
-               (finishOrdinary (L.length names) scope (A.functionBody f));
+               (finishWorker (L.length names) scope (A.functionBody f));
              modify (withInlinePrimitives inline)
            };
       cgPure symbol
     };
+  -- Keep the environment, closure and unary constructor allocations together.
+  -- The exact factory takes every capture directly from its boxed worker ABI.
+  wrapsCapturedFunction :: Output -> [] XName -> XErased -> Bool;
+  wrapsCapturedFunction state arguments expression = case expression of {
+    XEApp (XEConstructor constructor) (XEAbs binder body) ->
+      case M.lookup compareString constructor (constructors state) of {
+        Just ((,) _ 1) -> let { captures = callbackNames state binder body } in
+          L.not (L.null captures) && L.null (L.drop 4 captures) &&
+          L.all (\name -> L.elem O.eqName name arguments) captures;
+        _ -> False
+      };
+    _ -> False
+  };
+  finishWorker :: Int -> Map XName CGBinding -> XErased -> Build ();
+  finishWorker arity scope expression = do {
+    state <- get;
+    case integerReduction state scope expression of {
+      Nothing -> finishOrdinary arity scope expression;
+      Just ((,,,) template start step count) -> do {
+        value <- emitIntegerReduction scope template start step count;
+        emit ("  ret ptr " ++ value)
+      }
+    }
+  };
+  -- Wrapping Int addition permits a left fold. Evaluate the leaves in their
+  -- original order and share one loop body when only a compact literal varies
+  -- as a progression. The template preserves the leaves' lazy lets and calls.
+  reductionLiteral :: XName;
+  reductionLiteral = XName (0 - 9223372036854775807 - 1) "reduction literal";
+  integerSumLeaves :: [] XErased -> [] XErased;
+  integerSumLeaves pending = case pending of {
+    [] -> [];
+    (:) expression rest -> case expression of {
+      XEApp (XEApp (XEPrimitive PAddInt) left) right -> integerSumLeaves ((:) left ((:) right rest));
+      _ -> (:) expression (integerSumLeaves rest)
+    }
+  };
+  literalTemplate :: XErased -> Maybe ((,) XErased (Maybe Int));
+  literalTemplate expression = let {
+    intact = Just ((,) expression Nothing);
+    matchPair merge left right = do {
+      (,) a first <- literalTemplate left;
+      (,) b second <- literalTemplate right;
+      constant <- case first of {
+        Nothing -> Just second;
+        Just _ -> case second of { Nothing -> Just first; Just _ -> Nothing }
+      };
+      Just ((,) (merge a b) constant)
+    }
+  } in case expression of {
+    XEInt n -> if n >= (0 - 4611686018427387904) && n < 4611686018427387904
+      then Just ((,) (XEVar reductionLiteral) (Just n)) else Nothing;
+    XEVar n -> if O.eqName n reductionLiteral then Nothing else intact;
+    XEPrimitive _ -> intact;
+    XEApp f a -> matchPair XEApp f a;
+    XELet n a b -> if O.eqName n reductionLiteral then Nothing else matchPair (XELet n) a b;
+    XECase subject [XErasedAlternative pattern body] ->
+      if L.any (O.eqName reductionLiteral) (X.patternNames pattern) then Nothing
+      else matchPair (\value branch -> XECase value [XErasedAlternative pattern branch]) subject body;
+    _ -> Nothing
+  };
+  matchReductionLeaf :: Output -> XErased -> Maybe ((,,) XErased ([] String) Int);
+  matchReductionLeaf state leaf = case literalTemplate leaf of {
+    Just ((,) template (Just literal)) -> do {
+      fields <- callbackTerm state M.empty template;
+      Just ((,,) template fields literal)
+    };
+    _ -> Nothing
+  };
+  integerReduction :: Output -> Map XName CGBinding -> XErased -> Maybe ((,,,) XErased Int Int Int);
+  integerReduction state scope expression =
+    if M.member O.compareName reductionLiteral scope ||
+       M.member O.compareName reductionLiteral (functions state)
+    then Nothing else case integerSumLeaves [expression] of {
+        (:) first ((:) second rest) -> if L.null (L.drop 5 rest) then Nothing else do {
+          (,,) template key start <- matchReductionLeaf state first;
+          (,,) _ other next <- matchReductionLeaf state second;
+          let {
+            step = next - start;
+            match ((,) preceding count) leaf = do {
+              (,,) _ keyHere value <- matchReductionLeaf state leaf;
+              if value == preceding + step && L.eqList eqString key keyHere
+              then let { size = count + 1 } in seq size (Just ((,) value size))
+              else Nothing
+            }
+          };
+          if L.not (L.eqList eqString key other) then Nothing else do {
+            (,) _ count <- L.foldM match ((,) next 2) rest;
+            Just ((,,,) template start step count)
+          }
+        };
+        _ -> Nothing
+    };
+  emitIntegerReduction :: Map XName CGBinding -> XErased -> Int -> Int -> Int -> Build String;
+  emitIntegerReduction scope template start step count = do {
+    origin <- gets block;
+    loop <- fresh "sum.loop.";
+    continue <- fresh "sum.next.";
+    done <- fresh "sum.done.";
+    nextBits <- fresh "%v";
+    nextCount <- fresh "%v";
+    nextSum <- fresh "%v";
+    emit ("  br label %" ++ loop);
+    loopLabel loop;
+    bits <- phi "i64" [((,) (showInt (2 * start + 1)) origin), ((,) nextBits continue)];
+    remaining <- phi "i64" [((,) (showInt count) origin), ((,) nextCount continue)];
+    total <- phi "ptr" [((,) (immediate 1) origin), ((,) nextSum continue)];
+    literal <- result ("inttoptr i64 " ++ bits ++ " to ptr");
+    term <- evaluate (M.insert O.compareName reductionLiteral (CGBinding literal True) scope) template;
+    emit ("  br label %" ++ continue);
+    label continue;
+    emit ("  " ++ nextSum ++ " = call ptr @mlf_add_int(ptr " ++ total ++ ", ptr " ++ term ++ ")");
+    emit ("  " ++ nextBits ++ " = add i64 " ++ bits ++ ", " ++ showInt (2 * step));
+    emit ("  " ++ nextCount ++ " = sub i64 " ++ remaining ++ ", 1");
+    test <- result ("icmp eq i64 " ++ nextCount ++ ", 0");
+    emit ("  br i1 " ++ test ++ ", label %" ++ done ++ ", label %" ++ loop);
+    label done;
+    cgPure nextSum
+  };
   -- In a large module, preserve a branching worker's tail transfer to a peer.
   -- Inlining these workers into each other duplicates the branches along the
   -- chain. Straight-line wrappers and calls with a different ABI stay eligible.
@@ -464,20 +768,21 @@ module Bootstrap.LLVM.Codegen where {
   -- never addresses in the caller's frame. Only equal all-pointer ABIs qualify.
   -- Keep specialized entry selection, operand demand order and outlining rules.
   finishOrdinary :: Int -> Map XName CGBinding -> XErased -> Build ();
-  finishOrdinary arity scope expression = do {
-    prior <- gets instructions;
-    if O.remainingSize 128 expression < 0 && workerBodyLimit 4097 prior then do {
+  finishOrdinary arity = finishOrdinaryWithDemands arity Nothing;
+  finishOrdinaryWithDemands arity demands scope expression = do {
+    prior <- gets emittedCount;
+    if O.remainingSize 128 expression < 0 && prior >= 4097 then do {
       value <- evaluate scope expression;
       emit ("  ret ptr " ++ value)
-    } else finishOrdinaryBody arity scope expression
+    } else finishOrdinaryBody arity demands scope expression
   };
   finishOrdinaryValue :: Map XName CGBinding -> XErased -> Build ();
   finishOrdinaryValue scope expression = do {
     value <- evaluateBody scope expression;
     emit ("  ret ptr " ++ value)
   };
-  finishOrdinaryBody :: Int -> Map XName CGBinding -> XErased -> Build ();
-  finishOrdinaryBody arity scope expression = case expression of {
+  finishOrdinaryBody :: Int -> Maybe A.LetDemands -> Map XName CGBinding -> XErased -> Build ();
+  finishOrdinaryBody arity demands scope expression = case expression of {
     XELet n rhs body -> do {
       fs <- gets functions;
       if M.member O.compareName n fs then finishOrdinary arity scope body else do {
@@ -488,9 +793,7 @@ module Bootstrap.LLVM.Codegen where {
             emit ("  ret ptr " ++ value)
           };
           Nothing -> do {
-            strict <- letDemanded scope n body;
-            value <- if strict then evaluate scope rhs else thunk scope rhs;
-            finishOrdinary arity (M.insert O.compareName n (CGBinding value strict) scope) body
+            emitDemandedLet demands fs scope n rhs body (finishOrdinaryWithDemands arity)
           }
         }
       }
@@ -518,11 +821,15 @@ module Bootstrap.LLVM.Codegen where {
       else finishCase (finishOrdinary arity) scope scrutinee alternatives
     };
     _ -> case O.applications expression of {
-      (,) (XEPrimitive PIfThenElse) [condition,yes,no] -> do {
-        value <- evaluate scope condition;
-        test <- result ("icmp eq ptr " ++ value ++ ", " ++ immediate 6);
-        finishChoice test (finishOrdinary arity scope yes) (finishOrdinary arity scope no)
-      };
+      (,) (XEPrimitive PIfThenElse) [condition,yes,no] ->
+        case integerCases condition yes no of {
+          Just ((,,) name arms fallback) -> finishIntegerCases (finishOrdinary arity) scope name arms fallback;
+          Nothing -> do {
+            value <- evaluate scope condition;
+            test <- result ("icmp eq ptr " ++ value ++ ", " ++ immediate 6);
+            finishChoice test (finishOrdinary arity scope yes) (finishOrdinary arity scope no)
+          }
+        };
       (,) (XEPrimitive PSeq) [first,next] -> do {
         evaluate scope first;
         finishOrdinary arity scope next
@@ -533,8 +840,7 @@ module Bootstrap.LLVM.Codegen where {
           Just f -> do {
             symbol <- worker name f;
             prepared <- workerArguments scope f args;
-            value <- result ("musttail call ptr " ++ symbol ++ "(" ++
-              L.intercalate ", " (L.map pointer (L.append (L.fst prepared) (L.snd prepared))) ++ ")");
+            value <- mustTailPointer symbol (L.map pointer (L.append (L.fst prepared) (L.snd prepared)));
             emit ("  ret ptr " ++ value)
           };
           Nothing -> finishOrdinaryValue scope expression
@@ -563,8 +869,20 @@ module Bootstrap.LLVM.Codegen where {
   buildWrapper name f symbol captured remaining =
     case remaining of {
       [] -> failure "LLVM empty function wrapper";
-      (:) arg rest ->
-        definition symbol (args2 "ptr %env" "ptr %arg")
+      (:) arg rest -> do {
+        enabled <- gets closureChainsEnabled;
+        let { width = L.length captured };
+        if enabled && useClosureChain width (L.length rest) then
+          case L.reverse rest of {
+            (:) last previous -> do {
+              child <- fresh "@mlf.curry.";
+              let { fields = L.append captured ((:) arg (L.reverse previous)) };
+              buildWrapper name f child fields [last];
+              startClosureChain symbol width (L.length fields) child
+            };
+            [] -> failure "LLVM empty function wrapper"
+          }
+        else definition symbol (args2 "ptr %env" "ptr %arg")
           (do {
              saved <- readEnvironment captured;
              let {
@@ -579,6 +897,7 @@ module Bootstrap.LLVM.Codegen where {
                     call "@mlf_closure" (args2 (pointer next) (pointer env))
                   }
            })
+      }
     };
   invoke :: Map XName CGBinding -> XName -> A.WorkerFunction -> [] XErased -> Build String;
   invoke scope name f args =
@@ -627,6 +946,39 @@ module Bootstrap.LLVM.Codegen where {
     }) (L.zip (A.parameters f) args);
     cgPure ((,) captured values)
   };
+  -- Only returned values contribute. Ordered effects and failures keep their
+  -- original evaluation, and all possible returning branches must agree that
+  -- the result is a compact Int. This does not assume anything about operands.
+  boxedResultRange :: XErased -> Maybe ((,) Int Int);
+  boxedResultRange expression = let {
+    child = boxedResultRange;
+    combine range value = do {
+      current <- range;
+      found <- child value;
+      Just (rangeUnion current found)
+    };
+    known value = if N.smallBounds value then Just value else Nothing
+  } in case expression of {
+    XEInt n -> known ((,) n n);
+    XELet _ _ body -> child body;
+    XELetRec _ body -> child body;
+    XECase _ ((:) (XErasedAlternative _ body) rest) -> L.foldl
+      (\range (XErasedAlternative _ arm) -> combine range arm) (child body) rest;
+    XEApp _ _ -> case O.applications expression of {
+      (,) (XEPrimitive PRemInt) [_, XEInt divisor] ->
+        if divisor > 0 && N.smallBounds ((,) divisor divisor)
+        then Just ((,) (1 - divisor) (divisor - 1)) else Nothing;
+      (,) (XEPrimitive PIfThenElse) [_,yes,no] -> combine (child yes) no;
+      (,) (XEPrimitive PSeq) [_,body] -> child body;
+      (,) (XEPrimitive primitive) [left,right] -> case primitive of {
+        PAddInt -> do { a <- child left; b <- child right; known (N.integerBounds primitive a b) };
+        PSubInt -> do { a <- child left; b <- child right; known (N.integerBounds primitive a b) };
+        _ -> Nothing
+      };
+      _ -> Nothing
+    };
+    _ -> Nothing
+  };
   invokeOrdinary :: Map XName CGBinding ->
                     XName -> A.WorkerFunction -> [] XErased -> Build String;
   invokeOrdinary scope name f args =
@@ -638,7 +990,12 @@ module Bootstrap.LLVM.Codegen where {
           symbol <- worker name f;
           preparedArguments <- workerArguments scope f args;
           let { captured = L.fst preparedArguments; values = L.snd preparedArguments };
-          call symbol (L.map pointer (L.append captured values))
+          value <- call symbol (L.map pointer (L.append captured values));
+          case boxedResultRange (A.functionBody f) of {
+            Nothing -> cgPure ();
+            Just bounds -> recordRange value bounds
+          };
+          cgPure value
         }
       }
     };
@@ -676,7 +1033,7 @@ module Bootstrap.LLVM.Codegen where {
           else (:) (pointer (producerRegister selected index)) []) entries };
       let { scope = M.fromList O.compareName (L.map
         (\((,) index parameter) -> (,) parameter
-          (CGBinding (producerRegister selected index) (S.member O.compareName parameter (A.strict f))))
+          (CGWorkerArgument (producerRegister selected index) (S.member O.compareName parameter (A.strict f))))
         (L.filter (\((,) index ignored) -> index /= selected) entries)) };
       definition symbol parameters
         (evaluateProducerPrefix info mode first second scope (V.prefixExpression name (V.prefix info)))
@@ -731,7 +1088,7 @@ module Bootstrap.LLVM.Codegen where {
       (,) (XEPrimitive PIfThenElse) ((:) condition ((:) yes ((:) no []))) -> do {
         boxed <- result ("icmp eq i64 " ++ mode ++ ", 0");
         value <- choose "ptr" boxed
-          (forceBinding (CGBinding first False))
+          (forceBinding (CGWorkerArgument first False))
           (evaluate (producerScope info (args2 first second)) (V.recipe info));
         evaluate (M.insert O.compareName (V.parameter info) (CGBinding value True) scope) expression
       };
@@ -848,24 +1205,32 @@ module Bootstrap.LLVM.Codegen where {
              env <- environment scope captures;
              call "@mlf_thunk" (args2 (pointer code) (pointer env))
            }
-      else do {
-             value <-
-               call (if (L.length captures <= 28) then "@mlf.allocate.thunk" else "@mlf_thunk_new")
-                 (args2 (pointer code) (number (L.length captures)));
-             env <- loadAt "ptr" value 16;
-             L.mapM_
-               (\entry ->
-                  case entry of {
-                    (,) index name ->
-                      do {
-                        binding <- lookupName scope name;
-                        captured <- bindingOperand binding;
-                        storeEnvironment env index captured
-                      }
-                  })
-               (L.zip (L.range 0 (L.length captures - 1)) captures);
-             cgPure value
-           }
+      else let {
+        width = L.length captures;
+        local name = case M.lookup O.compareName name scope of {
+          Just (CGSlot _ _) -> Nothing;
+          ready -> ready
+        };
+        compact = if width <= 4 then L.mapM local captures else Nothing
+      } in case compact of {
+        -- Existing operands can be passed without emitting a load, closure
+        -- or force. Their references stay live until the helper fills its slots.
+        Just bindings -> do {
+          values <- L.mapM bindingOperand bindings;
+          callCompactAllocation (thunkCaptureHelper width) ((:) (pointer code) (L.map pointer values))
+        };
+        Nothing -> do {
+          value <- call (if width <= 28 then "@mlf.allocate.thunk" else "@mlf_thunk_new")
+            (args2 (pointer code) (number width));
+          env <- loadAt "ptr" value 16;
+          L.mapM_ (\((,) index name) -> do {
+            binding <- lookupName scope name;
+            captured <- bindingOperand binding;
+            storeEnvironment env index captured
+          }) (L.zip (L.range 0 (width - 1)) captures);
+          cgPure value
+        }
+      }
     };
   -- Computing these operations cannot fail on checked, already evaluated
   -- operands. In particular, neither indexing nor division is admitted here.
@@ -900,7 +1265,7 @@ module Bootstrap.LLVM.Codegen where {
   readyName scope known name = case M.lookup O.compareName name scope of {
     Nothing -> False;
     Just (CGSlot _ forced) -> forced;
-    Just (CGBinding value forced) -> forced || M.member compareString value known
+    Just binding -> evaluated binding || M.member compareString (operand binding) known
   };
   nextDemandIs :: Map XName CGBinding -> Map String String -> XName -> [] XName -> Bool;
   nextDemandIs scope known binder names = case names of {
@@ -910,15 +1275,18 @@ module Bootstrap.LLVM.Codegen where {
       else if readyName scope known first then nextDemandIs scope known binder rest
       else False
   };
-  letDemanded :: Map XName CGBinding -> XName -> XErased -> Build Bool;
-  letDemanded scope binder body = do {
-    fs <- gets functions;
+  emitDemandedLet :: forall a. Maybe A.LetDemands -> Map XName A.WorkerFunction ->
+    Map XName CGBinding -> XName -> XErased -> XErased ->
+    (Maybe A.LetDemands -> Map XName CGBinding -> XErased -> Build a) -> Build a;
+  emitDemandedLet pending fs scope binder rhs body continue = let {
+    demands = case pending of { Just saved -> saved; Nothing -> A.letBodyDemands fs body }
+  } in case demands of { A.LetDemands entry rest -> do {
     known <- gets forcedValues;
-    -- Entry prefixes already stop at semantic barriers. Skip only earlier
-    -- forces that have succeeded on this dominating path; missing bindings
-    -- and facts from sibling branches cannot justify advancing the demand.
-    cgPure (nextDemandIs scope known binder (A.demandNames (A.entryDemand fs M.empty body)))
-  };
+    -- Skip only earlier forces that succeeded on this dominating path.
+    let { strict = nextDemandIs scope known binder (A.demandNames entry) };
+    value <- if strict then evaluate scope rhs else thunk scope rhs;
+    continue rest (M.insert O.compareName binder (CGBinding value strict) scope) body
+  } };
   thunk :: Map XName CGBinding -> XErased -> Build String;
   thunk scope expression =
     case expression of {
@@ -959,23 +1327,28 @@ module Bootstrap.LLVM.Codegen where {
   -- function. Outline only at an existing evaluation point, immediately call
   -- the helper, and capture values so demand order and escaping closures stay
   -- unchanged. Both the expression and instruction scans are bounded.
-  evaluate scope expression = do {
-    prior <- gets instructions;
-    if O.remainingSize 128 expression < 0 && workerBodyLimit 4097 prior then do {
+  evaluate = evaluateSkippingCases 0;
+  evaluateSkippingCases skipped = evaluateWithDemands skipped Nothing;
+  evaluateWithDemands skipped demands scope expression = do {
+    prior <- gets emittedCount;
+    if O.remainingSize 128 expression < 0 && prior >= 4097 then do {
       fs <- gets functions;
       let { names = S.toList (A.needed fs expression) };
       -- Loading an oversized environment could itself cross the instruction
       -- budget and re-outline the same expression indefinitely. Descend in the
       -- current function until the required capture set is small enough.
-      if L.length names > 1024 then evaluateBody scope expression else do {
-        code <- callback names Nothing expression;
+      if L.length names > 1024 then evaluateBodySkippingCases skipped demands scope expression else do {
+        -- The size guard also rules out callback interning. Keep the declined
+        -- prefix when the ordinary instruction budget outlines this branch.
+        code <- callbackFreshWith (evaluateWithDemands skipped demands) False names Nothing expression;
         env <- environment scope names;
         call code (args2 (pointer env) "ptr null")
       }
-    } else evaluateBody scope expression
+    } else evaluateBodySkippingCases skipped demands scope expression
   };
   evaluateBody :: Map XName CGBinding -> XErased -> Build String;
-  evaluateBody scope expression =
+  evaluateBody = evaluateBodySkippingCases 0 Nothing;
+  evaluateBodySkippingCases skipped demands scope expression =
     case expression of {
       XEVar n ->
         do {
@@ -1029,9 +1402,7 @@ module Bootstrap.LLVM.Codegen where {
             case recipePlan n plans of {
               Just info -> evaluateDeferredProducer info scope;
               Nothing -> do {
-                strict <- letDemanded scope n body;
-                value <- if strict then evaluate scope rhs else thunk scope rhs;
-                evaluate (M.insert O.compareName n (CGBinding value strict) scope) body
+                emitDemandedLet demands fs scope n rhs body (evaluateWithDemands 0)
               }
             }
           }
@@ -1041,7 +1412,18 @@ module Bootstrap.LLVM.Codegen where {
           recursive <- recursiveBindings scope bindings body;
           evaluate recursive body
         };
-      XECase scrutinee alternatives -> evaluateCase evaluate scope scrutinee alternatives;
+      XECase scrutinee alternatives -> let {
+        ordinary remaining = evaluateCase (evaluateSkippingCases remaining) scope scrutinee alternatives
+      } in if skipped > 0 then ordinary (skipped - 1) else case constructorSpine alternatives of {
+        Right ((,,,,) constructor depth next found fallback) -> do {
+          available <- gets constructors;
+          case M.lookup compareString constructor available of {
+            Just ((,) tag 2) -> evaluateConstructorSpine scope scrutinee constructor tag depth next found fallback;
+            _ -> ordinary (depth - 1)
+          }
+        };
+        Left remaining -> ordinary remaining
+      };
       XEApp f a -> application scope expression;
       XEEvidenceHole hole -> failure "LLVM unresolved dictionary evidence"
     };
@@ -1063,6 +1445,62 @@ module Bootstrap.LLVM.Codegen where {
     Just f -> if L.length args == L.length (A.parameters f) then found else S.insert O.compareName name found;
     Nothing -> found
   };
+  -- A recursive group needs escape information only for its own captureless
+  -- workers. Collect these uses together as the syntax enters their groups.
+  -- A repeated recursive identity in raw input uses the scoped scan above.
+  indexWorkerEscapes :: Map XName A.WorkerFunction -> XErased -> WorkerEscapes;
+  indexWorkerEscapes fs expression = observe fs IM.empty
+    (WorkerEscapes IS.empty IS.empty IS.empty) expression;
+  recursiveWorkerArity fs name = case M.lookup O.compareName name fs of {
+    Just f -> if L.null (A.captures f) then Just (L.length (A.parameters f)) else Nothing;
+    Nothing -> Nothing
+  };
+  enrollWorker fs ((,) active previous) ((,) name _) =
+    case recursiveWorkerArity fs name of {
+      Just count -> case previous of {
+        WorkerEscapes entered repeated escaped ->
+          let { identity = O.nameId name;
+                duplicates = if IS.member identity entered then IS.insert identity repeated else repeated }
+          in (,) (IM.insert identity count active)
+                 (WorkerEscapes (IS.insert identity entered) duplicates escaped)
+      };
+      Nothing -> (,) active previous
+    };
+  observeWorker active previous name arity =
+    let { identity = O.nameId name } in case IM.lookup identity active of {
+      Just expected -> if arity == expected then previous else case previous of {
+        WorkerEscapes entered repeated escaped ->
+          WorkerEscapes entered repeated (IS.insert identity escaped)
+      };
+      Nothing -> previous
+    };
+  observeWorkerCall fs active arity previous expression = seq previous
+    (case expression of {
+      XEApp head argument -> observeWorkerCall fs active (arity + 1)
+        (observe fs active previous argument) head;
+      XEVar name -> observeWorker active previous name arity;
+      _ -> observe fs active previous expression
+    });
+  observe fs active previous expression = seq previous (case expression of {
+    XEVar name -> observeWorker active previous name 0;
+    XEApp _ _ -> observeWorkerCall fs active 0 previous expression;
+    XEAbs _ body -> observe fs active previous body;
+    XELet _ value body -> observe fs active (observe fs active previous value) body;
+    XELetRec bindings body -> case L.foldlStrict (enrollWorker fs) ((,) active previous) bindings of {
+      (,) local next -> observe fs local
+        (L.foldlStrict (\found entry -> observe fs local found (L.snd entry)) next bindings) body
+    };
+    XECase subject alternatives -> L.foldlStrict
+      (\found (XErasedAlternative _ body) -> observe fs active found body)
+      (observe fs active previous subject) alternatives;
+    _ -> previous
+  });
+  indexedWorkerEscape index fallback name = case index of {
+    Just (WorkerEscapes entered repeated escaped) -> let { identity = O.nameId name } in
+      if IS.member identity entered && L.not (IS.member identity repeated) then IS.member identity escaped
+      else S.member O.compareName name fallback;
+    Nothing -> S.member O.compareName name fallback
+  };
   -- In a large recursive scope retain escaping function values once, rather than
   -- rebuilding their environments at every lookup. Stack slots shorten the
   -- SSA lifetimes of recursive roots; only entry-block slots are allowed.
@@ -1070,13 +1508,14 @@ module Bootstrap.LLVM.Codegen where {
   recursiveBindings :: Map XName CGBinding -> [] ((,) XName XErased) -> XErased -> Build (Map XName CGBinding);
   recursiveBindings scope bindings body = do {
     fs <- gets functions;
+    index <- gets workerEscapeIndex;
     let {
       large = M.size scope + L.length bindings > 128 || O.remainingSize 16384 body < 0;
       escapes = L.foldlStrict (\seen binding -> escapingWorkers fs seen (L.snd binding))
         (escapingWorkers fs S.empty body) bindings;
       needsHole entry = case M.lookup O.compareName (L.fst entry) fs of {
         Nothing -> True;
-        Just f -> large && (L.not (L.null (A.captures f)) || S.member O.compareName (L.fst entry) escapes)
+        Just f -> large && (L.not (L.null (A.captures f)) || indexedWorkerEscape index escapes (L.fst entry))
       };
       values = L.filter needsHole bindings
     };
@@ -1097,6 +1536,78 @@ module Bootstrap.LLVM.Codegen where {
       emit ("  call void @mlf_fill(ptr " ++ operand hole ++ ", ptr " ++ value ++ ")")
     }) values;
     cgPure recursive
+  };
+  -- A successful arm may only demand one of this constructor's fields as the
+  -- next subject. At the last constructor it returns a single field. Every
+  -- default has the same closed literal and binds nothing.
+  constructorSpine :: [] XErasedAlternative -> Either Int ((,,,,) String Int Int Int Int);
+  constructorSpine alternatives = let {
+    matches n field = case field of { Just other -> X.equalName n other; _ -> False };
+    selected n a b = case (,) (matches n a) (matches n b) of {
+      (,) True False -> Just 0; (,) False True -> Just 1; _ -> Nothing
+    };
+    -- All prior levels matched this tag, field and literal. Their suffixes
+    -- reach the same mismatch. The mismatching case can start another spine.
+    scan constructor fallback step depth arms = let { stop = Left (depth - 2) } in case arms of {
+      [XErasedAlternative (XConstructorPattern name [a,b]) body,
+       XErasedAlternative (XDefaultPattern Nothing) (XEInt miss)] ->
+        if L.not (eqString name constructor) || miss /= fallback then stop else case body of {
+          XECase (XEVar n) next -> case selected n a b of {
+            Just field -> if field == step then scan constructor fallback step (depth + 1) next else stop;
+            Nothing -> stop
+          };
+          XEVar n -> if depth < 4 then stop else case selected n a b of {
+            Just field -> Right ((,,,,) constructor depth step field fallback); Nothing -> stop
+          };
+          _ -> stop
+        };
+      _ -> stop
+    }
+  } in case alternatives of {
+    [XErasedAlternative (XConstructorPattern constructor [a,b]) (XECase (XEVar n) next),
+     XErasedAlternative (XDefaultPattern Nothing) (XEInt fallback)] -> case selected n a b of {
+       Just step -> scan constructor fallback step 2 next; Nothing -> Left 0
+    };
+    _ -> Left 0
+  };
+  evaluateConstructorSpine scope subject constructor tag depth step found fallback = do {
+    first <- evaluate scope subject;
+    flags <- gets (\state -> M.findWithDefault compareString [] constructor (constructorFacts state));
+    let { strict field = L.fromMaybe False (L.at field flags);
+          offset field = 16 + 8 * field };
+    entry <- gets block;
+    loop <- fresh "spine.loop."; matched <- fresh "spine.match.";
+    advance <- fresh "spine.tail."; success <- fresh "spine.field.";
+    short <- fresh "spine.short."; join <- fresh "spine.join.";
+    next <- fresh "%spine.next."; decremented <- fresh "%spine.count.";
+    emit ("  br label %" ++ loop);
+    loopLabel loop;
+    value <- phi "ptr" [(,) first entry,(,) next advance];
+    remaining <- phi "i64" [(,) (showInt depth) entry,(,) decremented advance];
+    actual <- constructorTag value;
+    same <- result ("icmp eq i64 " ++ actual ++ ", " ++ showInt tag);
+    emit ("  br i1 " ++ same ++ ", label %" ++ matched ++ ", label %" ++ short);
+    label matched;
+    last <- result ("icmp eq i64 " ++ remaining ++ ", 1");
+    emit ("  br i1 " ++ last ++ ", label %" ++ success ++ ", label %" ++ advance);
+    label advance;
+    address <- result ("getelementptr i8, ptr " ++ value ++ ", i64 " ++ showInt (offset step));
+    let { load = "load ptr, ptr " ++ address ++ ", align 8, !tbaa !3" };
+    if strict step then emit ("  " ++ next ++ " = " ++ load) else do {
+      raw <- result load;
+      emit ("  " ++ next ++ " = call ptr @mlf.force(ptr " ++ raw ++ ")")
+    };
+    emit ("  " ++ decremented ++ " = sub i64 " ++ remaining ++ ", 1");
+    emit ("  br label %" ++ loop);
+    label success;
+    field <- loadAt "ptr" value (offset found);
+    answer <- if strict found then cgPure field else forceValue field;
+    emit ("  br label %" ++ join);
+    label short;
+    missed <- literalInteger fallback;
+    emit ("  br label %" ++ join);
+    label join;
+    phi "ptr" [(,) answer success,(,) missed short]
   };
   evaluateCase :: (Map XName CGBinding -> XErased -> Build String) ->
                   Map XName CGBinding -> XErased -> [] XErasedAlternative -> Build String;
@@ -1128,7 +1639,6 @@ module Bootstrap.LLVM.Codegen where {
       _ ->
         do {
           value <- evaluate scope scrutinee;
-          tag <- constructorTag value;
           labelled <-
             L.mapM
               (\alternative ->
@@ -1142,10 +1652,7 @@ module Bootstrap.LLVM.Codegen where {
           let {
             fallback = L.fromMaybe missing (caseFallback labelled)
           };
-          entries <- L.mapM caseSwitchEntry labelled;
-          emit ("  switch i64 " ++ (tag ++ (", label %" ++ (fallback ++ " ["))));
-          L.mapM_ emit (L.concat entries);
-          emit "  ]";
+          dispatchCase value fallback labelled;
           forcedBefore <- gets forcedValues;
           incoming <-
             L.mapM
@@ -1183,6 +1690,55 @@ module Bootstrap.LLVM.Codegen where {
           _ -> caseFallback rest
         }
     };
+  -- Only a complete set from one checked constructor family can use its
+  -- representation directly. The caller still evaluates the scrutinee.
+  dispatchCase :: String -> String -> [] ((,) String XErasedAlternative) -> Build ();
+  dispatchCase value fallback labelled = do {
+    entries <- L.mapM (\((,) dest (XErasedAlternative pat _)) -> case pat of {
+      XDefaultPattern _ -> cgPure [];
+      XConstructorPattern name _ -> do {
+        descriptor <- lookupConstructor name;
+        cgPure [(,) (L.fst descriptor) dest]
+      }
+    }) labelled;
+    layouts <- gets caseDispatches;
+    let {
+      arms = L.concat entries;
+      generic = do { tag <- constructorTag value; emitCaseSwitch tag fallback arms };
+      target tag = L.fromMaybe fallback (L.lookup eqInt tag arms)
+    };
+    case arms of {
+      [] -> generic;
+      (:) ((,) tag _) rest -> case M.lookup L.compareInt tag layouts of {
+        Nothing -> generic;
+        Just ((,,) owner width plan) -> let {
+          member entry = case M.lookup L.compareInt (L.fst entry) layouts of {
+            Just ((,,) other _ _) -> owner == other;
+            Nothing -> False
+          };
+          distinct = S.size (S.fromList L.compareInt (L.map L.fst arms))
+        } in if width /= L.length arms || distinct /= width || L.not (L.all member rest) ||
+          L.isJust (caseFallback labelled) then generic else case plan of {
+          SingleCase -> emit ("  br label %" ++ target tag);
+          HeapCases -> do { key <- loadAt "i64" value 8; emitCaseSwitch key fallback arms };
+          ImmediateCases -> do {
+            bits <- result ("ptrtoint ptr " ++ value ++ " to i64");
+            emitCaseSwitch bits fallback (L.map (\((,) n dest) -> (,) (n * 8 + 4) dest) arms)
+          };
+          BinaryCase zero boxed -> do {
+            empty <- result ("icmp eq ptr " ++ value ++ ", " ++ immediate (8 * zero + 4));
+            emit ("  br i1 " ++ empty ++ ", label %" ++ target zero ++ ", label %" ++ target boxed)
+          }
+        }
+      }
+    }
+  };
+  emitCaseSwitch :: String -> String -> [] ((,) Int String) -> Build ();
+  emitCaseSwitch tag fallback arms = do {
+    emit ("  switch i64 " ++ tag ++ ", label %" ++ fallback ++ " [");
+    L.mapM_ (\((,) n dest) -> emit ("    i64 " ++ showInt n ++ ", label %" ++ dest)) arms;
+    emit "  ]"
+  };
   caseSwitchEntry :: (,) String XErasedAlternative -> Build ([] String);
   caseSwitchEntry ((,) label (XErasedAlternative pattern body)) =
     case pattern of {
@@ -1261,17 +1817,18 @@ module Bootstrap.LLVM.Codegen where {
   -- Ordinary worker and let demands still produce the action description before
   -- execution. Bind results stay lazy, including results returned by helpers.
   executeST :: String -> Map XName CGBinding -> XErased -> Build String;
-  executeST fuel scope expression =
+  executeST fuel = executeSTWithDemands fuel Nothing;
+  executeSTWithDemands fuel demands scope expression =
     case expression of {
       XELet n rhs body ->
         case body of {
           XEApp (XEApp (XEPrimitive PSTBind) (XEVar use)) next ->
             if (O.eqName n use && L.not (S.member O.compareName n (O.free next)))
             then executeST fuel scope (XEApp (XEApp (XEPrimitive PSTBind) rhs) next)
-            else executeSTLet fuel scope n rhs body;
+            else executeSTLet fuel demands scope n rhs body;
           XEVar use ->
-            if O.eqName n use then executeST fuel scope rhs else executeSTLet fuel scope n rhs body;
-          _ -> executeSTLet fuel scope n rhs body
+            if O.eqName n use then executeST fuel scope rhs else executeSTLet fuel demands scope n rhs body;
+          _ -> executeSTLet fuel demands scope n rhs body
         };
       XELetRec bindings body ->
         do {
@@ -1443,22 +2000,19 @@ module Bootstrap.LLVM.Codegen where {
     };
   -- Single-use action aliases remain in the execution context above; ordinary
   -- values retain the same demand and sharing rules as ordinary code generation.
-  executeSTLet :: String -> Map XName CGBinding -> XName -> XErased -> XErased -> Build String;
-  executeSTLet fuel scope n rhs body =
+  executeSTLet :: String -> Maybe A.LetDemands -> Map XName CGBinding -> XName -> XErased -> XErased -> Build String;
+  executeSTLet fuel demands scope n rhs body =
     do {
       fs <- gets functions;
       if M.member O.compareName n fs
       then executeST fuel scope body
-      else do {
-             strict <- letDemanded scope n body;
-             value <- if strict then evaluate scope rhs else thunk scope rhs;
-             executeST fuel (M.insert O.compareName n (CGBinding value strict) scope) body
-           }
+      else emitDemandedLet demands fs scope n rhs body (executeSTWithDemands fuel)
     };
   -- Tail transfers preserve the current frame's budget. Only equal worker
   -- signatures use musttail; non-tail calls still consume bounded fuel.
   executeSTTail :: Int -> String -> String -> Map XName CGBinding -> XErased -> Build ();
-  executeSTTail arity tailFuel fuel scope expression =
+  executeSTTail arity tailFuel fuel = executeSTTailWithDemands arity tailFuel fuel Nothing;
+  executeSTTailWithDemands arity tailFuel fuel demands scope expression =
     case expression of {
       XELet n rhs body ->
         case body of {
@@ -1466,12 +2020,12 @@ module Bootstrap.LLVM.Codegen where {
             if (O.eqName n use && L.not (S.member O.compareName n (O.free next)))
             then executeSTTail arity tailFuel fuel scope
                    (XEApp (XEApp (XEPrimitive PSTBind) rhs) next)
-            else executeSTTailLet arity tailFuel fuel scope n rhs body;
+            else executeSTTailLet arity tailFuel fuel demands scope n rhs body;
           XEVar use ->
             if O.eqName n use
             then executeSTTail arity tailFuel fuel scope rhs
-            else executeSTTailLet arity tailFuel fuel scope n rhs body;
-          _ -> executeSTTailLet arity tailFuel fuel scope n rhs body
+            else executeSTTailLet arity tailFuel fuel demands scope n rhs body;
+          _ -> executeSTTailLet arity tailFuel fuel demands scope n rhs body
         };
       XELetRec bindings body ->
         do {
@@ -1513,14 +2067,7 @@ module Bootstrap.LLVM.Codegen where {
                          preparedArguments <- workerArguments scope f args;
                          let { captured = L.fst preparedArguments; values = L.snd preparedArguments };
                          value <-
-                           result
-                             ("musttail call ptr " ++
-                              (symbol ++
-                               ("(" ++
-                                (L.intercalate ", "
-                                   ((:) ("i64 " ++ tailFuel)
-                                      (L.map pointer (L.append captured values))) ++
-                                 ")"))));
+                           mustTailPointer symbol ((:) ("i64 " ++ tailFuel) (L.map pointer (L.append captured values)));
                          emit ("  ret ptr " ++ value)
                        }
                   else finishST fuel scope expression;
@@ -1532,19 +2079,13 @@ module Bootstrap.LLVM.Codegen where {
     };
   executeSTTailLet :: Int ->
                       String ->
-                      String -> Map XName CGBinding -> XName -> XErased -> XErased -> Build ();
-  executeSTTailLet arity tailFuel fuel scope n rhs body =
+                      String -> Maybe A.LetDemands -> Map XName CGBinding -> XName -> XErased -> XErased -> Build ();
+  executeSTTailLet arity tailFuel fuel demands scope n rhs body =
     do {
       fs <- gets functions;
       if M.member O.compareName n fs
       then executeSTTail arity tailFuel fuel scope body
-      else do {
-             strict <- letDemanded scope n body;
-             value <- if strict then evaluate scope rhs else thunk scope rhs;
-             executeSTTail arity tailFuel fuel
-               (M.insert O.compareName n (CGBinding value strict) scope)
-               body
-           }
+      else emitDemandedLet demands fs scope n rhs body (executeSTTailWithDemands arity tailFuel fuel)
     };
   finishST :: String -> Map XName CGBinding -> XErased -> Build ();
   finishST fuel scope expression =
@@ -1557,6 +2098,222 @@ module Bootstrap.LLVM.Codegen where {
     withScalarRanges (scalarRanges saved)
       (withArrayViews (arrayViews saved)
          (withUnboxedDoubles (unboxedDoubles saved) (withForcedValues (forcedValues saved) state)));
+  -- Source literal cases are lowered to nested equalities. An Int in the
+  -- compact range has a canonical immediate representation, whose low bit
+  -- distinguishes it from heap-boxed Ints.
+  integerCaseKey :: XErased -> Maybe ((,) XName Int);
+  integerCaseKey condition = case condition of {
+    XEApp (XEApp (XEPrimitive PEqInt) (XEVar name)) (XEInt value) ->
+      if N.smallBounds ((,) value value)
+      then Just ((,) name (2 * value + 1)) else Nothing;
+    _ -> Nothing
+  };
+  integerCases :: XErased -> XErased -> XErased -> Maybe ((,,) XName ([] ((,) Int XErased)) XErased);
+  integerCases condition yes no = do {
+    (,) name key <- integerCaseKey condition;
+    let {
+      collect seen reversed next = case next of {
+        XEApp (XEApp (XEApp (XEPrimitive PIfThenElse) test) branch) rest ->
+          case integerCaseKey test of {
+            Just ((,) use bits) ->
+              if O.eqName name use && L.not (S.member L.compareInt bits seen)
+              then collect (S.insert L.compareInt bits seen) ((:) ((,) bits branch) reversed) rest
+              else ((,) reversed next);
+            Nothing -> ((,) reversed next)
+          };
+        _ -> ((,) reversed next)
+      }
+    };
+    case collect (S.singleton key) [((,) key yes)] no of {
+      (,) arms fallback ->
+        if L.null (L.drop 2 arms) then Nothing else Just ((,,) name (L.reverse arms) fallback)
+    }
+  };
+  finishIntegerCases :: (Map XName CGBinding -> XErased -> Build ()) ->
+    Map XName CGBinding -> XName -> [] ((,) Int XErased) -> XErased -> Build ();
+  finishIntegerCases finish scope name arms fallback =
+    let { ordinary = finishIntegerSwitch finish scope name arms fallback } in
+    if M.member O.compareName caseString scope then ordinary else do {
+      state <- get;
+      case largestStringCaseRun state arms of {
+        Just run@(DenseStringRun offset start count body expected texts) ->
+          let { partial = finishPartialStringCase finish scope name arms fallback run } in
+          if offset /= 0 || L.not (L.null (L.drop count arms)) then partial else
+            case stringCaseKey state fallback of {
+              Just ((,,) _ fields defaultText) ->
+                if L.eqList eqString expected fields
+                then emitDenseStringCases finish scope name start body texts defaultText
+                else partial;
+              Nothing -> partial
+            };
+        Nothing -> ordinary
+      }
+    };
+  -- Replace one static string in each arm with a common operand. The exact
+  -- callback key checks the remaining expression, including worker captures.
+  -- Choosing the operand does not evaluate any part of the continuation.
+  caseString :: XName;
+  caseString = XName (0 - 9223372036854775807) "case string";
+  stringCaseTemplate :: XErased -> Maybe ((,) XErased (Maybe String));
+  stringCaseTemplate expression = let {
+    intact = Just ((,) expression Nothing);
+    matchPair combine function argument = do {
+      (,) f first <- stringCaseTemplate function;
+      (,) a second <- stringCaseTemplate argument;
+      literal <- case first of {
+        Nothing -> Just second;
+        Just _ -> case second of { Nothing -> Just first; Just _ -> Nothing }
+      };
+      Just ((,) (combine f a) literal)
+    }
+  } in case expression of {
+    XEString value -> Just ((,) (XEVar caseString) (Just value));
+    XEVar name -> if O.eqName name caseString then Nothing else intact;
+    XEApp function argument -> matchPair XEApp function argument;
+    XELet name rhs body ->
+      if O.eqName name caseString then Nothing else matchPair (XELet name) rhs body;
+    XECase subject [XErasedAlternative pattern body] ->
+      if L.any (O.eqName caseString) (X.patternNames pattern) then Nothing
+      else matchPair (\value branch -> XECase value [XErasedAlternative pattern branch]) subject body;
+    XEPrimitive _ -> intact;
+    XEConstructor _ -> intact;
+    XEInt _ -> intact;
+    _ -> Nothing
+  };
+  stringCaseKey :: Output -> XErased -> Maybe ((,,) XErased ([] String) String);
+  stringCaseKey state branch = if O.remainingSize 128 branch < 0 then Nothing else
+    case stringCaseTemplate branch of {
+      Just ((,) template (Just literal)) -> do {
+        key <- callbackTerm state M.empty template;
+        Just ((,,) template key literal)
+      };
+      _ -> Nothing
+    };
+  data DenseStringRun = DenseStringRun Int Int Int XErased ([] String) ([] String);
+  -- Completed runs do not overlap. Consume each arm once except for the first
+  -- arm after a run, whose key also starts the next candidate.
+  largestStringCaseRun :: Output -> [] ((,) Int XErased) -> Maybe DenseStringRun;
+  largestStringCaseRun state arms = let {
+    consume expected key count reversed remaining = let {
+      done = (,,) count reversed remaining
+    } in case remaining of {
+      (:) ((,) actual arm) rest -> if key /= actual then done else
+        case stringCaseKey state arm of {
+          Just ((,,) _ fields literal) ->
+            if L.eqList eqString expected fields then
+              let { next = key + 2; size = count + 1 } in seq next (seq size
+                (consume expected next size ((:) literal reversed) rest))
+            else done;
+          Nothing -> done
+        };
+      [] -> done
+    };
+    scan offset largest best remaining = case remaining of {
+      [] -> best;
+      (:) ((,) start arm) rest -> case stringCaseKey state arm of {
+        Nothing -> scan (offset + 1) largest best rest;
+        Just ((,,) template expected literal) ->
+          case consume expected (start + 2) 1 [literal] rest of {
+            (,,) count reversed trailing ->
+              let { next = offset + count } in seq next
+                (if count > largest
+                then scan next count (Just (DenseStringRun offset start count template expected (L.reverse reversed))) trailing
+                else scan next largest best trailing)
+          }
+      }
+    }
+  } in
+    if L.null (L.drop 7 arms) || M.member O.compareName caseString (functions state)
+    then Nothing
+    else scan 0 7 Nothing arms;
+  finishPartialStringCase :: (Map XName CGBinding -> XErased -> Build ()) ->
+    Map XName CGBinding -> XName -> [] ((,) Int XErased) -> XErased -> DenseStringRun -> Build ();
+  finishPartialStringCase finish scope name arms fallback (DenseStringRun offset start count body _ entries) = do {
+    value <- evaluate scope (XEVar name);
+    let { strict = M.insert O.compareName name (CGBinding value True) scope };
+    bits <- result ("ptrtoint ptr " ++ value ++ " to i64");
+    (,) index inside <- denseStringIndex bits start count;
+    finishChoice inside
+      (do {
+        (,) tableType table <- denseStringTable strict count entries;
+        selected <- loadStringCase tableType table index;
+        finish (M.insert O.compareName caseString (CGBinding selected True) strict) body
+      })
+      (emitIntegerSwitch finish strict bits
+        (L.append (L.take offset arms) (L.drop (offset + count) arms)) fallback)
+  };
+  emitDenseStringCases :: (Map XName CGBinding -> XErased -> Build ()) ->
+    Map XName CGBinding -> XName -> Int -> XErased -> [] String -> String -> Build ();
+  emitDenseStringCases finish scope name start body entries defaultText = do {
+    value <- evaluate scope (XEVar name);
+    let {
+      strict = M.insert O.compareName name (CGBinding value True) scope;
+      count = L.length entries
+    };
+    (,) tableType table <- denseStringTable strict count entries;
+    fallback <- evaluateBody strict (XEString defaultText);
+    bits <- result ("ptrtoint ptr " ++ value ++ " to i64");
+    (,) index inside <- denseStringIndex bits start count;
+    selected <- choose "ptr" inside (loadStringCase tableType table index) (cgPure fallback);
+    finish (M.insert O.compareName caseString (CGBinding selected True) strict) body
+  };
+  denseStringTable :: Map XName CGBinding -> Int -> [] String -> Build ((,) String String);
+  denseStringTable scope count entries = do {
+    literals <- L.mapM (\text -> evaluateBody scope (XEString text)) entries;
+    table <- fresh "@mlf.case.strings.";
+    let {
+      tableType = "[" ++ showInt count ++ " x ptr]";
+      declaration = table ++ " = private unnamed_addr constant " ++ tableType ++ " [" ++
+        L.intercalate ", " (L.map pointer literals) ++ "], align 8"
+    };
+    modify (\state -> withConstants ((:) declaration (constants state)) state);
+    cgPure ((,) tableType table)
+  };
+  denseStringIndex :: String -> Int -> Int -> Build ((,) String String);
+  denseStringIndex bits start count = do {
+    -- Successive keys differ by two. Check the tag as well as the unsigned
+    -- index before touching the table, so boxed Ints take the default.
+    adjusted <- result ("sub i64 " ++ bits ++ ", " ++ showInt start);
+    index <- result ("lshr i64 " ++ adjusted ++ ", 1");
+    tagged <- result ("trunc i64 " ++ bits ++ " to i1");
+    bounded <- result ("icmp ult i64 " ++ index ++ ", " ++ showInt count);
+    inside <- result ("and i1 " ++ tagged ++ ", " ++ bounded);
+    cgPure ((,) index inside)
+  };
+  loadStringCase :: String -> String -> String -> Build String;
+  loadStringCase tableType table index = do {
+    slot <- result ("getelementptr inbounds " ++ tableType ++ ", ptr " ++ table ++ ", i64 0, i64 " ++ index);
+    result ("load ptr, ptr " ++ slot ++ ", align 8")
+  };
+  finishIntegerSwitch :: (Map XName CGBinding -> XErased -> Build ()) ->
+    Map XName CGBinding -> XName -> [] ((,) Int XErased) -> XErased -> Build ();
+  finishIntegerSwitch finish scope name arms fallback = do {
+    value <- evaluate scope (XEVar name);
+    bits <- result ("ptrtoint ptr " ++ value ++ " to i64");
+    let { strict = M.insert O.compareName name (CGBinding value True) scope };
+    emitIntegerSwitch finish strict bits arms fallback
+  };
+  emitIntegerSwitch :: (Map XName CGBinding -> XErased -> Build ()) ->
+    Map XName CGBinding -> String -> [] ((,) Int XErased) -> XErased -> Build ();
+  emitIntegerSwitch finish strict bits arms fallback = do {
+    saved <- get;
+    defaultLabel <- fresh "int.default.";
+    labelled <- L.mapM (\((,) key body) -> do {
+      entry <- fresh "int.case.";
+      cgPure ((,,) key body entry)
+    }) arms;
+    emit ("  switch i64 " ++ bits ++ ", label %" ++ defaultLabel ++ " [");
+    L.mapM_ (\((,,) key _ entry) -> emit ("    i64 " ++ showInt key ++ ", label %" ++ entry)) labelled;
+    emit "  ]";
+    L.mapM_ (\((,,) _ body entry) -> do {
+      modify (restoreBranchCaches saved);
+      label entry;
+      finish strict body
+    }) labelled;
+    modify (restoreBranchCaches saved);
+    label defaultLabel;
+    finish strict fallback
+  };
   finishChoice :: String -> Build () -> Build () -> Build ();
   finishChoice condition yes no =
     do {
@@ -1582,7 +2339,6 @@ module Bootstrap.LLVM.Codegen where {
       _ ->
         do {
           value <- evaluate scope scrutinee;
-          tag <- constructorTag value;
           labelled <-
             L.mapM
               (\a ->
@@ -1595,10 +2351,7 @@ module Bootstrap.LLVM.Codegen where {
           let {
             fallback = L.fromMaybe missing (caseFallback labelled)
           };
-          entries <- L.mapM caseSwitchEntry labelled;
-          emit ("  switch i64 " ++ (tag ++ (", label %" ++ (fallback ++ " ["))));
-          L.mapM_ emit (L.concat entries);
-          emit "  ]";
+          dispatchCase value fallback labelled;
           saved <- get;
           L.mapM_
             (\entry ->
@@ -1646,7 +2399,7 @@ module Bootstrap.LLVM.Codegen where {
                  M.fromList O.compareName
                    (L.zipWith
                       (\n register ->
-                         (,) n (CGBinding register (S.member O.compareName n (A.strict f))))
+                         (,) n (CGWorkerArgument register (S.member O.compareName n (A.strict f))))
                       names
                       registers)
              };
@@ -1949,7 +2702,9 @@ module Bootstrap.LLVM.Codegen where {
           function <- thunk scope f;
           argument <- thunk scope a;
           app <- call "@mlf_application" (args2 (pointer function) (pointer argument));
-          forceValue app
+          -- Application cells take the runtime path even in the inline
+          -- force helper. Call it directly when this is known at emission.
+          call "@mlf_force" (args1 (pointer app))
         };
       _ -> failure "LLVM expected application"
     };
@@ -1957,13 +2712,64 @@ module Bootstrap.LLVM.Codegen where {
   -- A single thunk can use its own update root directly. Mark it busy before
   -- calling, clear captures through its callback, then force and memoize its
   -- result. Runtime fallback preserves null/cycle errors and longer spines.
-  -- Keep the immediate, WHNF and one-forwarding tests inline. Thunk entry
-  -- performs the same busy marking, callback, forcing and memoization once
-  -- out of line, instead of duplicating that sequence at every force site.
+  -- Share the immediate and heap dispatch for ordinary forcing sites.
+  -- Boxed worker arguments inline their ready-value and forwarding checks.
   forceDefinition :: [] String;
-  forceDefinition =
-    ["define private ptr @mlf.force(ptr %value) alwaysinline {",
-     "entry:",
+  forceDefinition = L.concat
+    [["define private ptr @mlf.force(ptr %value) noinline {",
+      "entry:",
+      "  %bits = ptrtoint ptr %value to i64",
+      "  %kind = and i64 %bits, 7",
+      "  %immediate = icmp ne i64 %kind, 0",
+      "  br i1 %immediate, label %done, label %heap",
+      "done:",
+      "  ret ptr %value",
+      "heap:",
+      "  %result = tail call ptr @mlf.force.heap(ptr %value)",
+      "  ret ptr %result",
+      "}",
+      "define private ptr @mlf.force.heap(ptr %value) noinline {",
+      "entry:",
+      "  %null = icmp eq ptr %value, null",
+      "  br i1 %null, label %slow, label %tagged",
+      "tagged:"],
+     forceTagBlocks,
+     ["  %result.deferred = tail call ptr @mlf.force.deferred(ptr %value, i32 %tag)",
+      "  ret ptr %result.deferred",
+      "done:",
+      "  ret ptr %value",
+      "slow:",
+      "  %result = tail call ptr @mlf_force(ptr %value)",
+      "  ret ptr %result",
+      "}"],
+     ["define private ptr @mlf.force.deferred(ptr %value, i32 %tag) noinline {",
+      "entry:"],
+     forceForwardingBlocks,
+     forceEnterOrFallback,
+     ["define private ptr @mlf.force.worker(ptr %value) alwaysinline {"],
+     forceReadyBlocks,
+     forceForwardingBlocks,
+     ["done:",
+      "  ret ptr %value"],
+     forceEnterOrFallback,
+     ["define private ptr @mlf.force.enter(ptr %value) noinline {",
+      "entry:",
+      "  %code.slot = getelementptr i8, ptr %value, i64 8",
+      "  %env.slot = getelementptr i8, ptr %value, i64 16",
+      "  %code = load ptr, ptr %code.slot, align 8",
+      "  %env = load ptr, ptr %env.slot, align 8",
+      "  store i32 1, ptr %value, align 4",
+      "  store ptr null, ptr %code.slot, align 8",
+      "  store ptr null, ptr %env.slot, align 8",
+      "  %returned = call ptr %code(ptr %env, ptr null)",
+      "  %canonical = call ptr @mlf_force(ptr %returned)",
+      "  store i32 2, ptr %value, align 4",
+      "  store ptr %canonical, ptr %code.slot, align 8",
+      "  ret ptr %canonical",
+      "}"]];
+  forceReadyBlocks :: [] String;
+  forceReadyBlocks =
+    L.append ["entry:",
      "  %null = icmp eq ptr %value, null",
      "  br i1 %null, label %slow, label %test",
      "test:",
@@ -1971,12 +2777,16 @@ module Bootstrap.LLVM.Codegen where {
      "  %kind = and i64 %bits, 7",
      "  %immediate = icmp ne i64 %kind, 0",
      "  br i1 %immediate, label %done, label %tagged",
-     "tagged:",
-     "  %tag = load i32, ptr %value, align 4",
+     "tagged:"] forceTagBlocks;
+  forceTagBlocks :: [] String;
+  forceTagBlocks =
+    ["  %tag = load i32, ptr %value, align 4",
      "  %ready = icmp uge i32 %tag, 5",
      "  br i1 %ready, label %done, label %deferred",
-     "deferred:",
-     "  %isthunk = icmp eq i32 %tag, 3",
+     "deferred:"];
+  forceForwardingBlocks :: [] String;
+  forceForwardingBlocks =
+    ["  %isthunk = icmp eq i32 %tag, 3",
      "  br i1 %isthunk, label %enter, label %indirect",
      "indirect:",
      "  %forwarded = icmp eq i32 %tag, 2",
@@ -1996,30 +2806,15 @@ module Bootstrap.LLVM.Codegen where {
      "  %pready = icmp uge i32 %ptag, 5",
      "  br i1 %pready, label %forward, label %slow",
      "forward:",
-     "  ret ptr %p",
-     "done:",
-     "  ret ptr %value",
-     "enter:",
+     "  ret ptr %p"];
+  forceEnterOrFallback :: [] String;
+  forceEnterOrFallback =
+    ["enter:",
      "  %entered = tail call ptr @mlf.force.enter(ptr %value)",
      "  ret ptr %entered",
      "slow:",
      "  %result = tail call ptr @mlf_force(ptr %value)",
      "  ret ptr %result",
-     "}",
-     "define private ptr @mlf.force.enter(ptr %value) noinline {",
-     "entry:",
-     "  %code.slot = getelementptr i8, ptr %value, i64 8",
-     "  %env.slot = getelementptr i8, ptr %value, i64 16",
-     "  %code = load ptr, ptr %code.slot, align 8",
-     "  %env = load ptr, ptr %env.slot, align 8",
-     "  store i32 1, ptr %value, align 4",
-     "  store ptr null, ptr %code.slot, align 8",
-     "  store ptr null, ptr %env.slot, align 8",
-     "  %returned = call ptr %code(ptr %env, ptr null)",
-     "  %canonical = call ptr @mlf_force(ptr %returned)",
-     "  store i32 2, ptr %value, align 4",
-     "  store ptr %canonical, ptr %code.slot, align 8",
-     "  ret ptr %canonical",
      "}"];
   aliasMetadata :: [] String;
   aliasMetadata =
@@ -2029,7 +2824,7 @@ module Bootstrap.LLVM.Codegen where {
             ((:) "!3 = !{!1, !1, i64 0}" ((:) "!4 = !{!2, !2, i64 0}" []))));
   runtimeDeclarations :: [] String;
   runtimeDeclarations =
-    L.append ["declare ptr @mlf_st_freeze_array(ptr)", "@mlf_ascii_string_indices = external global i64",
+    L.append ["declare void @llvm.sideeffect()", "declare ptr @mlf_st_freeze_array(ptr)", "@mlf_ascii_string_indices = external global i64",
       "declare ptr @mlf_string_utf8_length(ptr)",
       "declare ptr @mlf_string_length(ptr)", "declare ptr @mlf_string_code_at(ptr, ptr)",
       "declare ptr @mlf_concat_string_list(ptr)",
@@ -2289,5 +3084,30 @@ module Bootstrap.LLVM.Codegen where {
                                                                      "  %allocated = call ptr @mlf_thunk_new(ptr %code, i64 %count)"
                                                                      ((:) "  ret ptr %allocated"
                                                                         ((:) "}"
-                                                                           [])))))))))))))))))))))))
+                                                                           [])))))))))))))))))))))));
+  thunkCaptureHelper :: Int -> String;
+  thunkCaptureHelper width = "@mlf.allocate.thunk.fill." ++ showInt width;
+  thunkCaptureDefinitions :: (String -> Bool) -> [] String;
+  thunkCaptureDefinitions needs = L.concatMap (\width ->
+    if needs (thunkCaptureHelper width) then thunkCaptureDefinition width else []) [1,2,3,4];
+  -- The compact and runtime allocation paths both install the environment
+  -- pointer. Load that pointer before writing capture slots in source order.
+  thunkCaptureDefinition :: Int -> [] String;
+  thunkCaptureDefinition width = let {
+    indices = L.range 1 width;
+    name prefix i = prefix ++ showInt i;
+    formals = L.intercalate ", " ((:) "ptr %code" (L.map (\i -> pointer (name "%capture" i)) indices));
+    store i = let { slot = name "%slot" i; value = name "%capture" i } in [
+      "  " ++ slot ++ " = getelementptr i8, ptr %env, i64 " ++ showInt (8 * i),
+      "  store ptr " ++ value ++ ", ptr " ++ slot ++ ", align 8, !tbaa !3"
+    ]
+  } in L.concat [
+    ["define private ptr " ++ thunkCaptureHelper width ++ "(" ++ formals ++ ") noinline {",
+     "entry:",
+     "  %thunk = call ptr @mlf.allocate.thunk(ptr %code, i64 " ++ showInt width ++ ")",
+     "  %env.slot = getelementptr i8, ptr %thunk, i64 16",
+     "  %env = load ptr, ptr %env.slot, align 8, !tbaa !3"],
+    L.concatMap store indices,
+    ["  ret ptr %thunk", "}"]
+  ]
 }

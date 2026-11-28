@@ -160,11 +160,23 @@ int wmain(int argc, wchar_t **argv) {
         ++index;
     }
     if (index>=argc) return 2;
+    if (!wcscmp(operation,L"mkdir")) {
+        for (; index<argc; ++index) {
+            wchar_t *path=absolute(argv[index]);
+            int ok=path && mkdirs(path);
+            DWORD error=ok ? ERROR_SUCCESS : GetLastError();
+            free(path);
+            if (!ok) {
+                fprintf(stderr,"mlf-host: operation failed (Win32 %lu)\n",(unsigned long)error);
+                return 1;
+            }
+        }
+        return 0;
+    }
     wchar_t *a=absolute(argv[index]), *b=index+1<argc ? absolute(argv[index+1]) : NULL;
     if (!a || (index+1<argc && !b)) { free(a); free(b); return 1; }
     int ok=0;
-    if (!wcscmp(operation,L"mkdir") && index+1==argc) ok=mkdirs(a);
-    else if (!wcscmp(operation,L"copy") && b && index+2==argc) ok=recursive ? copy_tree(a,b) : CopyFileW(a,b,FALSE)!=0;
+    if (!wcscmp(operation,L"copy") && b && index+2==argc) ok=recursive ? copy_tree(a,b) : CopyFileW(a,b,FALSE)!=0;
     else if (!wcscmp(operation,L"move") && b && index+2==argc) ok=MoveFileExW(a,b,MOVEFILE_REPLACE_EXISTING|MOVEFILE_WRITE_THROUGH)!=0;
     else if (!wcscmp(operation,L"remove") && index+1==argc) {
         if (!safe_remove(a)) { free(a); free(b); fputs("mlf-host: refusing unsafe removal path\n",stderr); return 2; }

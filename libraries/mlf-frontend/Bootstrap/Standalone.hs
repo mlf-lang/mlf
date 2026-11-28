@@ -7,6 +7,7 @@ module Bootstrap.Standalone where {
   import Bootstrap.Types;
   import Bootstrap.Std;
   import qualified Bootstrap.Data as D;
+  import qualified Bootstrap.Unicode as U;
   import qualified Bootstrap.Desugar as Desugar;
   import qualified Bootstrap.Module as Modules;
   import qualified Bootstrap.Prelude as Prelude;
@@ -203,7 +204,11 @@ module Bootstrap.Standalone where {
             Modules.Method _ -> reject ("standalone facade method is not in scope without implicit Prelude: " ++ name);
             _ -> unchanged (SVar name)
           };
-          _ -> unchanged (SVar name)
+          _ -> case Modules.components name of {
+            (:) qualifier ((:) _ _) -> if D.identifier U.isUpper qualifier
+              then reject ("name is not in scope: " ++ name) else unchanged (SVar name);
+            _ -> unchanged (SVar name)
+          }
         };
       Just entity -> case Modules.role entity of {
         Modules.Primitive _ -> if eqString name (Modules.spelling entity)
@@ -340,6 +345,10 @@ module Bootstrap.Standalone where {
       annotation' <- rewriteOptionalAnnotation scope annotation;
       body' <- rewriteExpr scope (Set.insert compareString name bound) body;
       unchanged (SLam name annotation' body')
+    };
+    SBindDictionaries names body -> do {
+      rewritten <- rewriteExpr scope (addBound bound names) body;
+      unchanged (SBindDictionaries names rewritten)
     };
     SApp f a -> do { f' <- rewriteExpr scope bound f; a' <- rewriteExpr scope bound a; unchanged (SApp f' a') };
     SLet name value body -> do {
@@ -506,6 +515,7 @@ module Bootstrap.Standalone where {
     SWantedRefs n candidates -> (:) n (map (compose termRefName snd) candidates);
     SConstructor name -> (:) name [];
     SLam name annotation body -> (:) name (append (maybe [] annotationNames annotation) (expressionNames body));
+    SBindDictionaries names body -> append names (expressionNames body);
     SApp f a -> append (expressionNames f) (expressionNames a);
     SLet name value body -> (:) name (append (expressionNames value) (expressionNames body));
     SAnn value annotation -> append (expressionNames value) (annotationNames annotation);

@@ -43,9 +43,14 @@ variables separate uses, an occurs check rejects recursive types, and non-bottom
 MLF bounds contribute constraints and explicit instance computations. Sealing
 resolves every required type before the independent checker admits a fragment.
 This route does not generalize unsigned exports, choose default types, or replace
-bounded MLF schemes with rank-1 schemes. Ambiguous arguments, local
-generalization, unsupported syntax and failed checks use the ordinary solver.
-The general path retains inferred-type and source-erasure agreement checks.
+bounded MLF schemes with rank-1 schemes. The conservative signed checker
+rejects local lets that require generalization. The dispatch path can specialize
+a nonrecursive local let at exactly one explicit use, with no additional
+implicit evidence occurrence of the binder. The use must leave the checked
+term fully determined, and its let binding is retained. Multiple uses that
+require generalization, ambiguous types, unsupported syntax and failed checks
+use the ordinary solver. The general path retains inferred-type and
+source-erasure agreement checks.
 All paths produce closed normalized schemes
 and independently checked implementations abstracted over their imports. Solver
 graphs are transient. A cached fragment is decoded and checked again, including
@@ -85,6 +90,21 @@ SCC retains the compiler's existing requirement for closed signatures; this
 supports its existing explicitly polymorphic recursion. Acyclic declarations
 retain separate generalization. Unrestricted inferred polymorphic recursion is
 not added by this migration. See the [migration evidence](crate-migration.md).
+
+## Compiler entry points
+
+Use `emlf` for a source file, an expression or standard input, and `mlfpkg build`
+for a package target. An individual file keeps its existing generalization
+boundaries across its imports. The package manifest defines which modules form
+an independently compiled unit.
+
+Source resolution supplies the names and instance scopes for the root. When
+a checked library is available, the root is checked against its selected import
+signatures. Installed native code uses that checked root with the installation's
+export layout. A separately compiled crate publishes its interface and checked
+object before either can be retained in a compiler session. Disk and retained
+objects enter the same linker, including its Prelude admission checks.
+`emlf --help tools` lists the commands for running a stage independently.
 
 ## Artifacts
 
@@ -201,16 +221,19 @@ measured in the language's String units:
 Query keys include compiler identity, canonical resolved syntax with lexical
 alpha normalization, exact polymorphic predecessor schemes, and needed nominal
 layouts/kinds. They retain literal bits, annotation flags and evidence roles.
-They exclude predecessor body hashes. SHA-256 addresses cache files; the full
-canonical key is also compared on reload. A damaged cache entry is a miss.
-Writers use locks and atomic replacement.
+They exclude predecessor body hashes. SHA-256 addresses cache files. Lowered
+inference writes a binary record containing the full key and raw object. The
+reader requires that exact key. Historical text entries trigger fresh inference.
 
-`MLF-QUERY-CACHE-2` omits repeated datatype contexts only when both the fragment
-header and its actual term context match the layouts already recorded in the
-complete query key. Reloading restores those layouts from the current query,
-then performs the same ownership, scheme, context and independent term checks.
-This also permits canonical datatype-binder renaming. Older cache entries remain
-readable; an incompatible or malformed entry causes fresh inference.
+Source inference records bind an input hash and a result fingerprint. The
+usual layout also exposes the input address in a separate root for early
+rejection. When the extra root exceeds a wire limit, the writer can use a
+single root that still carries both hashes. Shared contexts are addressed by
+their binary content hash and checked against the expected datatype context.
+Reloading validates group ownership, schemes, datatype context and the checked
+term. Historical text records and binary envelopes that predate the result
+fingerprint trigger fresh inference, as do malformed entries. The compiler
+replaces each missed group’s entry atomically under the cache lock.
 
 The package manager's outer artifact cache remains conservative about source
 and implementation inputs because assembly and final code must reflect changed
@@ -237,7 +260,7 @@ LLVM currently optimizes the linked erased program. Nominal constructor tags,
 global optimization and closure layouts remain code-generation inputs.
 Inference-fragment reuse does not by itself imply native object reuse. The
 [migration ledger](crate-migration.md) records the implemented code-generation
-cache boundary and accepted measurements. The [validation record](crate-validation.json)
+cache boundary and accepted measurements. The [validation record](https://github.com/mlf-lang/mlf/blob/0704d216b8cf6d887d3737efa30a2eae3c152f0a/docs/crate-validation.json)
 binds the six native groups, fresh self-hosting, exact tool/source identities
 and isolated performance evidence.
 

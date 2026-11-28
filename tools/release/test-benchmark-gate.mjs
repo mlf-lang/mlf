@@ -1,21 +1,50 @@
 import assert from 'node:assert/strict';
+import fs, {appendFileSync} from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import {createHash} from 'node:crypto';
 import {verify, workloads} from './verify-benchmarks.mjs';
 const digest = 'a'.repeat(64);
 const metric = {wall_seconds:1,cpu_seconds:1,peak_rss_bytes:1024,exit_code:0,timed_out:false,interrupted:false,termination_signal:0};
 const summary = {median_wall_seconds:1,min_wall_seconds:1,max_wall_seconds:1,median_absolute_deviation_seconds:0,samples:Array.from({length:7},()=>({...metric}))};
 const manifest = {workloads:workloads.map(name=>({name,default_input:100}))};
+const directory = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'mlf-bench-gate-')));
+process.on('exit', () => fs.rmSync(directory, {recursive:true, force:true}));
+const runtimes = {}, fingerprints = {};
+for (const language of ['mlf', 'baseline']) {
+ const folder = path.join(directory, language);
+ fs.mkdirSync(folder);
+ runtimes[language] = path.join(folder, 'mlf_runtime.c');
+ const files = ['mlf_runtime.c', 'mlf_runtime.h'];
+ if (language === 'mlf') files.push('mlf_process_supervisor.c');
+ for (const name of files) {
+   const file = path.join(folder, name);
+   fs.writeFileSync(file, language + name);
+   fingerprints[file] = createHash('sha256').update(fs.readFileSync(file)).digest('hex');
+ }
+}
+function compilation(language) {
+ if (language === 'c') return summary;
+ const stages = [{...metric,phase:'runtime',command:['clang','-c',runtimes[language],'-o','runtime.o']}];
+ if (language === 'mlf') stages.push({...metric,phase:'runtime-supervisor',
+   command:['clang','-c',path.join(directory, language, 'mlf_process_supervisor.c'),'-o','runtime-supervisor.o']});
+ return {...summary, samples:summary.samples.map(sample => ({...sample,stages}))};
+}
 const fixture = {
- status:'passed',implementation:'MLF',runs:7,limits:{compilation:3,runtime:2},workload_selection:workloads,
+ runtimes, fingerprints, status:'passed',implementation:'MLF',runs:7,limits:{compilation:3,runtime:2},workload_selection:workloads,
  benchmarks:workloads.map(benchmark=>({benchmark,input:100,stdin_sha256:digest,
-   languages:Object.fromEntries(['c','baseline','mlf'].map(language=>[language,{compilation:summary,runtime:summary}])),
-   binary_samples:Array.from({length:7},()=>Object.fromEntries(['c','baseline','mlf'].map(language=>[language,{binary_sha256:digest,artifacts_sha256:{'program.ll':digest,'runtime.o':digest,'program.o':digest}}])))})),
+   languages:Object.fromEntries(['c','baseline','mlf'].map(language=>[language,{compilation:compilation(language),runtime:summary}])),
+   binary_samples:Array.from({length:7},()=>Object.fromEntries(['c','baseline','mlf'].map(language=>[language,{binary_sha256:digest,artifacts_sha256:{'program.ll':digest,'runtime.o':digest,'program.o':digest,...(language === 'mlf' ? {'runtime-supervisor.o':digest} : {})}}])))})),
  performance_checks:workloads.flatMap(benchmark=>['compilation','runtime'].map(dimension=>({benchmark,dimension,maximum_ratio:dimension==='compilation'?3:2,passed:true,mlf_over_c:1})))
 };
-verify(fixture,manifest);
-let count=1;
+const checks = [['benchmark-gate-controls/canonical-report', () => verify(fixture,manifest,runtimes)]];
 function reject(label, mutate) {
- const report=structuredClone(fixture), inputs=structuredClone(manifest); mutate(report,inputs);
- assert.throws(()=>verify(report,inputs),undefined,label); count++;
+ const id = 'benchmark-gate-controls/' + label.replaceAll(' ', '-').toLowerCase();
+ checks.push([id, () => {
+   const report=structuredClone(fixture), inputs=structuredClone(manifest);
+   mutate(report,inputs);
+   assert.throws(()=>verify(report,inputs,runtimes),undefined,label);
+ }]);
 }
 for (const state of ['running','failed','preparing',undefined]) reject(`reject ${state}`,r=>r.status=state);
 reject('nine selected workloads',r=>r.workload_selection.pop());
@@ -26,6 +55,13 @@ reject('changed default input',r=>r.benchmarks[0].input=99);
 reject('historical 5x limit',r=>r.limits.compilation=5);
 reject('relaxed runtime',r=>r.limits.runtime=3);
 reject('three instead of seven samples',r=>r.runs=3);
+reject('baseline paired with candidate runtime',r=>r.runtimes.baseline=r.runtimes.mlf);
+reject('missing baseline runtime header fingerprint',r=>delete r.fingerprints[path.join(directory,'baseline','mlf_runtime.h')]);
+reject('changed candidate runtime fingerprint',r=>r.fingerprints[r.runtimes.mlf]=digest);
+reject('baseline measures candidate runtime',r=>r.benchmarks[0].languages.baseline.compilation.samples[0].stages[0].command[2]=r.runtimes.mlf);
+reject('missing measured runtime compile',r=>r.benchmarks[0].languages.mlf.compilation.samples[0].stages.shift());
+reject('wrong split supervisor source',r=>r.benchmarks[0].languages.mlf.compilation.samples[0].stages[1].command[2]=r.runtimes.mlf);
+reject('missing split supervisor object',r=>delete r.benchmarks[0].binary_samples[0].mlf.artifacts_sha256['runtime-supervisor.o']);
 reject('missing baseline',r=>delete r.benchmarks[0].languages.baseline);
 reject('missing timed sample',r=>r.benchmarks[0].languages.mlf.runtime.samples.pop());
 reject('missing binary identity',r=>r.benchmarks[0].binary_samples[0].mlf.binary_sha256='');
@@ -40,4 +76,31 @@ reject('native failed check',r=>r.performance_checks[0].passed=false);
 reject('native relaxed check',r=>r.performance_checks[0].maximum_ratio=5);
 reject('native ratio exceeds limit',r=>r.performance_checks[0].mlf_over_c=3.01);
 reject('ratio inconsistent with samples',r=>r.performance_checks[0].mlf_over_c=2);
-console.log(`${count} benchmark gate checks passed.`);
+const registered = process.env.MLF_TEST_SUITE === 'benchmark-gate-controls';
+const exact = registered ? process.env.MLF_TEST_EXACT : undefined;
+const selected = exact ? checks.filter(([id]) => id === exact) : checks;
+const ids = selected.map(([id]) => id);
+assert.ok(ids.length && ids.length === new Set(ids).size, 'unknown or duplicate benchmark gate control');
+if (process.argv.includes('--framework-list')) {
+ console.log(JSON.stringify(ids));
+} else {
+ const events = registered && process.env.MLF_TEST_EVENTS;
+ const emit = entry => {
+   if (events) appendFileSync(events, JSON.stringify(entry) + '\n');
+ };
+ emit({plan: ids});
+ let passed = 0;
+ for (const [id, run] of selected) {
+   emit({start:id});
+   try {
+     run();
+     passed++;
+     emit({id,status:'pass'});
+   } catch (error) {
+     console.error(error);
+     emit({id,status:'fail',detail:String(error)});
+   }
+ }
+ console.log(`${passed} benchmark gate checks passed.`);
+ if (passed !== selected.length) process.exitCode = 1;
+}

@@ -28,19 +28,12 @@ module Main where {
       decoded <- W.decodeGraph W.defaultLimits 6 bytes;
       case decoded of {
         Left e -> putStrLn ("E " ++ e);
-        Right graph -> case Q.decodeIndex "cfg" graph of {
+        Right graph -> case Q.admitIndex "cfg" graph of {
           Left e -> putStrLn ("E " ++ e);
-          Right nodes -> do {
-            encoded <- W.encode W.defaultLimits 6 [Q.encodeLegacyIndex "cfg" nodes];
-            case encoded of {
-              Left e -> panic e;
-              Right canonical -> do {
-                putStrLn "OK";
-                printInt (M.size nodes);
-                byteArrayDigest canonical >>= putStrLn;
-                saveColumns destination nodes
-              }
-            }
+          Right ((,) nodes _) -> do {
+            putStrLn "OK";
+            printInt (M.size nodes);
+            saveColumns destination nodes
           }
         }
       }

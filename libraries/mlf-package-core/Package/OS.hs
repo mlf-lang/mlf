@@ -17,6 +17,15 @@ module Package.OS where {
   starts prefix text =
     ((stringLength text >= stringLength prefix) &&
      eqString (stringSlice text 0 (stringLength prefix)) prefix);
+  nativeTargetFlags :: String -> [] String;
+  nativeTargetFlags triple =
+    case split 45 triple of {
+      (:) arch ((:) vendor ((:) system _)) ->
+        if (eqString arch "arm64" || eqString arch "aarch64") && eqString vendor "apple" &&
+           (starts "darwin" system || starts "macos" system)
+        then ["-mno-outline"] else [];
+      _ -> []
+    };
   ends suffix text =
     ((stringLength text >= stringLength suffix) &&
      eqString (stringSlice text (stringLength text - stringLength suffix) (stringLength suffix))

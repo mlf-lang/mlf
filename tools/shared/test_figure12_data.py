@@ -1,198 +1,148 @@
 #!/usr/bin/env python3
-"""Data-decoder controls only: no compiler execution or source translation."""
-import json
+"""Reference-data controls; current source spelling is not an oracle contract."""
+import copy
 import hashlib
+import json
 from pathlib import Path
-import shutil
 import tempfile
 import unittest
-from unittest.mock import patch
 
 import figure12_data as data
 
 
 class Figure12Data(unittest.TestCase):
-    def test_maintained_inventory(self):
-        fixture = data.decode()
+    def setUp(self):
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        self.root = Path(temporary.name)
+        self.path = self.root / data.REFERENCE
+        self.path.parent.mkdir(parents=True)
+        self.raw = (data.ROOT / data.REFERENCE).read_bytes()
+        self.reference = json.loads(self.raw)
+        self.path.write_bytes(self.raw)
+
+    def write(self, reference):
+        self.path.write_text(json.dumps(reference))
+
+    def test_independent_reference_inventory(self):
+        fixture = data.decode(self.root)
         self.assertEqual(len(fixture['cases']), 43)
         self.assertEqual(len(fixture['type_checks']), 4)
         self.assertEqual(len(fixture['repairs']), 3)
         cases = fixture['cases']
-        self.assertEqual([c['id'] for c in cases if not c['paper_acceptance']], ['A11', 'C1a', 'C1c', 'E1a'])
-        self.assertEqual([c['id'] for c in cases if not c['expected_acceptance']], ['A8', 'A11', 'C1a', 'C1c', 'E1a'])
+        self.assertEqual([c['id'] for c in cases if not c['paper_acceptance']],
+                         ['A11', 'C1a', 'C1c', 'E1a'])
+        self.assertEqual([c['id'] for c in cases if not c['expected_acceptance']],
+                         ['A8', 'A11', 'C1a', 'C1c', 'E1a'])
         self.assertEqual([c['id'] for c in cases if c['paper_acceptance'] != c['expected_acceptance']], ['A8'])
-        self.assertEqual([c['id'] for c in fixture['repairs']], ['A11', 'C1a', 'C1c'])
-        self.assertTrue(all(c['expected_acceptance'] for c in fixture['repairs']))
+        index = {c['id']: c for c in cases}
+        for alias, canonical in [('A12.1', 'A10.1'), ('E3a', 'A12.2')]:
+            self.assertEqual(index[alias]['expression'], index[canonical]['expression'])
+            self.assertEqual(index[alias]['local_signatures'], index[canonical]['local_signatures'])
         self.assertEqual(json.loads(json.dumps(fixture)), fixture)
 
-    def test_lexical_binding_and_constructor_data(self):
-        parsed = data.Parser('(let { yes n e = Case n e true true [] } in (:) (yes "x" "guest") [])').parse()
-        value = data.evaluate(parsed, data.environment())
-        self.assertEqual(value, [dict(id='x', expression='guest', paper_acceptance=True, expected_acceptance=True, local_signatures=[])])
-
-    def test_reject_unsupported_syntax(self):
-        for source in ['(:) 1 2', '(,) \"a\" \"b\" trailing', 'Nil', 'Cons 1 Nil', '[1,2]', '\\x -> x', 'let rec { x = 1 } in x', 'Cons 1 Nil trailing', 'unknown', '"bad\\q"', 'Pair "a" "b" garbage', '(Pair "a" "b") )']:
-            with self.subTest(source=source), self.assertRaises((data.FixtureError, TypeError)):
-                data.evaluate(data.Parser(source).parse(), data.environment())
-
-    def test_no_guest_expression_evaluation(self):
-        source = 'Case "x" "unsafe-looking opaque guest source: (panic 1)" true false []'
-        decoded = data.evaluate(data.Parser(source).parse(), data.environment())
-        self.assertEqual(decoded['expression'], 'unsafe-looking opaque guest source: (panic 1)')
-
-    def changed(self, relative, old, new):
-        temporary = tempfile.TemporaryDirectory()
-        self.addCleanup(temporary.cleanup)
-        root = Path(temporary.name)
-        for fixture_relative in data.REVIEWED_SEMANTIC_SHA256:
-            name = Path(fixture_relative).name
-            target = root / 'tests/Tests' / name
+    def test_current_implementation_is_not_read(self):
+        expected = data.decode(self.root)
+        # A source-only checkout is unnecessary. Even a malformed or renamed
+        # native helper cannot alter this independent compiler input corpus.
+        for name in ('Figure12.emlf', 'Figure12Suite.emlf', 'Helpers.emlf', 'Map.emlf', 'Set.emlf'):
+            target = self.root / 'tests/Tests' / name
             target.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copyfile(data.ROOT / 'tests/Tests' / name, target)
-        target = root / relative
-        text = target.read_text()
-        self.assertIn(old, text)
-        target.write_text(text.replace(old, new, 1))
-        return root
+            target.write_text('-- harmless reformatting of maintained source\n')
+        self.assertEqual(data.decode(self.root), expected)
 
-    def reviewed_decode_for_data_control(self, root):
-        # Test-only simulation of an explicit re-review. There is no production
-        # bypass flag: ordinary decode MUST reject the same mutation first.
-        with self.assertRaisesRegex(data.FixtureError, 'unreviewed Figure12 oracle semantics'):
-            data.decode(root)
-        reviewed = {relative: hashlib.sha256((root / relative).read_bytes()).hexdigest()
-                    for relative in data.REVIEWED_SEMANTIC_SHA256}
-        with patch.object(data, 'REVIEWED_SEMANTIC_SHA256', reviewed):
-            return data.decode(root)
+    def test_json_layout_is_irrelevant_but_input_digest_is_current(self):
+        before = data.decode(self.root)
+        self.write(self.reference)
+        after = data.decode(self.root)
+        old_hashes = before.pop('fixture_sha256')
+        new_hashes = after.pop('fixture_sha256')
+        self.assertEqual(before, after)
+        self.assertNotEqual(old_hashes, new_hashes)
+        self.assertEqual(new_hashes, {str(data.REFERENCE): hashlib.sha256(self.path.read_bytes()).hexdigest()})
 
-    def test_fixture_changes_flow_into_output(self):
-        root = self.changed('tests/Tests/Figure12.emlf', 'yes "A2" "choose id"', 'yes "A2" "choose nil"')
-        self.assertEqual(self.reviewed_decode_for_data_control(root)['cases'][1]['expression'], 'choose nil')
-        self.assertNotEqual(self.reviewed_decode_for_data_control(root)['fixture_sha256'], data.decode()['fixture_sha256'])
+    def test_guest_expressions_remain_opaque_data(self):
+        self.reference['cases'][0]['expression'] = 'unsafe-looking guest source: (panic 1)'
+        self.write(self.reference)
+        self.assertEqual(data.decode(self.root)['cases'][0]['expression'], 'unsafe-looking guest source: (panic 1)')
 
-    def test_type_expectation_is_decoded_not_recomputed(self):
-        root = self.changed('tests/Tests/Figure12Suite.emlf', 'identity = (XForall (XTyVar 0) XBot', 'identity = (XForall (XTyVar 99) XBot')
-        expected = self.reviewed_decode_for_data_control(root)['type_checks'][3]['expected']
-        self.assertEqual(expected[1][1], ['XTyVar', 99])
+    def test_expected_type_is_loaded_not_recomputed(self):
+        expected = ['XArrow', ['XBot'], ['XBot']]
+        self.reference['type_checks'][0]['expected'] = expected
+        self.write(self.reference)
+        self.assertEqual(data.decode(self.root)['type_checks'][0]['expected'], expected)
 
-    def test_repair_source_is_decoded(self):
-        root = self.changed('tests/Tests/Figure12Suite.emlf', 'then "k (', 'then "changed (')
-        self.assertTrue(self.reviewed_decode_for_data_control(root)['repairs'][0]['expression'].startswith('changed ('))
+    def test_type_case_ids_preserve_inputs_when_rows_or_labels_change(self):
+        original = data.decode(self.root)['type_checks']
+        self.reference['type_checks'].reverse()
+        for check in self.reference['type_checks']:
+            check['label'] = 'Updated display label'
+        self.write(self.reference)
+        reordered = data.decode(self.root)['type_checks']
+        self.assertEqual([check['id'] for check in reordered],
+                         ['A1-principal', 'A2-principal', 'A4-result', 'A4-signature'])
+        for before, after in zip(original, reordered):
+            self.assertEqual(after['source'], before['source'])
+            self.assertEqual(after['expected'], before['expected'])
+            self.assertEqual(after['label'], 'Updated display label')
 
-    def test_changed_repair_logic_fails_closed(self):
-        root = self.changed('tests/Tests/Figure12Suite.emlf', 'if eqString label "A11" then', 'if otherPredicate label "A11" then')
+    def test_duplicate_missing_or_unknown_type_case_id_fails(self):
+        for identity in ('A2-principal', 'unknown', None):
+            changed = copy.deepcopy(self.reference)
+            if identity is None:
+                del changed['type_checks'][0]['id']
+            else:
+                changed['type_checks'][0]['id'] = identity
+            self.write(changed)
+            with self.subTest(identity=identity), self.assertRaises(data.FixtureError):
+                data.decode(self.root)
+
+    def test_missing_malformed_and_duplicate_json_fail(self):
+        self.path.unlink()
         with self.assertRaises(data.FixtureError):
-            self.reviewed_decode_for_data_control(root)
+            data.decode(self.root)
+        for raw in (b'{', b'\xff', b'{"schema_version":1,"schema_version":1}'):
+            with self.subTest(raw=raw):
+                self.path.write_bytes(raw)
+                with self.assertRaises(data.FixtureError):
+                    data.decode(self.root)
 
-    def test_changed_repaired_constructor_fails_closed(self):
-        root = self.changed('tests/Tests/Figure12Suite.emlf', 'expression (paperAcceptance c) true (localSignatures c)', 'expression (paperAcceptance c) false (localSignatures c)')
-        with self.assertRaises(data.FixtureError):
-            self.reviewed_decode_for_data_control(root)
+    def test_invalid_schema_and_missing_data_fail(self):
+        for key, value in [('schema_version', 2), ('schema_version', True),
+                           ('origin', {}), ('signatures', [['name']]),
+                           ('cases', []), ('type_checks', []), ('repairs', [])]:
+            with self.subTest(key=key, value=value):
+                changed = dict(self.reference, **{key: value})
+                self.write(changed)
+                with self.assertRaises(data.FixtureError):
+                    data.decode(self.root)
+        for key in self.reference:
+            changed = dict(self.reference)
+            del changed[key]
+            self.write(changed)
+            with self.subTest(missing=key), self.assertRaises(data.FixtureError):
+                data.decode(self.root)
 
-    def test_changed_projection_fails_closed(self):
-        root = self.changed('tests/Tests/Figure12.emlf',
-                            'expectedAcceptance (Case _ _ _ a _) = a',
-                            'expectedAcceptance (Case _ _ a _ _) = a')
-        with self.assertRaises(data.FixtureError):
-            self.reviewed_decode_for_data_control(root)
+    def test_case_identity_and_acceptance_corruption_fail(self):
+        for key, value in [('id', 'A2'), ('expression', None),
+                           ('paper_acceptance', False), ('expected_acceptance', False),
+                           ('expected_acceptance', 1), ('local_signatures', [['x', 'Int'], ['x', 'Bool']])]:
+            with self.subTest(key=key, value=value):
+                changed = copy.deepcopy(self.reference)
+                changed['cases'][0][key] = value
+                self.write(changed)
+                with self.assertRaises(data.FixtureError):
+                    data.decode(self.root)
 
-    def test_malformed_expected_type_fails_closed(self):
-        root = self.changed('tests/Tests/Figure12Suite.emlf',
-                            'identity = (XForall (XTyVar 0) XBot',
-                            'identity = (XForall (XTyVar "wrong") XBot')
-        with self.assertRaises(data.FixtureError):
-            self.reviewed_decode_for_data_control(root)
-
-    def test_semantic_oracle_mutations_fail_closed(self):
-        mutations = [
-            ('Figure12.emlf', 'import Prelude hiding (Monad, return, bind)\nimport MLF.Primitive (Monad, return, bind)\n', ''),
-            ('Figure12Suite.emlf', 'T.alphaEq (inferredType result) expected', 'true'),
-            ('Figure12Suite.emlf', 'S.find (\\c -> eqString label (caseId c)) cases',
-             'S.find (\\c -> eqString "A11" (caseId c)) cases'),
-            ('Figure12.emlf', 'H.append signatures (localSignatures c)',
-             'H.append (localSignatures c) signatures'),
-            ('Figure12Suite.emlf', 'X.equalErased (X.erase parsed) (X.erase (compiledTerm result))', 'true'),
-            ('Figure12.emlf', '(Set.delete x (freeNames b))', '(freeNames b)'),
-            ('Figure12.emlf', '(expression c) ss', '(expression c) []'),
-            ('Helpers.emlf', 'instance Ord String where { compare = compareString }',
-             'instance Ord String where { compare = compareInt }'),
-            ('Helpers.emlf', 'S.mapEither IM.fromList', 'fmap IM.fromList'),
-            ('Helpers.emlf', 'S.mapEither ((,) k) (f k v)', 'fmap ((,) k) (f k v)'),
-            ('Map.emlf', 'fromList xs = M.fromList H.compare xs', 'fromList xs = M.empty'),
-            ('Set.emlf', 'toAscList = S.toList', 'toAscList = S.empty'),
-        ]
-        for filename, old, new in mutations:
-            with self.subTest(filename=filename, old=old):
-                root = self.changed('tests/Tests/' + filename, old, new)
-                with self.assertRaisesRegex(data.FixtureError, 'unreviewed Figure12 oracle semantics'):
-                    data.decode(root)
-
-    def test_reviewed_transcriptions_reconstruct_old_allowlist(self):
-        self.assertEqual(set(data.REVIEWED_SOURCE_TRANSITIONS),
-                         {'tests/Tests/Figure12.emlf', 'tests/Tests/Helpers.emlf'})
-        for relative, transition in data.REVIEWED_SOURCE_TRANSITIONS.items():
-            with self.subTest(relative=relative):
-                current = (data.ROOT / relative).read_text()
-                previous = current
-                for before, after in reversed(transition['edits']):
-                    self.assertEqual(previous.count(after), 1)
-                    previous = previous.replace(after, before, 1)
-                self.assertEqual(hashlib.sha256(previous.encode()).hexdigest(),
-                                 data.REVIEWED_SEMANTIC_SHA256[relative])
-                self.assertEqual(transition['preimage_sha256'], data.REVIEWED_SEMANTIC_SHA256[relative])
-                self.assertEqual(hashlib.sha256(current.encode()).hexdigest(), transition['postimage_sha256'])
-                self.assertEqual(data.authenticate_semantic_source(
-                    relative, previous.encode(), data.REVIEWED_SEMANTIC_SHA256[relative]), previous)
-                root = self.changed(relative, current, previous)
-                self.assertEqual(data.decode(root)['cases'], data.decode()['cases'])
-
-    def test_partial_or_mutated_transcriptions_fail_closed(self):
-        mutations = [
-            ('Figure12.emlf', '  bound (SIndexedStringPattern _ _ _) = [];\n', ''),
-            ('Figure12.emlf', 'SGlobal _ _ -> panic', 'SGlobal _ _ -> Set.empty; -- panic'),
-            ('Figure12.emlf', 'SDeclScope _ _ -> panic', 'SDeclScope _ body -> freeNames body; -- panic'),
-            ('Figure12.emlf', 'SWantedRefs _ _ -> panic', 'SWantedRefs _ _ -> Set.empty; -- panic'),
-            ('Figure12.emlf', 'references (SIndexedStringPattern _ _ _) = panic',
-             'references (SIndexedStringPattern _ _ _) = Set.empty; -- panic'),
-            ('Figure12.emlf', 'bound (SIndexedStringPattern _ _ _) = []',
-             'bound (SIndexedStringPattern _ _ _) = ["hint"]'),
-            ('Helpers.emlf', 'import Prelude hiding (Eq, fail)\n', ''),
-            ('Helpers.emlf', 'SSignature body annotation -> SSignature (layoutExpr body) annotation',
-             'SSignature body annotation -> layoutExpr body'),
-            ('Helpers.emlf', 'SourceSpan package owner "" 0 0 0 0', 'SourceSpan "" "" "" 0 0 0 0'),
-            ('Helpers.emlf', 'S.map layoutInstance instances', 'instances'),
-        ]
-        for filename, old, new in mutations:
-            with self.subTest(filename=filename, old=old):
-                root = self.changed('tests/Tests/' + filename, old, new)
-                with self.assertRaisesRegex(data.FixtureError, 'unreviewed Figure12 oracle semantics'):
-                    data.decode(root)
-
-    def test_postimage_digest_cannot_authorize_unreviewed_source(self):
-        relative = 'tests/Tests/Figure12.emlf'
-        root = self.changed(relative, '(Set.delete x (freeNames b))', '(freeNames b)')
-        transitions = {key: dict(value) for key, value in data.REVIEWED_SOURCE_TRANSITIONS.items()}
-        transitions[relative]['postimage_sha256'] = hashlib.sha256((root / relative).read_bytes()).hexdigest()
-        with patch.object(data, 'REVIEWED_SOURCE_TRANSITIONS', transitions):
-            with self.assertRaisesRegex(data.FixtureError, 'unreviewed Figure12 oracle semantics'):
-                data.decode(root)
-
-    def test_appended_or_reordered_semantics_fail_closed(self):
-        for relative, transition in data.REVIEWED_SOURCE_TRANSITIONS.items():
-            current = (data.ROOT / relative).read_text()
-            before, after = transition['edits'][-1]
-            for mutant in [current + '\nfreeNames expression = Set.empty\n',
-                           current.replace(after, before, 1) + after]:
-                with self.subTest(relative=relative, mutant=hashlib.sha256(mutant.encode()).hexdigest()):
-                    root = self.changed(relative, current, mutant)
-                    with self.assertRaisesRegex(data.FixtureError, 'unreviewed Figure12 oracle semantics'):
-                        data.decode(root)
-
-    def test_multiline_or_ambiguous_data_fails_closed(self):
-        for new in ['signatures =\n ', 'signatures = []\nsignatures = ']:
-            root = self.changed('tests/Tests/Figure12.emlf', 'signatures = ', new)
-            with self.assertRaises(data.FixtureError):
-                self.reviewed_decode_for_data_control(root)
+    def test_malformed_expected_type_fails(self):
+        for expected in ([], ['XTyVar', 1], ['XArrow', ['XBot']],
+                         ['XVar', ['XTyVar', 'wrong']], ['XVar', ['XTyVar', True]]):
+            with self.subTest(expected=expected):
+                changed = copy.deepcopy(self.reference)
+                changed['type_checks'][0]['expected'] = expected
+                self.write(changed)
+                with self.assertRaises(data.FixtureError):
+                    data.decode(self.root)
 
 
 if __name__ == '__main__':

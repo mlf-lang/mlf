@@ -128,6 +128,83 @@ def stamp(cache, row):
     return directory, value
 
 
+def verify_native_dependencies(report, tools, artifacts, worker_results, crate, emission,
+                               emit_stamp, assembled, assembly_stamp, link_job, link_stamp):
+    inventory_name = 'native-dependencies.json'
+    linked = link_stamp['inputs'].get('native-crates', [])
+    if inventory_name not in assembly_stamp['files']:
+        require(not linked and inventory_name not in emit_stamp['files'],
+                'native dependencies missing from assembly')
+        return
+    digest = assembly_stamp['files'][inventory_name]
+    require(emit_stamp['files'].get(inventory_name) == digest
+            and assembly_stamp['inputs'].get('native-dependencies') == digest,
+            'native dependency inventory changed between emission and assembly')
+    inventory = read(verified(assembled / inventory_name, digest))
+    objects = inventory['objects']
+    selected = [r['dependency'] for r in objects]
+    require(objects == linked and len(selected) == len(set(selected))
+            and set(selected) == {r['dependency'] for r in inventory['dependency_modes'] if r['mode'] == 'native'},
+            'native link differs from selected dependency implementations')
+    if not objects:
+        if 'native-report.json' in emit_stamp['files']:
+            outcome = read(verified(emission / 'native-report.json', emit_stamp['files']['native-report.json']))
+            require(outcome['selected'] == [], 'assembly omitted a native object chosen by the compiler')
+        return
+    plan = read(verified(emission / 'native-plan.json', emit_stamp['files']['native-plan.json']))
+    outcome = read(verified(emission / 'native-report.json', emit_stamp['files']['native-report.json']))
+    target = read(verified(emission / 'native-target.json', plan['target_sha256']))
+    require(plan['format'] == 'MLF-PINNED-NATIVE-DEPENDENCIES-1'
+            and outcome['format'] == 'MLF-NATIVE-PROGRAM-1' and set(outcome['selected']) == set(selected)
+            and target == tools['native-crate-target']
+            and all(target[k] == tools[k] for k in ('compiler', 'clang', 'system', 'machine', 'runtime'))
+            and target['target_triple'] and target['data_layout'], 'invalid native target or compiler selection')
+    candidates = {r['crate_id']: r for r in plan['dependencies']}
+    require(len(candidates) == len(plan['dependencies']), 'duplicate native crate candidate')
+    closure = read(regular(crate / 'dependency-files.json'))
+    producers = {str(directory / 'unit.o'): (row, directory, saved) for row, directory, saved in artifacts
+                 if row['kind'] == 'native crate library'}
+    for obj in objects:
+        owner = obj['dependency']
+        require(owner in candidates and obj['path'] in producers, 'missing pinned native crate producer')
+        candidate = candidates[owner]
+        row, directory, producer = producers[obj['path']]
+        inputs = producer['inputs']
+        checked_result, checked_stamp = worker_results[row['job_id']]
+        checked = Path(checked_result['artifact'])
+        expected = {**read(regular(checked / 'dependency-files.json')),
+                    **{str(checked / f): checked_stamp['files'][f] for f in ('unit.mlfci', 'unit.mlfco')}}
+        require(checked_stamp['inputs']['crate'] == owner == inputs['crate_id']
+                and inputs['target'] == target and inputs['checked_closure'] == expected
+                and all(closure.get(path) == value for path, value in expected.items())
+                and sorted(pin['sha256'] for pin in candidate['interfaces']) ==
+                    sorted(value for path, value in expected.items() if path.endswith('.mlfci')),
+                'native producer is outside the target checked closure')
+        for path, value in expected.items():
+            verified(path, value)
+        contract_path = verified(directory / 'contract.json', obj['contract_sha256'])
+        contract = read(contract_path)
+        machine = verified(obj['path'], obj['sha256'])
+        receipt = read(verified(directory / 'native.json', producer['files']['native.json']))
+        require(receipt['format'] == 'MLF-NATIVE-ARTIFACT-1' and contract['format'] == 'MLF-NATIVE-CRATE-1'
+                and receipt['inputs'] == inputs and receipt['status'] == contract['status'] == 'eligible'
+                and contract['crate_id'] == receipt['crate_id'] == owner
+                and obj['identity'] == candidate['identity'] == contract['identity'] == receipt['identity']
+                and contract['export_abi'] == target['export_abi'] and contract['runtime_abi'] == target['runtime_abi']
+                and obj['sha256'] == producer['files']['unit.o'] == receipt['sha256']
+                and obj['contract_sha256'] == producer['files']['contract.json'] == receipt['contract_sha256']
+                and candidate['contract'] == {'path': str(contract_path), 'sha256': obj['contract_sha256']}
+                and candidate['object'] == {'path': str(machine), 'sha256': obj['sha256']},
+                'native link object differs from the verified producer or compiler contract')
+    commands = [command['argv'] for command in report['commands'] if command.get('job_id') == link_job['id']]
+    program = Path(worker_results[link_job['llvm']][0]['artifact']) / 'program.o'
+    runtime = Path(worker_results[link_job['runtime']][0]['artifact']) / 'runtime.o'
+    require(len(commands) == 1 and commands[0][0] == tools['clang']['path']
+            and [arg for arg in commands[0] if Path(arg).suffix == '.o'] ==
+                [str(program), *(obj['path'] for obj in objects), str(runtime)],
+            'selected native crate objects differ from actual linker arguments')
+
+
 def verify_stage(stage, cache, pair, helper, clang, runtime_inputs, expected_packages, expected_targets, pkg, expected_crates, source_root):
     report_file = regular(stage / 'build-report.json')
     report = read(report_file)
@@ -373,6 +450,8 @@ def verify_stage(stage, cache, pair, helper, clang, runtime_inputs, expected_pac
                 and crate_stamp['files']['unit.mlfci'] == value['files']['unit.mlfci']
                 and crate_stamp['files']['unit.mlfco'] == value['files']['unit.mlfco'],
                 'disconnected target artifact chain')
+        verify_native_dependencies(report, tools, artifacts, worker_results, Path(crate_result['artifact']),
+                                   Path(emit_result['artifact']), emit_stamp, directory, value, link_job, link_stamp)
         llvm = verified(directory / 'program.ll', value['files']['program.ll'])
         binary = verified(directory / 'program', value['files']['program'])
         installed = verified(stage / 'bin' / target, sha(binary))

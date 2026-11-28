@@ -103,6 +103,10 @@ static MLF_NOINLINE MlfValue *mlf_process_request(MlfValue *request) {
     const char *op = fields[1];
     if (!strcmp(op,"version") && count==2) {
         status=MLF_PROCESS_OK; mlf_ps_reply_int(&reply,status); mlf_ps_reply_int(&reply,1);
+    } else if (!strcmp(op,"acquire-file-lock") && count==3) {
+        intptr_t handle=os_file_lock(fields[2]);
+        status=handle < 0 ? MLF_PROCESS_SYSTEM_ERROR : MLF_PROCESS_OK;
+        if (!status) { mlf_ps_reply_int(&reply,status); mlf_ps_reply_int(&reply,handle); }
     } else if (!strcmp(op,"clock") && count==2) {
         status=MLF_PROCESS_OK; mlf_ps_reply_int(&reply,status); mlf_ps_reply_uint(&reply,async_clock_ms());
     } else if (!strcmp(op,"pause") && count==3) {

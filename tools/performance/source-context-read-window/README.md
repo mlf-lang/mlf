@@ -47,7 +47,7 @@ of the observed improvement.
   of the current reports. The SCC histogram was 501 singletons, one pair and two
   groups of four. The canonical population-projection SHA is recorded in JSON.
 * The ordinary CLI implementation `runEntry Entry.main` linked into the
-  unchanged [FoundationStudy.hs](FoundationStudy.hs) helper. This is a qualified
+  unchanged [FoundationStudy.hs](https://github.com/mlf-lang/mlf/blob/0704d216b8cf6d887d3737efa30a2eae3c152f0a/tools/performance/source-context-read-window/FoundationStudy.hs) helper. This is a qualified
   wrapper executable identity, **not** a claim that its bytes equal `emlf`.
 * A cold CACHE-3 compilation followed by lossless CACHE-1 materialization using
   that **same executable**. B is not a historical compiler and does not measure
@@ -83,24 +83,14 @@ oracles, source/producer closed sets and command captures.
 
 [results-20261102.json](results-20261102.json) contains exact input and executable
 identities, stage times/counts, full directory accounting and evidence hashes.
-The Haskell helper is published byte-for-byte from the completed run.
-The original [inner runner](reference-run-foundation.py) and
-[qualification launcher](reference-qualification.py) are included byte-for-byte
-as **fixed-environment reference source**, not portable entry points. Their
-identities are recorded too.
-
-The two reference Python files intentionally preserve their original absolute
-bindings, draft-era comments and execution protocol. Their completed status comes
-from the receipts, not from editing a historical source comment. Do not run them
-as repository defaults. The local launchers are **not presented as portable
-repository commands**:
-they bind a specific authenticated producer, private resource root and historical
-golden dependency closure. In particular, golden interfaces contain dependency
-paths; copying them and silently rewriting paths or hashes is not reproduction.
-This reference protocol intentionally does not replace those constraints with
-an unchecked new launcher. The earlier portable
-[64-group runner](../source-context-read-reuse/run_workload64.py) remains a
-separate smaller fixture, not a substitute for this real package population.
+The Haskell helper used the text-cache encodings measured in this study.
+The archived [inner runner](https://github.com/mlf-lang/mlf/blob/0704d216b8cf6d887d3737efa30a2eae3c152f0a/tools/performance/source-context-read-window/reference-run-foundation.py) and
+[qualification launcher](https://github.com/mlf-lang/mlf/blob/0704d216b8cf6d887d3737efa30a2eae3c152f0a/tools/performance/source-context-read-window/reference-qualification.py) record the
+original machine-specific paths, producer checks and resource limits. Their
+hashes appear in the results. The golden interfaces contain absolute dependency
+paths, so a reproduction also requires the golden closure at its recorded paths.
+The [64-group study](../source-context-read-reuse/README.md) records the
+earlier comparison on a synthetic workload.
 
 To reproduce the Foundation protocol in another environment:
 

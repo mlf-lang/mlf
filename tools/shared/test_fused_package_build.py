@@ -81,9 +81,26 @@ def main():
             raise RuntimeError(name + ' failed; retained stdout/stderr in ' + str(output))
         return stdout
 
+    # This fixture exercises retained whole-program IR and its staged predecessor.
+    # The separate native-library/package-dependency-cli case covers mixed object linking.
+    def adapter(name, flags):
+        wrapper = output / name
+        wrapper.write_text('#!' + sys.executable + '\nimport os, subprocess, sys\nreal = ' + repr(str(emlf)) + '\n'
+            'if sys.argv[1:] == ["--help"]:\n'
+            '    p = subprocess.run([real, "--help"], stdout=subprocess.PIPE)\n'
+            '    fields = p.stdout.split()\n'
+            '    sys.stdout.buffer.write(b" ".join(x for x in fields if x not in ' + repr(flags) + '))\n'
+            '    raise SystemExit(p.returncode)\n'
+            'os.execv(real, [real, *sys.argv[1:]])\n')
+        wrapper.chmod(0o755)
+        return wrapper
+
+    ir_compiler = adapter('compiler-with-fused-IR', [b'--crate-library-to-llvm'])
+    evidence['ir_adapter_sha256'] = sha(ir_compiler)
+
     def build(name, *, directory=None, store=None, jobs=2, compiler=None, success=True):
         directory = directory or output / 'build'
-        run(name, [manager, '--manifest', manifest, '--compiler', compiler or emlf,
+        run(name, [manager, '--manifest', manifest, '--compiler', compiler or ir_compiler,
             '--runtime', ROOT / 'runtime/mlf_runtime.c', '--build-dir', directory,
             '--cache-dir', store or cache, '--jobs', str(jobs), 'build'], success=success)
         report = directory / 'build-report.json'
@@ -188,14 +205,7 @@ def main():
 
     # This adapter changes only feature discovery. It executes the same compiler
     # for real staged builds, so the legacy fallback cannot pass with fake output.
-    wrapper = output / 'compiler-without-fused-protocol'
-    wrapper.write_text('#!' + sys.executable + '\nimport os, subprocess, sys\nreal = ' + repr(str(emlf)) + '\n'
-        'if sys.argv[1:] == ["--help"]:\n'
-        '    p = subprocess.run([real, "--help"], stdout=subprocess.PIPE)\n'
-        '    sys.stdout.buffer.write(p.stdout.replace(b"--codegen-cache", b"--unavailable-codegen-cache"))\n'
-        '    raise SystemExit(p.returncode)\n'
-        'os.execv(real, [real, *sys.argv[1:]])\n')
-    wrapper.chmod(0o755)
+    wrapper = adapter('compiler-without-fused-protocol', [b'--crate-library-to-llvm', b'--codegen-cache'])
     evidence['legacy_adapter_sha256'] = sha(wrapper)
     legacy_dir = output / 'legacy-build'
     legacy = build('legacy-cold', compiler=wrapper, directory=legacy_dir, store=output / 'legacy-cache')

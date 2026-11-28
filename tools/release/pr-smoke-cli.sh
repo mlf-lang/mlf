@@ -3,6 +3,14 @@
 set -euo pipefail
 test "$#" -eq 2 || { printf '%s\n' 'Usage: pr-smoke-cli.sh COMPILER OUTPUT-DIRECTORY' >&2; exit 2; }
 root=$(cd -- "$(dirname -- "$0")/../.." && pwd)
+. "$root/tools/testing/compiler-diagnostics.sh"
+if [ "${MLF_TEST_SUITE:-}" = candidate-smoke-cli ]; then
+  . "$root/tools/testing/native-events.sh"
+else
+  mlf_case_start() { :; }
+  mlf_case_result() { :; }
+  mlf_case_cleanup() { :; }
+fi
 script="$root/tools/release/pr-smoke-cli.sh"
 mkdir -p "$2"
 work=$(cd -- "$2" && pwd)
@@ -30,8 +38,10 @@ stop_sleep_jobs() {
   exit 0
 }
 cleanup() {
+  local status=$?
   if [ -n "$watchdog_pid" ]; then kill "$watchdog_pid" 2>/dev/null || true; fi
   if [ -n "$command_pid" ]; then kill "$command_pid" 2>/dev/null || true; fi
+  mlf_case_cleanup "$status"
 }
 trap cleanup EXIT
 trap 'exit 130' INT
@@ -66,7 +76,10 @@ run() {
   wait "$watchdog_pid" 2>/dev/null || true
   watchdog_pid=
   printf '%s\n' "$status" > "$work/$label.status"
-  test ! -e "$work/$label.timed-out" || fail "$label timed out"
+  if [ -e "$work/$label.timed-out" ]; then
+    mlf_case_result timeout "$status"
+    fail "$label timed out"
+  fi
   return "$status"
 }
 success() {
@@ -75,22 +88,28 @@ success() {
   test ! -s "$work/$label.stderr" || fail "$label wrote unexpected diagnostics"
 }
 rejection() {
+  local diagnostics=cat
+  if [ "$1" = --source ]; then diagnostics=mlf_compiler_diagnostics; shift; fi
   local label=$1 expected=$2 status=0
   shift 2
   run "$label" /dev/null "$@" || status=$?
   test "$status" -eq 1 || fail "$label returned $status instead of rejection status 1"
   test ! -s "$work/$label.stdout" || fail "$label produced output before rejecting"
-  cmp "$expected" "$work/$label.stderr" || fail "$label rejected for the wrong reason"
+  "$diagnostics" < "$work/$label.stderr" | cmp "$expected" - || fail "$label rejected for the wrong reason"
 }
 
 for name in polymorphic-let impredicative-self-application; do
-  success "$name.compile" /dev/null "$compiler" "$fixtures/$name.emlf"
+  mlf_case_start "candidate-smoke-cli/source-accepted/$name"
+  mlf_source_success "$name.compile" /dev/null "$compiler" "$fixtures/$name.emlf"
   success "$name.check" /dev/null "$compiler" --check "$work/$name.compile.stdout"
   cmp "$fixtures/$name.type" "$work/$name.check.stdout" || fail "$name has the wrong checked target type"
+  mlf_case_result pass 0
   printf 'PASS accepted %s\n' "$name"
 done
 for name in monomorphic-mismatch invalid-universal-annotation; do
-  rejection "$name.reject" "$fixtures/$name.stderr" "$compiler" "$fixtures/$name.emlf"
+  mlf_case_start "candidate-smoke-cli/source-rejected/$name"
+  rejection --source "$name.reject" "$fixtures/$name.stderr" "$compiler" "$fixtures/$name.emlf"
+  mlf_case_result pass 0
   printf 'PASS rejected %s\n' "$name"
 done
 
@@ -103,9 +122,10 @@ read -r -a libs <<< "$pkg_libs"
 success runtime /dev/null "$clang" -O2 -std=c11 -Wall -Wextra -Werror \
   "${cflags[@]}" -c "$root/runtime/mlf_runtime.c" -o "$work/runtime.o"
 for name in unbounded-integers lazy-closure-constructor repeated-unicode-input; do
+  mlf_case_start "candidate-smoke-cli/interpreter-and-llvm/$name"
   input=/dev/null
   if [ -f "$fixtures/$name.stdin" ]; then input="$fixtures/$name.stdin"; fi
-  success "$name.compile" /dev/null "$compiler" "$fixtures/$name.emlf"
+  mlf_source_success "$name.compile" /dev/null "$compiler" "$fixtures/$name.emlf"
   success "$name.check" /dev/null "$compiler" --check "$work/$name.compile.stdout"
   cmp "$fixtures/io-unit.type" "$work/$name.check.stdout" || fail "$name is not checked IO Unit"
   success "$name.interpreter" "$input" "$compiler" --run-xmlf "$work/$name.compile.stdout"
@@ -115,12 +135,15 @@ for name in unbounded-integers lazy-closure-constructor repeated-unicode-input; 
     -x none "$work/runtime.o" "${libs[@]}" -lm -o "$work/$name.native"
   success "$name.llvm" "$input" "$work/$name.native"
   cmp "$fixtures/$name.stdout" "$work/$name.llvm.stdout" || fail "$name LLVM output differs from its oracle"
+  mlf_case_result pass 0
   printf 'PASS interpreter+llvm %s\n' "$name"
 done
+mlf_case_start candidate-smoke-cli/malformed-target
 rejection malformed.interpreter "$fixtures/malformed-before-effects.interpreter.stderr" \
   "$compiler" --run-xmlf "$fixtures/malformed-before-effects.xmlf"
 rejection malformed.llvm "$fixtures/malformed-before-effects.llvm.stderr" \
   "$compiler" --xmlf-to-llvm-io-gc "$fixtures/malformed-before-effects.xmlf"
+mlf_case_result pass 0
 printf 'PASS malformed target before effects on interpreter+llvm\n'
 
 # Hash every checked-in input and expected result, plus generated targets and
@@ -142,6 +165,7 @@ for label in "${command_labels[@]}"; do
   done
 done
 jq -n --arg compiler_sha256 "$(sha256 "$compiler")" --arg script_sha256 "$(sha256 "$script")" \
+  --arg diagnostics_sha256 "$(sha256 "$root/tools/testing/compiler-diagnostics.sh")" \
   --arg runtime_sha256 "$(sha256 "$root/runtime/mlf_runtime.c")" \
   --arg runtime_header_sha256 "$(sha256 "$root/runtime/mlf_runtime.h")" \
   --arg runtime_object_sha256 "$(sha256 "$work/runtime.o")" --arg clang_sha256 "$(sha256 "$clang")" \
@@ -149,7 +173,7 @@ jq -n --arg compiler_sha256 "$(sha256 "$compiler")" --arg script_sha256 "$(sha25
   --slurpfile fixtures "$work/fixtures.json" --slurpfile observations "$work/observations.json" \
   '{complete:true,compiler_sha256:$compiler_sha256,cases:8,accepted:2,rejected:2,runtime:3,
     invalid_target:1,backends:["interpreter","llvm"],seconds:$seconds,timeout_seconds:$timeout_seconds,
-    script_sha256:$script_sha256,runtime_sha256:$runtime_sha256,runtime_header_sha256:$runtime_header_sha256,
+    script_sha256:$script_sha256,diagnostics_sha256:$diagnostics_sha256,runtime_sha256:$runtime_sha256,runtime_header_sha256:$runtime_header_sha256,
     runtime_object_sha256:$runtime_object_sha256,clang_sha256:$clang_sha256,
     fixtures:$fixtures[0],observations:$observations[0]}' > "$work/result.tmp"
 mv "$work/result.tmp" "$work/result.json"

@@ -68,6 +68,13 @@ BASELINE="$COMPILER"
   3 "$CLANG" 3 2
 ```
 
+The candidate links the checkout's `runtime/mlf_runtime.c`. When the baseline
+compiler uses a different runtime ABI, set `MLF_BENCH_BASELINE_RUNTIME` to
+its matching `mlf_runtime.c` before running `bench`. When unset, the
+baseline uses the checkout runtime. The release gate selects the runtime
+shipped with its pinned baseline. The report records both resolved runtime
+paths and fingerprints the C sources and headers in each runtime directory.
+
 For a qualified native pair, set `MLF_PACKAGE_MANAGER`, `COMPILER` and
 `MLF_BUILD_RUNNER` to that pair's tools and keep the same package-build and bench
 commands. The runner itself is a compiled native MLF executable in either case;
@@ -104,7 +111,7 @@ not a compilation/runtime target PASS. Missing PCRE2 or any failed source,
 fixture, oracle or integrity check still stops the complete ten-workload gate.
 
 Static migration checks (no compilation or benchmark execution) are available as
-`python3 tools/bench/check-migration.py`; see [validation protocol](MIGRATION-VALIDATION.md).
+`python3 -B tools/testing/run.py benchmark-migration-contract`; see [validation protocol](MIGRATION-VALIDATION.md).
 
 Run from the repository root with a fresh output directory and no other builds
 or measured jobs running. An odd sample count of at least three is required.
@@ -184,9 +191,10 @@ both selected backend executables. Keep streaming and runtime-splitting settings
 compatible with both backends.
 
 Set `MLF_BENCH_SPLIT_RUNTIME=1` to compile the runtime core and process supervisor
-as two fresh translation units in parallel. This option applies to both MLF
-compiler variants and works with the ordinary Clang backend as well as the
-streaming modes below. Each build compiles `mlf_runtime.c` with
+as two fresh translation units in parallel. A baseline whose runtime ships
+without `mlf_process_supervisor.c` builds its embedded runtime as one object.
+Splitting works with the ordinary Clang backend and the streaming modes
+below. Each split build compiles `mlf_runtime.c` with
 `-DMLF_RUNTIME_EXTERNAL_PROCESS_SUPERVISOR=1` into `runtime.o` and its sibling
 `mlf_process_supervisor.c` into `runtime-supervisor.o`, with the same O2 flags and
 library/include arguments. Linking consumes both objects directly; all process,
@@ -309,12 +317,16 @@ programs. Flags outside the supported link form retain Clang's normal driver.
 `native-default.py` measures the direct `emlf SOURCE -o EXE --build-dir DIR`
 command, including process startup, installed-library validation, fresh user
 frontend and LLVM generation, one ordinary Clang O2 object compilation and a
-fresh link. Fixed library installation is excluded and its separately measured
+fresh link. Native crate installation is excluded and its separately measured
 receipt and timing are recorded. This is a distinct measurement boundary from
-the fresh-runtime runner above. Every workload must use the installed standard
-library path; a zero native-export count is allowed and recorded. The report
-separately records fixed runtime reuse, native library export reuse and checked
-builtin unfolding; these are distinct mechanisms.
+the fresh-runtime runner above. Each workload requires an authenticated
+installation and no dependency fallback. A program may need no native provider;
+its actual checked-IR and source dependencies remain recorded. The runner accepts
+`MLF-NATIVE-PROGRAM-BUILD-3` receipts and compares `native_providers` with the
+native entries in `dependency_modes`, the installed crate contracts, and every
+object passed to the linker. `link_objects` records those selected provider
+objects followed by the authenticated runtime; `runtime_reused` records that
+runtime reuse independently.
 
 Supply a prebuilt independent oracle executable that implements
 `ORACLE WORKLOAD SIZE OUTPUT` by calling `Package.Benchmark.validateOutput`;
@@ -326,7 +338,7 @@ report with compiler fingerprints and one independently checked executable at
 fresh output and no other measured work:
 
 ```sh
-python3 tools/bench/native-default.py \
+python3 -B tools/testing/run.py application-benchmarks-installed -- \
   --compiler /absolute/path/to/emlf \
   --install-receipt /absolute/path/to/native/receipt.json \
   --install-timing /absolute/path/to/install-timing.json \
@@ -339,7 +351,7 @@ python3 tools/bench/native-default.py \
 
 Each workload has an excluded warmup and five fresh paired candidate/C builds,
 plus candidate/C/baseline runtime processes. The report retains exact commands,
-receipts, correctness cases, medians, reuse counts and input identities. Its
+receipts, correctness cases, medians, dependency modes and input identities. Its
 `complete` status means collection and correctness succeeded; evaluate ratios
 against the desired limits separately. Do not describe it as the ten-workload
 fresh-runtime gate.

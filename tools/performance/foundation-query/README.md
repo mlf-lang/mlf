@@ -174,12 +174,14 @@ python3 tools/shared/build.py --optimization 2 --bootstrap-only --build-dir .mlf
 python3 tools/performance/foundation-query/compare.py "$pr25_emlf" "$candidate_emlf" "$pr25_checkout/libraries/mlf-foundation" "$new_directory"
 ```
 
-For two PR 29-family sequences with the same source and spec paths, compare
-the records and formal artifacts directly. The Prelude control uses a fresh
-directory and exercises missing, damaged and valid foreign artifacts.
+For two PR 29-family sequences with the same source and spec paths, set
+`archive` to a checkout of the [raw-record inspector and its matching decoders](https://github.com/mlf-lang/mlf/tree/0704d216b8cf6d887d3737efa30a2eae3c152f0a/tools/performance/foundation-query).
+The inspector compares the historical per-group cache and formal artifacts.
+The Prelude control uses a fresh directory and exercises missing, damaged and
+valid foreign artifacts.
 
 ```sh
-python3 tools/performance/foundation-query/check-raw.py "$pr29_sequence" "$candidate_sequence" "$pr29_emlf" "$candidate_emlf"
+python3 "$archive/tools/performance/foundation-query/check-raw.py" "$pr29_sequence" "$candidate_sequence" "$pr29_emlf" "$candidate_emlf"
 python3 tools/performance/foundation-query/check-prelude.py "$candidate_emlf" "$fresh_directory" --producer "$candidate_producer"
 ```
 

@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Exercise publishing decisions without credentials or writes to GitHub.
 set -euo pipefail
+. "$(dirname -- "$0")/test-events.sh" release-package-publishing
 scripts=$(cd -- "$(dirname -- "$0")" && pwd)
 scratch=$(mktemp -d)
 trap 'rm -rf -- "$scratch"' EXIT
@@ -40,29 +41,38 @@ case "$1 $2" in
 esac
 SH
 chmod +x "$scratch/bin/"*
+release_begin release/package-publishing/local-preparation
 jq -n '{name:"example",version:"1.2.3",compiler_sha256:("a" * 64)}' > "$scratch/bundle with spaces/release.json"
 "$scripts/prepare-package-release.sh" "$scratch/bundle with spaces" owner/repo packages/example/1.2.3 "$scratch/output with spaces" >/dev/null
 jq -e '.dependencies.example.github.repository == "owner/repo" and .dependencies.example.github.tag == "packages/example/1.2.3"' "$scratch/output with spaces/dependency.json" >/dev/null
 test ! -e "$TEST_PUBLISH_LOG"
 echo 'PASS publishing: preparation is local and emits pinned dependency'
-expect_failure() { if "$@" >"$scratch/failure.log" 2>&1; then echo 'Expected failure' >&2; exit 1; fi; }
+release_pass
+expect_failure() { if "$@" >"$scratch/failure.log" 2>&1; then echo 'Expected failure' >&2; false; fi; }
+release_begin release/package-publishing/invalid-preparation
 expect_failure "$scripts/prepare-package-release.sh" "$scratch/bundle with spaces" owner/repo packages/example/1.2.3 "$scratch/output with spaces"
 expect_failure "$scripts/prepare-package-release.sh" "$scratch/bundle with spaces" owner/repo --latest "$scratch/invalid"
 expect_failure "$scripts/prepare-package-release.sh" "$scratch/bundle with spaces" owner/repo latest "$scratch/invalid"
 echo 'PASS publishing: existing output and invalid locator are rejected'
+release_pass
 publish() { "$scripts/publish-package-release.sh" "$scratch/output with spaces" owner/repo packages/example/1.2.3 "$TEST_SOURCE"; }
+release_begin release/package-publishing/exact-tag-and-upload
 publish
 test "$(wc -l < "$TEST_PUBLISH_LOG" | tr -d ' ')" = 5
 tail -n 1 "$TEST_PUBLISH_LOG" | grep -q 'release edit.*--draft=false'
 echo 'PASS publishing: exact tag is checked and assets precede publication'
+release_pass
 for mode in existing moved upload-failed moved-during-upload; do
+  release_begin "release/package-publishing/$mode"
   export TEST_GH_MODE=$mode
   : > "$TEST_PUBLISH_LOG"
   expect_failure publish
-  if grep -q 'release edit' "$TEST_PUBLISH_LOG"; then exit 1; fi
-  if { [ "$mode" = existing ] || [ "$mode" = moved ]; } && grep -q 'release create' "$TEST_PUBLISH_LOG"; then exit 1; fi
+  if grep -q 'release edit' "$TEST_PUBLISH_LOG"; then false; fi
+  if { [ "$mode" = existing ] || [ "$mode" = moved ]; } && grep -q 'release create' "$TEST_PUBLISH_LOG"; then false; fi
   echo "PASS publishing: $mode cannot publish"
+  release_pass
 done
+release_begin release/package-publishing/damaged-asset
 export TEST_GH_MODE=success
 : > "$TEST_PUBLISH_LOG"
 asset=$(jq -r '.dependencies.example.github.asset' "$scratch/output with spaces/dependency.json")
@@ -70,4 +80,5 @@ printf '\nchanged\n' >> "$scratch/output with spaces/$asset"
 expect_failure publish
 test ! -s "$TEST_PUBLISH_LOG"
 echo 'PASS publishing: damaged asset is rejected before GitHub access'
+release_pass
 echo '8 package publishing checks passed'

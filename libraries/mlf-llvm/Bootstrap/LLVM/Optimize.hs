@@ -4,9 +4,12 @@
              MultiParamTypeClasses, OverloadedStrings #-}
 module Bootstrap.LLVM.Optimize where {
   import MLF.Primitive;
+  import qualified Bootstrap.LLVM.RecursiveArguments as Recursive;
   import Bootstrap.Types;
   import qualified Bootstrap.Std as L;
   import qualified Bootstrap.Map as M;
+  import qualified Bootstrap.IntMap as IM;
+  import qualified Bootstrap.IntSet as IS;
   import qualified Bootstrap.Set as S;
   import qualified Bootstrap.X.Syntax as X;
   import qualified Bootstrap.Primitive as P;
@@ -44,7 +47,29 @@ module Bootstrap.LLVM.Optimize where {
   eqName :: XName -> XName -> Bool;
   eqName a b = (nameId a == nameId b);
   free :: XErased -> Set XName;
-  free expression = freeWith free expression;
+  free expression = case expression of {
+    XEApp _ _ -> S.fromDistinctAscList (IM.elems (applicationFree IS.empty IM.empty expression));
+    _ -> freeWith free expression
+  };
+  -- Accumulate one representative per free identity across an application.
+  -- Visit the left operand first, matching the left-biased union of free sets.
+  applicationFree :: IntSet -> IntMap XName -> XErased -> IntMap XName;
+  applicationFree bound found expression = case expression of {
+    XEVar n -> let { key = nameId n } in
+      if IS.member key bound || IM.member key found then found else IM.insert key n found;
+    XEApp f a -> applicationFree bound (applicationFree bound found f) a;
+    XEAbs n body -> applicationFree (IS.insert (nameId n) bound) found body;
+    XELet n rhs body -> applicationFree (IS.insert (nameId n) bound)
+      (applicationFree bound found rhs) body;
+    XELetRec ds body -> let {
+      inside = L.foldlStrict (\scope binding -> IS.insert (nameId (L.fst binding)) scope) bound ds
+    } in L.foldlStrict (\names binding -> applicationFree inside names (L.snd binding))
+      (applicationFree inside found body) ds;
+    XECase subject branches -> L.foldlStrict (\names (XErasedAlternative pattern body) ->
+      let { inside = L.foldlStrict (\scope n -> IS.insert (nameId n) scope) bound (X.patternNames pattern) }
+      in applicationFree inside names body) (applicationFree bound found subject) branches;
+    _ -> found
+  };
   freeWith :: (XErased -> Set XName) -> XErased -> Set XName;
   freeWith descend expression = case expression of {
     XEVar n -> S.singleton n;
@@ -62,23 +87,9 @@ module Bootstrap.LLVM.Optimize where {
   freeAlternative = freeAlternativeWith free;
   freeAlternativeWith descend (XErasedAlternative pattern body) =
     S.difference compareName (descend body) (S.fromList compareName (X.patternNames pattern));
-  applications :: XErased -> (,) XErased ([] XErased);
-  applications expression = collectApplications [] expression;
-  collectApplications :: [] XErased -> XErased -> (,) XErased ([] XErased);
-  collectApplications args expression =
-    case expression of {
-      XEApp f a -> collectApplications ((:) a args) f;
-      _ -> (,) expression args
-    };
-  lambdas :: XErased -> (,) ([] XName) XErased;
-  lambdas expression =
-    case expression of {
-      XEAbs n b ->
-        case lambdas b of {
-          (,) ns body -> (,) ((:) n ns) body
-        };
-      _ -> (,) [] expression
-    };
+  applications = X.applications;
+  collectApplications = X.collectApplications;
+  lambdas = X.lambdas;
   -- Match the seed's bounded size query: a function larger than the inlining
   -- threshold need not have its remaining tree traversed.
   remainingSize :: Int -> XErased -> Int;
@@ -323,10 +334,12 @@ module Bootstrap.LLVM.Optimize where {
       _ -> freshPure expression
     };
   identities :: XErased -> Fresh XErased;
-  identities expression =
+  identities = identitiesWith reduceIdentity;
+  identitiesWith :: (XErased -> Fresh XErased) -> XErased -> Fresh XErased;
+  identitiesWith reduce expression =
     do {
-      normalized <- children identities expression;
-      reduceIdentity normalized
+      normalized <- children (identitiesWith reduce) expression;
+      reduce normalized
     };
   reduceIdentity normalized = case normalized of {
     XEApp (XEAbs n (XEVar other)) argument ->
@@ -334,11 +347,19 @@ module Bootstrap.LLVM.Optimize where {
     XELet n (XEVar a) b -> copy (M.singleton n (XEVar a)) b;
     _ -> freshPure normalized
   };
+  -- The checked identity pass can contract a let that returns its RHS.
+  -- Pending inlining still uses the ordinary rewrite when admission fails.
+  reduceCheckedIdentity normalized = case normalized of {
+    XELet name rhs (XEVar returned) ->
+      freshPure (if eqName name returned then rhs else XEVar returned);
+    _ -> reduceIdentity normalized
+  };
   -- Recognize helpers on the freshened declaration spine. These identities
   -- remain distinct underneath nested lambdas, patterns and recursive groups.
   data FoldBranch = ReturnField Int | CombineFields Primitive Int Int;
   data UnaryConstructorUse = BuildsField String | SelectsField String |
-    FoldsConstructors (Map String ((,) Int FoldBranch)) | ComposesFunctions | TranslatesBy Int;
+    FoldsConstructors (Map String ((,) Int FoldBranch)) | ComposesFunctions | TranslatesBy Int |
+    ProjectsArgument Int Int;
   unaryConstructorUse term = case term of {
     XEAbs name (XEApp (XEConstructor constructor) (XEVar field)) ->
       if eqName name field then Just (BuildsField constructor) else Nothing;
@@ -509,7 +530,7 @@ module Bootstrap.LLVM.Optimize where {
         Just role -> M.insert compareName name role known; Nothing -> known
       } };
       result <- checkedIdentities following body;
-      reduceIdentity (XELet name rhs result)
+      reduceCheckedIdentity (XELet name rhs result)
     };
     XELetRec [(,) name value] body -> do {
       rhs <- constructorIdentities known value;
@@ -522,7 +543,7 @@ module Bootstrap.LLVM.Optimize where {
     _ -> constructorIdentities known expression
   };
   constructorIdentities known expression = if M.null known
-    then identities expression else constructorApplications known expression;
+    then identitiesWith reduceCheckedIdentity expression else constructorApplications known expression;
   -- Inspect only partial applications built from checked composition roles
   -- and variables. Their ordinary child pass preserves the input syntax and
   -- seed. Callback roles are needed only when the erased result is demanded.
@@ -582,9 +603,9 @@ module Bootstrap.LLVM.Optimize where {
         freshPure (L.fromMaybe term (combineIntSummands left right));
       XEApp function argument -> case function of {
         XEApp (XEApp (XEVar _) _) _ -> freshPure (applyComposed known function argument);
-        _ -> reduceIdentity term
+        _ -> reduceCheckedIdentity term
       };
-      _ -> reduceIdentity term
+      _ -> reduceCheckedIdentity term
     }
   };
   fixedPoints :: XErased -> Fresh XErased;
@@ -630,31 +651,7 @@ module Bootstrap.LLVM.Optimize where {
   -- Arity evidence comes from independently checked constructor patterns. No
   -- constructor spelling or runtime tag is special; absent/conflicting evidence
   -- disables propagation, and partial applications are never treated as data.
-  subterms :: XErased -> [] XErased;
-  subterms expression =
-    case expression of {
-      XEAbs n b -> (:) b [];
-      XEApp f a -> (:) f ((:) a []);
-      XELet n a b -> (:) a ((:) b []);
-      XELetRec ds b ->
-        L.snoc
-          (L.map
-             (\entry ->
-                case entry of {
-                  (,) n a -> a
-                })
-             ds)
-          b;
-      XECase a branches ->
-        (:) a
-          (L.map
-             (\branch ->
-                case branch of {
-                  XErasedAlternative p b -> b
-                })
-             branches);
-      _ -> []
-    };
+  subterms = X.subterms;
   agreeArity :: Maybe Int -> Maybe Int -> Maybe Int;
   agreeArity a b =
     case a of {
@@ -706,10 +703,13 @@ module Bootstrap.LLVM.Optimize where {
          };
   liftConstructorValue :: Map String (Maybe Int) ->
                           XErased -> Fresh ((,) ([] ((,) XName XErased)) XErased);
-  liftConstructorValue arities value =
+  liftConstructorValue = liftConstructorValueFor False;
+  liftConstructorValueFor :: Bool -> Map String (Maybe Int) ->
+                                XErased -> Fresh ((,) ([] ((,) XName XErased)) XErased);
+  liftConstructorValueFor checked arities value =
     case constructorValue arities value of {
       Just ((,) c args) ->
-        do {
+        if checked && closedNestedFields arities args then freshPure ((,) [] value) else do {
           fields <- traverseFresh liftField args;
           freshPure
             ((,) (L.concatMap L.fst fields) (L.foldl XEApp (XEConstructor c) (L.map L.snd fields)))
@@ -727,13 +727,29 @@ module Bootstrap.LLVM.Optimize where {
       }
     };
   liftConstructorFields :: Map String (Maybe Int) -> XErased -> Fresh XErased;
-  liftConstructorFields arities expression =
+  liftConstructorFields = liftConstructorFieldsFor False;
+  -- A closed, nested constructor tree already has one lazy binding. Lifting
+  -- its children makes the parent a constructor with atomic fields, which
+  -- the ordinary inliner can then duplicate at each use.
+  closedNestedFields :: Map String (Maybe Int) -> [] XErased -> Bool;
+  closedNestedFields arities fields = let {
+    closed term = case term of {
+      XEInt _ -> True; XEDouble _ -> True; XEBool _ -> True; XEString _ -> True;
+      _ -> case constructorValue arities term of {
+        Just ((,) _ children) -> L.all closed children;
+        Nothing -> False
+      }
+    };
+    applied field = case field of { XEApp _ _ -> True; _ -> False }
+  } in L.any applied fields && L.all closed fields;
+  liftConstructorFieldsFor :: Bool -> Map String (Maybe Int) -> XErased -> Fresh XErased;
+  liftConstructorFieldsFor checked arities expression =
     do {
-      normalized <- children (liftConstructorFields arities) expression;
+      normalized <- children (liftConstructorFieldsFor checked arities) expression;
       case normalized of {
         XELet name rhs body ->
           do {
-            lifted <- liftConstructorValue arities rhs;
+            lifted <- liftConstructorValueFor checked arities rhs;
             case lifted of {
               (,) fields value ->
                 freshPure
@@ -827,7 +843,9 @@ module Bootstrap.LLVM.Optimize where {
   -- Cache capped free-use counts beside each rewrite subtree. Substitution can
   -- retain an unaffected subtree without walking it, preserving rewrite order
   -- and the exact fresh-name allocation order of the original pass.
-  data UseTree = UseTree XErased (Map XName Int) UseChildren;
+  data UseTree = UseTree XErased (Map XName Int) UseChildren
+    | IndexedUses XErased (IntMap UseCount) UseChildren;
+  data UseCount = UseCount XName Int;
   data UseChildren =
     UseLeaf |
     UseAbs XName UseTree |
@@ -837,10 +855,31 @@ module Bootstrap.LLVM.Optimize where {
     UseCase UseTree ([] ((,) XPattern UseTree));
   useTerm :: UseTree -> XErased;
   useTerm (UseTree term _ _) = term;
+  useTerm (IndexedUses term _ _) = term;
   useCounts :: UseTree -> Map XName Int;
   useCounts (UseTree _ counts _) = counts;
+  useCounts (IndexedUses _ counts _) = M.fromDistinctAscList
+    (L.map (\((,) _ (UseCount name count)) -> (,) name count) (IM.toList counts));
+  countIndex :: UseTree -> IntMap UseCount;
+  countIndex (IndexedUses _ counts _) = counts;
+  countIndex (UseTree _ counts _) = IM.fromList
+    (L.map (\((,) name count) -> (,) (nameId name) (UseCount name count)) (M.toList counts));
+  useCount :: XName -> UseTree -> Int;
+  useCount name tree = case tree of {
+    UseTree _ counts _ -> M.findWithDefault compareName 0 name counts;
+    IndexedUses _ counts _ -> case IM.lookup (nameId name) counts of {
+      Nothing -> 0;
+      Just (UseCount _ count) -> count
+    }
+  };
+  usesName :: XName -> UseTree -> Bool;
+  usesName name tree = case tree of {
+    UseTree _ counts _ -> M.member compareName name counts;
+    IndexedUses _ counts _ -> IM.member (nameId name) counts
+  };
   useChildren :: UseTree -> UseChildren;
   useChildren (UseTree _ _ children) = children;
+  useChildren (IndexedUses _ _ children) = children;
   addUses :: Int -> Int -> Int;
   addUses a b = L.min 2 (a + b);
   mergeUses :: Map XName Int -> Map XName Int -> Map XName Int;
@@ -851,36 +890,45 @@ module Bootstrap.LLVM.Optimize where {
   deleteUses :: [] XName -> Map XName Int -> Map XName Int;
   deleteUses names counts =
     L.foldl (\current name -> M.delete compareName name current) counts names;
+  -- Identity comparison on these maps needs only the numeric binder key.
+  -- Retain the representative name for callers that inspect useCounts.
+  mergeCountIndex :: IntMap UseCount -> IntMap UseCount -> IntMap UseCount;
+  mergeCountIndex left right = let {
+    merge (UseCount name a) (UseCount _ b) = UseCount name (addUses a b)
+  } in if IM.size left <= IM.size right then IM.unionWith merge left right
+    else IM.unionWith merge right left;
+  dropCountIndex :: [] XName -> IntMap UseCount -> IntMap UseCount;
+  dropCountIndex names counts = L.foldl (\current name -> IM.delete (nameId name) current) counts names;
   useAbs :: XName -> UseTree -> UseTree;
   useAbs name body =
-    UseTree (XEAbs name (useTerm body)) (M.delete compareName name (useCounts body))
+    IndexedUses (XEAbs name (useTerm body)) (IM.delete (nameId name) (countIndex body))
       (UseAbs name body);
   useApp :: UseTree -> UseTree -> UseTree;
   useApp function argument =
-    UseTree (XEApp (useTerm function) (useTerm argument))
-      (mergeUses (useCounts function) (useCounts argument))
+    IndexedUses (XEApp (useTerm function) (useTerm argument))
+      (mergeCountIndex (countIndex function) (countIndex argument))
       (UseApp function argument);
   useLet :: XName -> UseTree -> UseTree -> UseTree;
   useLet name value body =
-    UseTree (XELet name (useTerm value) (useTerm body))
-      (mergeUses (useCounts value) (M.delete compareName name (useCounts body)))
+    IndexedUses (XELet name (useTerm value) (useTerm body))
+      (mergeCountIndex (countIndex value) (IM.delete (nameId name) (countIndex body)))
       (UseLet name value body);
   useRec :: [] ((,) XName UseTree) -> UseTree -> UseTree;
   useRec bindings body =
-    let { counts = bindingUses bindings body } in
-    UseTree
+    let { counts = bindingCountIndex bindings body } in
+    IndexedUses
       (XELetRec (L.map (\((,) name value) -> (,) name (useTerm value)) bindings) (useTerm body))
-      (deleteUses (L.map L.fst bindings) counts)
+      (dropCountIndex (L.map L.fst bindings) counts)
       (UseRec bindings body);
-  bindingUses bindings body = L.foldl
-    (\current binding -> mergeUses current (useCounts (L.snd binding))) (useCounts body) bindings;
+  bindingCountIndex bindings body = L.foldl
+    (\current binding -> mergeCountIndex current (countIndex (L.snd binding))) (countIndex body) bindings;
   -- Inlining a shared lambda with two free occurrences can multiply both
   -- incoming and outgoing dependencies at every layer. A linear wrapper
   -- forwards at most one free occurrence per use, so it can still inline.
   branchesToFreeValues value = case useChildren value of {
-    UseAbs _ _ -> case M.toList (useCounts value) of {
+    UseAbs _ _ -> case IM.toList (countIndex value) of {
       [] -> False;
-      [(,) _ count] -> count > 1;
+      [(,) _ (UseCount _ count)] -> count > 1;
       _ -> True
     };
     _ -> False
@@ -891,11 +939,11 @@ module Bootstrap.LLVM.Optimize where {
       counts =
         L.foldl
           (\current ((,) pattern body) ->
-             mergeUses current (deleteUses (X.patternNames pattern) (useCounts body)))
-          (useCounts subject)
+             mergeCountIndex current (dropCountIndex (X.patternNames pattern) (countIndex body)))
+          (countIndex subject)
           alternatives
     } in
-    UseTree
+    IndexedUses
       (XECase (useTerm subject)
          (L.map (\((,) pattern body) -> XErasedAlternative pattern (useTerm body)) alternatives))
       counts
@@ -913,8 +961,8 @@ module Bootstrap.LLVM.Optimize where {
         useCase (indexUses subject)
           (L.map (\(XErasedAlternative pattern body) -> (,) pattern (indexUses body))
              alternatives);
-      XEVar name -> UseTree term (M.singleton name 1) UseLeaf;
-      _ -> UseTree term M.empty UseLeaf
+      XEVar name -> IndexedUses term (IM.singleton (nameId name) (UseCount name 1)) UseLeaf;
+      _ -> IndexedUses term IM.empty UseLeaf
     };
   mapUseChildren :: (UseTree -> Fresh UseTree) -> UseTree -> Fresh UseTree;
   mapUseChildren f tree =
@@ -966,7 +1014,7 @@ module Bootstrap.LLVM.Optimize where {
     };
   substituteUsed :: XName -> XErased -> UseTree -> Fresh UseTree;
   substituteUsed name value tree =
-    if L.not (M.member compareName name (useCounts tree))
+    if L.not (usesName name tree)
     then freshPure tree
     else case useTerm tree of {
            XEVar actual ->
@@ -1010,6 +1058,35 @@ module Bootstrap.LLVM.Optimize where {
                  body)
         }
     };
+  selectKnownConstructor :: UseTree -> [] ((,) XPattern UseTree) -> Maybe UseTree;
+  selectKnownConstructor subject branches = case useApplications [] subject of {
+    (,) head arguments -> case useTerm head of {
+      XEConstructor constructor -> selectUseConstructor constructor arguments branches;
+      _ -> Nothing
+    }
+  };
+  -- The condition is still demanded before either selected branch. At least
+  -- one result is a closed literal, so no local binder is duplicated.
+  selectConditionalConstructors :: UseTree -> [] ((,) XPattern UseTree) -> Maybe UseTree;
+  selectConditionalConstructors subject branches@((:) ((,) (XConstructorPattern _ _) _) _) = let {
+    closedLiteral value = case useTerm value of {
+      XEInt _ -> True; XEBool _ -> True; XEString _ -> True; XEDouble _ -> True; _ -> False
+    }
+  } in case useApplications [] subject of {
+    (,) operator [condition,yes,no] ->
+      case useTerm operator of {
+        XEPrimitive PIfThenElse -> do {
+          left <- selectKnownConstructor yes branches;
+          right <- selectKnownConstructor no branches;
+          if closedLiteral left || closedLiteral right
+          then Just (useApp (useApp (useApp operator condition) left) right)
+          else Nothing
+        };
+        _ -> Nothing
+      };
+    _ -> Nothing
+  };
+  selectConditionalConstructors _ _ = Nothing;
   substituteUsedBindings :: UseTree -> [] ((,) XName UseTree) -> Fresh UseTree;
   substituteUsedBindings body bindings =
     case bindings of {
@@ -1030,7 +1107,7 @@ module Bootstrap.LLVM.Optimize where {
   -- unrelated bind elsewhere in the body.  Zero-use subtrees remain opaque.
   singleUseIOPath :: XName -> Bool -> UseTree -> Bool;
   singleUseIOPath name insideIO tree =
-    if M.findWithDefault compareName 0 name (useCounts tree) == 0
+    if useCount name tree == 0
     then True
     else case useChildren tree of {
       UseLeaf ->
@@ -1078,7 +1155,7 @@ module Bootstrap.LLVM.Optimize where {
   -- not make the RHS globally strict: an unselected branch never evaluates it.
   singleUseBranchPath :: XName -> Bool -> UseTree -> Bool;
   singleUseBranchPath name selected tree =
-    if M.findWithDefault compareName 0 name (useCounts tree) == 0
+    if useCount name tree == 0
     then True
     else case useChildren tree of {
       UseLeaf -> case useTerm tree of {
@@ -1088,16 +1165,16 @@ module Bootstrap.LLVM.Optimize where {
       UseAbs _ _ -> False;
       UseRec _ _ -> False;
       UseLet _ value body ->
-        (M.findWithDefault compareName 0 name (useCounts value) == 0) &&
+        (useCount name value == 0) &&
         singleUseBranchPath name selected body;
       UseCase subject branches ->
-        (M.findWithDefault compareName 0 name (useCounts subject) == 0) &&
+        (useCount name subject == 0) &&
         L.all (\entry -> singleUseBranchPath name True (L.snd entry)) branches;
       UseApp _ _ -> case useApplications [] tree of {
         (,) function arguments -> case useTerm function of {
           XEPrimitive PIfThenElse -> case arguments of {
             (:) condition ((:) yes ((:) no [])) ->
-              (M.findWithDefault compareName 0 name (useCounts condition) == 0) &&
+              (useCount name condition == 0) &&
               (singleUseBranchPath name True yes && singleUseBranchPath name True no);
             _ -> False
           };
@@ -1132,12 +1209,13 @@ module Bootstrap.LLVM.Optimize where {
     }
   };
   outerCallNames :: XName -> Map XName Int -> [] UseTree -> Maybe ([] XName);
-  outerCallNames target outer arguments = case arguments of {
+  outerCallNames target outer = outerCallNamesUsing target (\name -> M.member compareName name outer);
+  outerCallNamesUsing target outer arguments = case arguments of {
     [] -> Just [];
     (:) argument rest -> case useTerm argument of {
       XEVar name ->
-        if L.not (eqName target name) && M.member compareName name outer
-        then case outerCallNames target outer rest of {
+        if L.not (eqName target name) && outer name
+        then case outerCallNamesUsing target outer rest of {
           Nothing -> Nothing;
           Just names -> Just ((:) name names)
         }
@@ -1146,26 +1224,28 @@ module Bootstrap.LLVM.Optimize where {
     }
   };
   commonCalls :: XName -> Int -> Map XName Int -> UseTree -> CommonCalls;
-  commonCalls target arity outer tree =
-    if M.findWithDefault compareName 0 target (useCounts tree) == 0
+  commonCalls target arity outer = commonCallsUsing target arity (\name -> M.member compareName name outer);
+  commonCallsUsing target arity outer tree =
+    if useCount target tree == 0
     then NoCommonCalls
     else case useApplications [] tree of {
       (,) function arguments -> case useTerm function of {
         XEVar name ->
           if eqName target name
           then if L.length arguments == arity
-               then case outerCallNames target outer arguments of {
+               then case outerCallNamesUsing target outer arguments of {
                  Just names -> CommonCalls names;
                  Nothing -> DifferentCalls
                }
                else DifferentCalls
-          else commonChildCalls target arity outer tree;
-        _ -> commonChildCalls target arity outer tree
+          else commonChildCallsUsing target arity outer tree;
+        _ -> commonChildCallsUsing target arity outer tree
       }
     };
   commonChildCalls :: XName -> Int -> Map XName Int -> UseTree -> CommonCalls;
-  commonChildCalls target arity outer tree =
-    let { collect = commonCalls target arity outer;
+  commonChildCalls target arity outer = commonChildCallsUsing target arity (\name -> M.member compareName name outer);
+  commonChildCallsUsing target arity outer tree =
+    let { collect = commonCallsUsing target arity outer;
           combine values = L.foldl mergeCommonCalls NoCommonCalls (L.map collect values)
     } in case useChildren tree of {
       UseLeaf -> DifferentCalls;
@@ -1177,7 +1257,7 @@ module Bootstrap.LLVM.Optimize where {
     };
   contractCommonCalls :: XName -> UseTree -> Fresh UseTree;
   contractCommonCalls target tree =
-    if M.findWithDefault compareName 0 target (useCounts tree) == 0
+    if useCount target tree == 0
     then freshPure tree
     else case useApplications [] tree of {
       (,) function _ -> case useTerm function of {
@@ -1204,9 +1284,9 @@ module Bootstrap.LLVM.Optimize where {
   specializeSharedValue name value body = case lambdas (useTerm value) of {
     (,) [] _ -> freshPure Nothing;
     (,) parameters _ ->
-      if M.findWithDefault compareName 0 name (useCounts body) < 1
+      if useCount name body < 1
       then freshPure Nothing
-      else case commonCalls name (L.length parameters) (useCounts body) body of {
+      else case commonCallsUsing name (L.length parameters) (\wanted -> usesName wanted body) body of {
         CommonCalls arguments -> do {
           result <- contractCommonCalls name body;
           specialized <- specializeCommonParameters value arguments;
@@ -1218,7 +1298,7 @@ module Bootstrap.LLVM.Optimize where {
   rewriteOrdinaryLet :: UseTree -> XName -> UseTree -> UseTree -> Fresh UseTree;
   rewriteOrdinaryLet tree name value body =
         let {
-          uses = M.findWithDefault compareName 0 name (useCounts body)
+          uses = useCount name body
         } in
         if (uses == 0)
         then freshPure body
@@ -1282,29 +1362,26 @@ module Bootstrap.LLVM.Optimize where {
           UseAbs name body -> freshPure (useLet name argument body);
           UseLet name value body -> freshPure (useLet name value (useApp body argument));
           UseRec bindings body -> freshPure (useRec bindings (useApp body argument));
-          UseApp operator left -> case useTerm operator of {
+          UseApp operator left -> if checked then case useTerm operator of {
             XEPrimitive PAddInt -> case combineIntSummands (useTerm left) (useTerm argument) of {
               Just reduced -> freshPure (indexUses reduced);
               Nothing -> freshPure tree
             };
             _ -> freshPure tree
-          };
+          } else freshPure tree;
           _ -> freshPure tree
         };
-      UseLet name value body -> case useTerm body of {
-        XEVar result -> freshPure (if eqName name result then value else body);
-        _ -> do {
-          shared <- specializeSharedValue name value body;
-          case shared of {
-            Just result -> freshPure result;
-            Nothing -> rewriteOrdinaryLet tree name value body
-          }
+      UseLet name value body -> do {
+        shared <- specializeSharedValue name value body;
+        case shared of {
+          Just result -> freshPure result;
+          Nothing -> rewriteOrdinaryLet tree name value body
         }
       };
       UseRec bindings body ->
         let {
           group = S.fromList compareName (L.map L.fst bindings);
-          counts = bindingUses bindings body
+          counts = bindingCountIndex bindings body
         } in
         let {
           expandable =
@@ -1312,7 +1389,7 @@ module Bootstrap.LLVM.Optimize where {
               (\((,) name value) ->
                  (smallValue (useTerm value) &&
                   (L.not checked || L.not (branchesToFreeValues value) ||
-                   M.findWithDefault compareName 0 name counts < 2) &&
+                   (case IM.lookup (nameId name) counts of { Just (UseCount _ n) -> n < 2; Nothing -> True })) &&
                   S.null (S.intersection compareName (free (useTerm value)) group)))
               bindings
         } in
@@ -1326,16 +1403,12 @@ module Bootstrap.LLVM.Optimize where {
       UseCase subject ((:) ((,) (XDefaultPattern optional) body) []) ->
         freshPure (useMaybeLet optional subject body);
       UseCase subject branches ->
-        case useApplications [] subject of {
-          (,) head arguments ->
-            case useTerm head of {
-              XEConstructor constructor ->
-                case selectUseConstructor constructor arguments branches of {
-                  Just selected -> freshPure selected;
-                  Nothing -> freshPure tree
-                };
-              _ -> freshPure tree
-            }
+        case selectKnownConstructor subject branches of {
+          Just selected -> freshPure selected;
+          Nothing -> if checked then case selectConditionalConstructors subject branches of {
+            Just selected -> freshPure selected;
+            Nothing -> freshPure tree
+          } else freshPure tree
         };
       _ -> freshPure tree
     };
@@ -1447,6 +1520,31 @@ module Bootstrap.LLVM.Optimize where {
                      (S.fromList compareName (X.patternNames pattern)))
                 alternatives))
     };
+  -- A queried negative call is always a free use. Use the existing subtree
+  -- counts to visit only paths where that particular name can survive.
+  negativeMember :: Map XName Int -> XName -> UseTree -> Bool;
+  negativeMember outer = negativeMemberUsing (\name -> M.member compareName name outer);
+  negativeMemberUsing outer target tree =
+    usesName target tree && (case useChildren tree of {
+      UseLeaf -> False;
+      UseAbs _ body -> negativeMemberUsing outer target body;
+      UseApp function argument -> let {
+        headWitness = case useTerm argument of {
+          XEVar name -> eqName name target || (case useTerm function of {
+            XEVar called -> eqName called target && L.not (outer name);
+            _ -> False
+          });
+          _ -> case useTerm function of { XEVar called -> eqName called target; _ -> False }
+        }
+      } in headWitness || negativeMemberUsing outer target function || negativeMemberUsing outer target argument;
+      UseLet name value body -> negativeMemberUsing outer target value ||
+        (L.not (eqName name target) && negativeMemberUsing outer target body);
+      UseRec bindings body -> negativeMemberUsing outer target body ||
+        L.any (\entry -> negativeMemberUsing outer target (L.snd entry)) bindings;
+      UseCase subject alternatives -> negativeMemberUsing outer target subject ||
+        L.any (\entry -> L.not (L.any (eqName target) (X.patternNames (L.fst entry))) &&
+          negativeMemberUsing outer target (L.snd entry)) alternatives
+    });
   -- Keep exact counts through three occurrences, with four meaning "many".
   -- This extra root summary leaves the public UseTree's 0/1/many contract
   -- unchanged. It is built once at a boundary, then updated by substitution.
@@ -1483,44 +1581,60 @@ module Bootstrap.LLVM.Optimize where {
   -- therefore points strictly outward and is acyclic. No rewrite or Fresh
   -- action runs during this walk; freshly exposed redexes wait for the next pass.
   materializeBody :: Map XName ([] UseTree) -> UseTree -> (,) UseTree (Map XName ([] UseTree));
-  materializeBody replacements tree =
+  materializeBody = materializeBodyWith False;
+  -- Each pending binder is globally fresh on the checked route. Its free
+  -- occurrences are indexed on the normalized use tree. A disjoint subtree
+  -- consumes no replacement and can be returned with all cached uses intact.
+  shareMaterialized replacements tree = let { counts = countIndex tree;
+    overlapsReplacements = M.foldrWithKey (\name _ found -> IM.member (nameId name) counts || found) False replacements;
+    overlapsCounts = IM.foldrWithKey (\_ (UseCount name _) found -> M.member compareName name replacements || found) False counts
+  } in M.null replacements || IM.null counts || L.not
+    (if M.size replacements <= IM.size counts then overlapsReplacements else overlapsCounts);
+  materializeBodyWith checked replacements tree =
+    if checked && shareMaterialized replacements tree then (,) tree replacements else
     case useChildren tree of {
       UseLeaf -> case useTerm tree of {
         XEVar name -> case M.lookup compareName name replacements of {
-          Just ((:) value rest) -> materializeBody (M.insert compareName name rest replacements) value;
+          Just ((:) value rest) -> materializeBodyWith checked
+            (if checked && L.null rest then M.delete compareName name replacements
+             else M.insert compareName name rest replacements) value;
           _ -> (,) tree replacements
         };
         _ -> (,) tree replacements
       };
-      UseAbs name body -> let { next = materializeBody replacements body }
+      UseAbs name body -> let { next = materializeBodyWith checked replacements body }
         in (,) (useAbs name (L.fst next)) (L.snd next);
       UseApp function argument -> let {
-        first = materializeBody replacements function;
-        next = materializeBody (L.snd first) argument
+        first = materializeBodyWith checked replacements function;
+        next = materializeBodyWith checked (L.snd first) argument
       } in (,) (useApp (L.fst first) (L.fst next)) (L.snd next);
       UseLet name value body -> let {
-        first = materializeBody replacements value;
-        next = materializeBody (L.snd first) body
+        first = materializeBodyWith checked replacements value;
+        next = materializeBodyWith checked (L.snd first) body
       } in (,) (useLet name (L.fst first) (L.fst next)) (L.snd next);
       UseRec bindings body -> let {
-        first = materializePairs replacements bindings;
-        next = materializeBody (L.snd first) body
+        first = materializePairsWith checked replacements bindings;
+        next = materializeBodyWith checked (L.snd first) body
       } in (,) (useRec (L.fst first) (L.fst next)) (L.snd next);
       UseCase subject alternatives -> let {
-        first = materializeBody replacements subject;
-        next = materializePairs (L.snd first) alternatives
+        first = materializeBodyWith checked replacements subject;
+        next = materializePairsWith checked (L.snd first) alternatives
       } in (,) (useCase (L.fst first) (L.fst next)) (L.snd next)
     };
-  materializePairs replacements entries = case entries of {
+  materializePairs = materializePairsWith False;
+  materializePairsWith :: forall a. Bool -> Map XName ([] UseTree) -> [] ((,) a UseTree) ->
+    (,) ([] ((,) a UseTree)) (Map XName ([] UseTree));
+  materializePairsWith checked replacements entries = case entries of {
     [] -> (,) [] replacements;
     (:) ((,) key value) rest -> let {
-      first = materializeBody replacements value;
-      next = materializePairs (L.snd first) rest
+      first = materializeBodyWith checked replacements value;
+      next = materializePairsWith checked (L.snd first) rest
     } in (,) ((:) ((,) key (L.fst first)) (L.fst next)) (L.snd next)
   };
   materializePending :: PendingBody -> UseTree;
-  materializePending (PendingBody body replacements _ _) =
-    if M.null replacements then body else L.fst (materializeBody replacements body);
+  materializePending = materializePendingWith False;
+  materializePendingWith checked (PendingBody body replacements _ _) =
+    if M.null replacements then body else L.fst (materializeBodyWith checked replacements body);
   queueSubstitution :: XName -> [] UseTree -> Int -> PendingBody -> PendingBody;
   queueSubstitution name copies uses (PendingBody body replacements counts calls) =
     let { replacement = L.head copies } in
@@ -1529,26 +1643,33 @@ module Bootstrap.LLVM.Optimize where {
           (M.map (\count -> L.min 4 (count * uses)) (limitedUses replacement)))
         (S.union compareName (S.delete compareName name calls) (negativeCalls replacement));
   delayOwnedLet :: XName -> UseTree -> PendingBody -> Fresh PendingBody;
-  delayOwnedLet name value pending =
+  delayOwnedLet name value pending = delayLetWith False name value pending
+    (M.findWithDefault compareName 0 name (pendingLimitedCounts pending)) (\wanted -> S.member compareName wanted (pendingCalls pending))
+    (\copies uses -> queueSubstitution name copies uses pending) beginPending;
+  delayLetWith :: forall a. Bool -> XName -> UseTree -> PendingBody -> Int -> (XName -> Bool) ->
+    ([] UseTree -> Int -> a) -> (UseTree -> a) -> Fresh a;
+  delayLetWith checked name value pending uses witnessed queue begin =
     let {
-      uses = M.findWithDefault compareName 0 name (pendingLimitedCounts pending);
       eligible = case useTerm value of {
         XEAbs _ _ ->
-          smallValue (useTerm value) &&
+          -- The ordinary inliner copies a single-use lambda even when its
+          -- body is large. A witnessed non-specializable call lets the
+          -- checked pass defer that same copy with its other replacements.
+          (smallValue (useTerm value) || (checked && uses == 1)) &&
           (uses > 0 && uses < 4 &&
-           S.member compareName name (pendingCalls pending));
+           witnessed name);
         _ -> False
       }
     } in
     if eligible
     then do {
       copies <- traverseFresh (\_ -> copy M.empty (useTerm value)) (L.range 1 uses);
-      freshPure (queueSubstitution name (L.map indexUses copies) uses pending)
+      freshPure (queue (L.map indexUses copies) uses)
     }
     else do {
-      let { body = materializePending pending };
+      let { body = materializePendingWith checked pending };
       result <- rewriteUsed (useLet name value body);
-      freshPure (beginPending result)
+      freshPure (begin result)
     };
   -- The checked pass owns every binder after its initial fresh copy. An
   -- already-saturated action used only as another bind's continuation body
@@ -1559,7 +1680,7 @@ module Bootstrap.LLVM.Optimize where {
       UseApp function continuation -> case (,) (useTerm function) (useChildren continuation) of {
         (,) (XEApp (XEPrimitive PIOBind) _) (UseAbs arg result) -> case useTerm result of {
           XEVar wanted -> if eqName name wanted && L.not (eqName name arg) &&
-            L.not (M.member compareName arg (useCounts value))
+            L.not (usesName arg value)
             then Just (useApp function (useAbs arg value)) else Nothing;
           _ -> Nothing
         };
@@ -1569,38 +1690,108 @@ module Bootstrap.LLVM.Optimize where {
     };
     _ -> Nothing
   };
+  -- The caller has established exactly one use in the fully indexed body.
+  -- An immediate case demands its scrutinee there. Reduce the sole use
+  -- only when the constructor and selected branch are already known.
+  moveSingleUse :: XName -> UseTree -> UseTree -> Maybe UseTree;
+  moveSingleUse name value body = case useChildren body of {
+    UseCase subject branches -> case useTerm subject of {
+      XEVar wanted -> if eqName name wanted then case selectKnownConstructor value branches of {
+        Just selected -> Just selected;
+        Nothing -> selectConditionalConstructors value branches
+      } else Nothing;
+      _ -> Nothing
+    };
+    _ -> sequenceSingleAction name value body
+  };
   -- Preserve a shared binding without forcing the substitutions queued for
   -- the rest of the declaration spine. Its RHS is outside the binder scope.
-  delayCheckedLet name value pending = case pending of {
+  data CheckedPending = CheckedPending PendingBody (XName -> Bool) (XName -> Int)
+    | ClosedCheckedPending PendingBody IntSet (XName -> Bool) (XName -> Int);
+  checkedBody (CheckedPending body _ _) = body;
+  checkedBody (ClosedCheckedPending body _ _ _) = body;
+  checkedUseCount tree name = boundedUseCount 4 name tree;
+  -- Existing counts distinguish zero, one and two-or-more free occurrences
+  -- at every subtree. Only an unmet budget above two needs any traversal.
+  boundedUseCount limit target tree = let {
+    known = useCount target tree;
+    appendCount count child = if count == limit then limit else
+      count + boundedUseCount (limit - count) target child
+  } in if known < 2 || limit <= 2 then L.min limit known else
+    case useChildren tree of {
+      UseLeaf -> known;
+      UseAbs _ body -> boundedUseCount limit target body;
+      UseApp function argument -> appendCount (boundedUseCount limit target function) argument;
+      UseLet bound value body -> let { first = boundedUseCount limit target value } in
+        if eqName target bound then first else appendCount first body;
+      UseRec bindings body -> L.foldl
+        (\count entry -> appendCount count (L.snd entry)) (boundedUseCount limit target body) bindings;
+      UseCase subject alternatives -> L.foldl
+        (\count entry -> if L.any (eqName target) (X.patternNames (L.fst entry))
+          then count else appendCount count (L.snd entry)) (boundedUseCount limit target subject) alternatives
+    };
+  afterUseBinding name value uses prior target = L.min 4
+    ((if eqName name target then 0 else prior target) + uses * checkedUseCount value target);
+  beginChecked body = CheckedPending (beginPending body) (\wanted -> negativeMemberUsing (\name -> usesName name body) wanted body)
+    (checkedUseCount body);
+  afterCallBinding name value previous wanted =
+    (L.not (eqName wanted name) && previous wanted) || negativeMemberUsing (\name -> usesName name value) wanted value;
+  -- Keep the original exported full witness set. The checked pass asks about
+  -- one binder at a time and can issue that exact query without building it.
+  delayCheckedLet name value pending = do {
+    result <- delayCheckedPending name value
+      (CheckedPending pending (\wanted -> S.member compareName wanted (pendingCalls pending))
+        (\wanted -> M.findWithDefault compareName 0 wanted (pendingLimitedCounts pending)));
+    freshPure (checkedBody result)
+  };
+  delayCheckedPending name value state = case state of {
+    CheckedPending pending witnessed countOf ->
+      delayCheckedWith name value state pending IS.empty witnessed countOf;
+    ClosedCheckedPending pending removed witnessed countOf ->
+      delayCheckedWith name value state pending removed witnessed countOf
+  };
+  delayCheckedWith name value state pending removed previousWitness previousCount = case pending of {
     PendingBody body replacements counts calls ->
       -- With no queued substitutions, the indexed body's existing 0/1/many
       -- count suffices for all of the comparisons below.
-      let { uses = M.findWithDefault compareName 0 name
-              (if M.null replacements then useCounts body else counts);
+      let { witnessed target = IS.notMember (nameId target) removed && previousWitness target;
+        countOf target = if IS.member (nameId target) removed then 0 else previousCount target;
+        uses = if M.null replacements then useCount name body else countOf name;
         -- A constructor applied only to atoms has no binders to freshen.
         -- The ordinary rule substitutes it immediately. Queue its sole use
         -- without rebuilding all later declarations and their use counts.
+        -- A closed replacement removes its own binder and contributes no free
+        -- names. Share the previous lookup functions across consecutive closed
+        -- replacements, recording the removed names in a single bitmap index.
+        queue copies count = let { replacement = L.head copies;
+          next = queueSubstitution name copies count pending
+        } in if IM.null (countIndex replacement)
+          then ClosedCheckedPending next (IS.insert (nameId name) removed) previousWitness previousCount
+          else CheckedPending next (afterCallBinding name replacement witnessed)
+            (afterUseBinding name replacement count countOf);
+        ordinary = delayLetWith True name value pending (countOf name) witnessed queue beginChecked;
         constructorValue = case useTerm value of {
           XEApp _ _ -> smallValue (useTerm value); _ -> False
         } } in
       -- The RHS has already been normalized. An unused binding costs no
       -- fresh names and leaves the effective body and its queued copies intact.
-      if uses == 0 then freshPure pending
-      else if uses == 1 && constructorValue then freshPure (queueSubstitution name [value] 1 pending)
-      else if uses == 1 && M.null replacements then case sequenceSingleAction name value body of {
-        Just result -> freshPure (beginPending result);
-        Nothing -> delayOwnedLet name value pending
+      if uses == 0 then freshPure state
+      else if uses == 1 && constructorValue then freshPure (queue [value] 1)
+      else if uses == 1 && M.null replacements then case moveSingleUse name value body of {
+        Just result -> freshPure (beginChecked result);
+        Nothing -> ordinary
       }
-      else if uses < 2 || L.not (branchesToFreeValues value) then delayOwnedLet name value pending
+      else if uses < 2 || L.not (branchesToFreeValues value) then ordinary
       else let {
-        retained = PendingBody (useLet name value body) replacements
+        retained = CheckedPending (PendingBody (useLet name value body) replacements
           (mergePendingUses (M.delete compareName name counts) (limitedUses value))
-          (S.union compareName (S.delete compareName name calls) (negativeCalls value))
-      } in if S.member compareName name calls then freshPure retained else do {
+          (S.union compareName (S.delete compareName name calls) (negativeCalls value)))
+          (afterCallBinding name value witnessed) (afterUseBinding name value 1 countOf)
+      } in if witnessed name then freshPure retained else do {
         -- All calls with the same outer arguments can still share a single
         -- specialized result. Inspect the effective body before deciding.
-        shared <- specializeSharedValue name value (materializePending pending);
-        freshPure (case shared of { Just result -> beginPending result; Nothing -> retained })
+        shared <- specializeSharedValue name value (materializePendingWith True pending);
+        freshPure (case shared of { Just result -> beginChecked result; Nothing -> retained })
       }
   };
   -- Delay only while unwinding a contiguous nonrecursive let-body chain.
@@ -1608,15 +1799,45 @@ module Bootstrap.LLVM.Optimize where {
   -- materialized body. RHS normalization still precedes body normalization.
   passPendingRaw :: XErased -> Fresh PendingBody;
   passPendingRaw = passPendingFor False;
-  passPendingFor checked expression = case expression of {
+  passPendingFor checked expression = if checked then do {
+    result <- passPendingWith True beginChecked delayCheckedPending expression;
+    freshPure (checkedBody result)
+  } else passPendingWith False beginPending delayOwnedLet expression;
+  -- An adjacent, nonrecursive local function can be inlined twice when both
+  -- arms call it. Keep one call and force the condition before its entry.
+  -- The ordinary application still controls demand for the selected argument.
+  shareLocalConditional :: XName -> XErased -> Fresh XErased;
+  shareLocalConditional name expression = let {
+    share chosen rebuild = case chosen of {
+      XEApp (XEApp (XEApp (XEPrimitive PIfThenElse) condition) (XEApp (XEVar first) yes)) (XEApp (XEVar second) no) ->
+        if eqName name first && eqName name second then do {
+          decision <- freshName;
+          let { flag = XEVar decision;
+            selected = XEApp (XEApp (XEApp (XEPrimitive PIfThenElse) flag) yes) no;
+            invoke = XEApp (XEVar name) selected };
+          freshPure (rebuild (XELet decision condition (XEApp (XEApp (XEPrimitive PSeq) flag) invoke)))
+        } else freshPure expression;
+      _ -> freshPure expression
+    }
+  } in case expression of {
+    XELet binder value body -> share value (\newValue -> XELet binder newValue body);
+    _ -> share expression L.id
+  };
+  passPendingWith :: forall a. Bool -> (UseTree -> a) -> (XName -> UseTree -> a -> Fresh a) ->
+    XErased -> Fresh a;
+  passPendingWith checked begin delay expression = case expression of {
     XELet name value body -> do {
       normalized <- passOwnedFor checked value;
-      pending <- passPendingFor checked body;
-      if checked then delayCheckedLet name normalized pending else delayOwnedLet name normalized pending
+      following <- if checked then case useChildren normalized of {
+        UseAbs _ _ -> shareLocalConditional name body;
+        _ -> freshPure body
+      } else freshPure body;
+      pending <- passPendingWith checked begin delay following;
+      delay name normalized pending
     };
     _ -> do {
       result <- passOwnedFor checked expression;
-      freshPure (beginPending result)
+      freshPure (begin result)
     }
   };
   passOwnedRaw :: XErased -> Fresh UseTree;
@@ -1624,7 +1845,7 @@ module Bootstrap.LLVM.Optimize where {
   passOwnedFor checked expression = case expression of {
     XELet _ _ _ -> do {
       pending <- passPendingFor checked expression;
-      freshPure (materializePending pending)
+      freshPure (materializePendingWith checked pending)
     };
     _ -> do {
       normalized <- case expression of {
@@ -1838,9 +2059,153 @@ module Bootstrap.LLVM.Optimize where {
            then freshPure expression
            else iterationsOwnedFor checked arities (count - 1) next
          };
+  -- One checked pass owns unique names. Cache only independent RHS work
+  -- that leaves the Fresh counter unchanged. The declaration body's rewrite
+  -- still sees the entire current context and follows the original order.
+  data StableRhs = StableRhs XErased UseTree;
+  sameOwnedName :: XName -> XName -> Bool;
+  sameOwnedName (XName a hint) (XName b other) = a == b && eqString hint other;
+  sameOwnedOptional left right = case (,) left right of {
+    (,) Nothing Nothing -> True;
+    (,) (Just a) (Just b) -> sameOwnedName a b;
+    _ -> False
+  };
+  sameOwnedPattern left right = case (,) left right of {
+    (,) (XDefaultPattern a) (XDefaultPattern b) -> sameOwnedOptional a b;
+    (,) (XConstructorPattern a ns) (XConstructorPattern b ms) ->
+      eqString a b && L.eqList sameOwnedOptional ns ms;
+    _ -> False
+  };
+  sameStableInput :: XErased -> XErased -> Bool;
+  sameStableInput left right = case (,) left right of {
+    (,) (XEVar a) (XEVar b) -> sameOwnedName a b;
+    (,) (XEAbs a x) (XEAbs b y) -> sameOwnedName a b && sameStableInput x y;
+    (,) (XEApp f a) (XEApp g b) -> sameStableInput f g && sameStableInput a b;
+    (,) (XELet n v body) (XELet m w rest) ->
+      sameOwnedName n m && sameStableInput v w && sameStableInput body rest;
+    (,) (XELetRec as body) (XELetRec bs rest) ->
+      L.eqList (\((,) a x) ((,) b y) -> sameOwnedName a b && sameStableInput x y) as bs &&
+      sameStableInput body rest;
+    (,) (XECase x as) (XECase y bs) -> sameStableInput x y && L.eqList
+      (\(XErasedAlternative p a) (XErasedAlternative q b) ->
+        sameOwnedPattern p q && sameStableInput a b) as bs;
+    (,) (XEDouble a) (XEDouble b) -> doubleToBits a == doubleToBits b;
+    _ -> X.equalErased left right
+  };
+  normalizeStableRhs :: IntMap StableRhs -> IntMap StableRhs -> XName -> XErased ->
+    Fresh ((,) UseTree (IntMap StableRhs));
+  normalizeStableRhs previous current name value = let {
+    identity = nameId name;
+    save normalized entry = let { indexed = IM.insert identity entry current } in
+      seq indexed (freshPure ((,) normalized indexed));
+    normalize = do {
+      before <- freshSeed;
+      normalized <- passOwnedFor True value;
+      after <- freshSeed;
+      if before == after && remainingSize 31 value < 0
+      then save normalized (StableRhs value normalized)
+      else freshPure ((,) normalized current)
+    }
+  } in case IM.lookup identity previous of {
+    Just entry@(StableRhs input normalized) -> if sameStableInput input value
+      then save normalized entry else normalize;
+    Nothing -> normalize
+  };
+  stableBindingGroup :: IntMap StableRhs -> IntMap StableRhs -> [] ((,) XName XErased) ->
+    Fresh ((,) ([] ((,) XName UseTree)) (IntMap StableRhs));
+  stableBindingGroup previous current bindings = case bindings of {
+    [] -> freshPure ((,) [] current);
+    (:) ((,) name value) rest -> do {
+      (,) normalized found <- normalizeStableRhs previous current name value;
+      (,) following cached <- stableBindingGroup previous found rest;
+      freshPure ((,) ((:) ((,) name normalized) following) cached)
+    }
+  };
+  cachedDeclarationPass :: IntMap StableRhs -> IntMap StableRhs -> XErased ->
+    Fresh ((,) UseTree (IntMap StableRhs));
+  cachedDeclarationPass previous current expression = case expression of {
+    XELet _ _ _ -> do {
+      (,) pending cached <- cachedDeclarationSpine previous current expression;
+      freshPure ((,) (materializePendingWith True (checkedBody pending)) cached)
+    };
+    XELetRec bindings body -> do {
+      (,) normalized found <- stableBindingGroup previous current bindings;
+      (,) following cached <- cachedDeclarationPass previous found body;
+      result <- rewriteUsedFor True (useRec normalized following);
+      freshPure ((,) result cached)
+    };
+    _ -> do {
+      result <- passOwnedFor True expression;
+      freshPure ((,) result current)
+    }
+  };
+  cachedDeclarationSpine :: IntMap StableRhs -> IntMap StableRhs -> XErased ->
+    Fresh ((,) CheckedPending (IntMap StableRhs));
+  cachedDeclarationSpine previous current expression = case expression of {
+    XELet name value body -> do {
+      (,) normalized found <- normalizeStableRhs previous current name value;
+      following <- case useChildren normalized of {
+        UseAbs _ _ -> shareLocalConditional name body;
+        _ -> freshPure body
+      };
+      (,) pending cached <- cachedDeclarationSpine previous found following;
+      result <- delayCheckedPending name normalized pending;
+      freshPure ((,) result cached)
+    };
+    _ -> do {
+      (,) result cached <- cachedDeclarationPass previous current expression;
+      freshPure ((,) (beginChecked result) cached)
+    }
+  };
+  -- No projection can start in a subtree without a case whose original
+  -- scrutinee names a known constructor. A later case can become eligible
+  -- after a child rewrite, so any positive probe uses the full traversal.
+  hasConstructorProjection :: Map XName ((,) String ([] XErased)) -> XErased -> Bool;
+  hasConstructorProjection facts expression = let { visit = hasConstructorProjection facts } in
+    case expression of {
+      XEAbs _ body -> visit body;
+      XEApp function argument -> visit function || visit argument;
+      XELet _ value body -> visit value || visit body;
+      XELetRec bindings body -> L.any (\((,) _ value) -> visit value) bindings || visit body;
+      XECase subject alternatives -> (case subject of {
+          XEVar name -> M.member compareName name facts;
+          _ -> visit subject
+        }) || L.any (\(XErasedAlternative _ body) -> visit body) alternatives;
+      _ -> False
+    };
+  projectDeclarationSpine :: Map XName ((,) String ([] XErased)) -> XErased -> Fresh XErased;
+  projectDeclarationSpine facts expression = let {
+    project value = if hasConstructorProjection facts value then projectConstructors facts value else freshPure value
+  } in case expression of {
+    XELet name value body -> do {
+      rhs <- project value;
+      rest <- projectDeclarationSpine facts body;
+      freshPure (XELet name rhs rest)
+    };
+    XELetRec bindings body -> do {
+      rhs <- traverseFresh (\((,) name value) -> do {
+        projected <- project value;
+        freshPure ((,) name projected)
+      }) bindings;
+      rest <- projectDeclarationSpine facts body;
+      freshPure (XELetRec rhs rest)
+    };
+    _ -> project expression
+  };
+  stableDeclarationIterations :: Map String (Maybe Int) -> Int -> IntMap StableRhs -> XErased -> Fresh XErased;
+  stableDeclarationIterations arities count previous expression = if count == 0
+    then freshPure expression else do {
+      let { facts = constructorFacts arities expression };
+      projected <- if M.null facts then freshPure expression else projectDeclarationSpine facts expression;
+      (,) normalized cached <- cachedDeclarationPass previous IM.empty projected;
+      let { next = useTerm normalized };
+      if X.equalErased expression next then freshPure expression
+      else stableDeclarationIterations arities (count - 1) cached next
+    };
   -- Find references still needed by the entry before copying its declaration
   -- spine. A nonrecursive RHS is in the outer scope. A recursive group binds
-  -- its names in every RHS and in the continuation.
+  -- its names in every RHS and in the continuation. Any reference from the
+  -- continuation keeps the whole recursive group.
   liveDeclarationSpine :: XErased -> (,) XErased (Set XName);
   liveDeclarationSpine expression = case expression of {
     XELet name rhs rest -> case liveDeclarationSpine rest of {
@@ -1849,10 +2214,13 @@ module Bootstrap.LLVM.Optimize where {
         else (,) body live
     };
     XELetRec bindings rest -> case liveDeclarationSpine rest of {
-      (,) body live -> let {
-        used = L.foldl (\names entry -> S.union compareName names (free (L.snd entry))) live bindings;
-        bound = S.fromList compareName (L.map L.fst bindings)
-      } in (,) (XELetRec bindings body) (S.difference compareName used bound)
+      (,) body live ->
+        if L.any (\entry -> S.member compareName (L.fst entry) live) bindings
+        then let {
+          used = L.foldl (\names entry -> S.union compareName names (free (L.snd entry))) live bindings;
+          bound = S.fromList compareName (L.map L.fst bindings)
+        } in (,) (XELetRec bindings body) (S.difference compareName used bound)
+        else (,) body live
     };
     _ -> (,) expression (free expression)
   };
@@ -1861,17 +2229,232 @@ module Bootstrap.LLVM.Optimize where {
   optimizeOwnedUsing = optimizeLetSharing False;
   optimizeLetSharing checked cleanInput expression =
     do {
-      unique <- copy M.empty (L.fst (liveDeclarationSpine expression));
+      unique <- copy M.empty (if checked then L.fst (liveDeclarationSpine expression) else expression);
       clean <- cleanInput unique;
       recursive <- fixedPoints clean;
       let {
         arities = constructorArities recursive
       };
-      lifted <- liftConstructorFields arities recursive;
-      simple <- iterationsOwnedFor checked arities 16 lifted;
+      lifted <- liftConstructorFieldsFor checked arities recursive;
+      let { iterate = if checked then stableDeclarationIterations arities 16 IM.empty
+        else iterationsOwnedFor False arities 16 };
+      simple <- iterate lifted;
       specialized <- specializeHigherOrder simple;
-      iterationsOwnedFor checked arities 16 specialized
+      iterate specialized
     };
+  compactRecursiveArguments = Recursive.compactRecursiveArguments;
+  -- Specialize a private recursive worker entered by one saturated call.
+  -- A static function argument stays fixed when every recursive call passes
+  -- the formal itself or the same primitive. Any partial application, escape,
+  -- or different argument keeps the original calling convention.
+  compactStaticRecursion :: XErased -> XErased;
+  compactStaticRecursion expression =
+    L.fst (runFresh (specializeStaticRecursion expression) (L.advanceIdentity (maxIdentity expression) 1));
+  specializeStaticRecursion :: XErased -> Fresh XErased;
+  specializeStaticRecursion expression = do {
+    normalized <- children specializeStaticRecursion expression;
+    case normalized of {
+      -- Encoding the canonical character list of a literal gives that string.
+      XEApp (XEPrimitive PTextFromChars) (XEApp (XEPrimitive PTextToChars) literal@(XEString _)) ->
+        freshPure literal;
+      XELetRec [((,) worker rhs)] entry -> case (,) (lambdas rhs) (applications entry) of {
+        (,) ((,) parameters body) ((,) (XEVar called) arguments) ->
+          let {
+            slots = L.zipWith (\parameter argument -> (,) parameter (staticPrimitive argument))
+              parameters arguments;
+            fixed = L.mapMaybe (\((,) name expected) -> case expected of {
+              Just primitive -> Just ((,) name (XEPrimitive primitive)); Nothing -> Nothing
+            }) slots;
+            retained = L.mapMaybe (\((,) name expected) -> case expected of {
+              Nothing -> Just name; Just _ -> Nothing
+            }) slots
+          } in if eqName worker called && L.length parameters == L.length arguments &&
+                    L.not (L.null fixed) && L.not (L.null retained) &&
+                    L.all (\argument -> occurrences 1 worker argument == 0) arguments &&
+                    uniformStaticRecursion worker slots body
+          then do {
+            let { plan = L.map L.snd slots };
+            contracted <- contractStaticRecursion worker plan body;
+            specialized <- copy (M.fromList compareName fixed) contracted;
+            freshPure (XELetRec [((,) worker (L.foldr XEAbs specialized retained))]
+              (L.foldl XEApp (XEVar worker) (dynamicArguments plan arguments)))
+          } else freshPure normalized;
+        _ -> freshPure normalized
+      };
+      XELetRec bindings _ -> if textWorkerGroup bindings then foldStaticConversions normalized else freshPure normalized;
+      _ -> freshPure normalized
+    }
+  };
+  -- A direct primitive argument from a sibling starts a bounded local analysis.
+  -- Check every use of each private function, including references in argument
+  -- position. A partial call or escape makes all its formals unknown.
+  textWorkerGroup bindings = case bindings of {
+    (:) _ ((:) _ _) -> L.null (L.drop 4 bindings) && L.any (\((,) self fn) ->
+      case applications (L.snd (lambdas fn)) of {
+        (,) (XEVar target) args -> L.not (eqName target self) &&
+          L.any (\entry -> eqName target (L.fst entry)) bindings &&
+          L.any textConverter args;
+        _ -> False
+      }) bindings;
+    _ -> False
+  };
+  textConverter term = case term of { XEPrimitive PTextFromChars -> True; _ -> False };
+  privateFunctions term rest = let {
+    put ((,) name fn) tail = case lambdas fn of {
+      (,) [] _ -> tail; (,) parameters _ -> (:) ((,) name parameters) tail
+    };
+    below = L.foldr privateFunctions rest (subterms term)
+  } in case term of {
+    XELet name rhs _ -> put ((,) name rhs) below;
+    XELetRec defs _ -> L.foldr put below defs;
+    _ -> below
+  };
+  regionBinders term rest = let { below = L.foldr regionBinders rest (subterms term) } in case term of {
+    XEAbs n _ -> (:) n below;
+    XELet n _ _ -> (:) n below;
+    XELetRec defs _ -> L.foldr (\entry tail -> (:) (L.fst entry) tail) below defs;
+    XECase _ branches -> L.foldr (\(XErasedAlternative pattern _) tail ->
+      L.append (X.patternNames pattern) tail) below branches;
+    _ -> below
+  };
+  privateCalls functions known term = case applications term of {
+    (,) head args -> let {
+      here = case head of {
+        XEVar target -> if M.member compareName target functions
+          then M.insertWith compareName L.append target [args] known else known;
+        _ -> L.foldlStrict (privateCalls functions) known (subterms head)
+      }
+    } in L.foldlStrict (privateCalls functions) here args
+  };
+  -- Nothing rules out a slot. Otherwise it records the supplying formals and
+  -- whether any call supplies the converter directly.
+  conversionInputs functions calls = L.concatMap (\((,) target parameters) ->
+    let { uses = M.findWithDefault compareName [] target calls;
+          arity = L.length parameters;
+          add observed value = case observed of {
+            Nothing -> Nothing;
+            Just ((,) concrete names) -> case value of {
+              XEPrimitive PTextFromChars -> Just ((,) True names);
+              XEVar name -> Just ((,) concrete ((:) name names));
+              _ -> Nothing
+            }
+          };
+          inputs = L.foldlStrict (L.zipWith add) (L.map (\_ -> Just ((,) False [])) parameters) uses
+    } in if L.null uses || L.any (\args -> L.length args /= arity) uses then []
+      else L.mapMaybe (\((,) name value) -> case value of {
+        Nothing -> Nothing; Just supplied -> Just ((,) name supplied)
+      }) (L.zip parameters inputs)) (M.toList functions);
+  -- Each newly certified formal has a concrete supplier. A self-forwarding
+  -- call preserves it. Unseeded or mutually dependent unknowns remain opaque.
+  certifiedConversions limit inputs known =
+    if limit == 0 then known else let {
+      next = L.foldlStrict (\found ((,) slot ((,) concrete names)) ->
+        if (concrete || L.any (\name -> S.member compareName name known) names) &&
+           L.all (\name -> eqName name slot || S.member compareName name known) names
+        then S.insert compareName slot found else found) known inputs
+    } in if S.size next == S.size known then known else certifiedConversions (limit - 1) inputs next;
+  -- Only a known positive-arity primitive can erase this seq. Preserve every
+  -- other binding and demand, including a converter supplied as a computation.
+  foldConversionText known expression = do {
+    value <- children (foldConversionText known) expression;
+    let { isConverter item = case item of {
+          XEVar name -> S.member compareName name known; _ -> textConverter item
+        } };
+    freshPure (case value of {
+      XELet bound rhs (XEApp (XEApp (XEPrimitive PSeq) (XEVar forced)) (XEVar returned)) ->
+        if eqName bound forced && eqName bound returned && isConverter rhs
+        then XEPrimitive PTextFromChars else value;
+      XEApp fn (XEApp (XEPrimitive PTextToChars) literal@(XEString _)) ->
+        if isConverter fn then literal else value;
+      XEApp (XEPrimitive PStringLength) (XEString text) -> XEInt (stringLength text);
+      XEApp (XEApp (XEPrimitive PAddInt) (XEInt left)) (XEInt right) -> XEInt (left + right);
+      _ -> value
+    })
+  };
+  foldStaticConversions expression =
+    if remainingSize 16384 expression < 0 then freshPure expression else let {
+      definitions = privateFunctions expression [];
+      binders = regionBinders expression [];
+      bound = S.fromList compareName binders;
+      -- The checked optimizer normally gives binders unique identities. Keep
+      -- ambiguous hand-built terms on the ordinary path as well.
+      scoped = S.size bound == L.length binders &&
+        S.null (S.intersection compareName bound (free expression))
+    } in if L.not (L.null (L.drop 16 definitions)) || L.not scoped then freshPure expression else let {
+      functions = M.fromList compareName definitions;
+      inputs = conversionInputs functions (privateCalls functions M.empty expression);
+      certified = certifiedConversions 12 inputs S.empty
+    } in if S.null certified then freshPure expression else do {
+      folded <- foldConversionText certified expression;
+      contractConversionFormals functions certified folded
+    };
+  -- Certified private functions can omit a converter from both binders and
+  -- saturated calls. Keep all-static functions as functions to preserve WHNF.
+  contractConversionFormals :: Map XName ([] XName) -> Set XName -> XErased -> Fresh XErased;
+  contractConversionFormals functions certified expression = let {
+    known name = S.member compareName name certified;
+    select parameters = if L.all known parameters then [] else L.filter known parameters;
+    removed = S.fromList compareName (L.concatMap select (M.elems functions));
+    drops name = S.member compareName name removed;
+    plan parameters = if L.any drops parameters
+      then Just (L.map (\name -> if drops name then Just PTextFromChars else Nothing) parameters)
+      else Nothing;
+    plans = M.mapMaybe plan functions;
+    visit term = case term of {
+      XEVar name -> freshPure (if drops name then XEPrimitive PTextFromChars else term);
+      XEAbs name body -> if drops name then visit body else children visit term;
+      XEApp _ _ -> case applications term of {
+        (,) head arguments -> let {
+          retained = case head of {
+            XEVar target -> case M.lookup compareName target plans of {
+              Just slots -> dynamicArguments slots arguments; Nothing -> arguments
+            };
+            _ -> arguments
+          }
+        } in do {
+          callee <- visit head;
+          operands <- traverseFresh visit retained;
+          freshPure (L.foldl XEApp callee operands)
+        }
+      };
+      _ -> children visit term
+    }
+  } in if S.null removed then freshPure expression else visit expression;
+  staticPrimitive :: XErased -> Maybe Primitive;
+  staticPrimitive expression = case expression of {
+    XEPrimitive primitive -> if P.primitiveArity primitive > 0 then Just primitive else Nothing;
+    _ -> Nothing
+  };
+  dynamicArguments :: [] (Maybe Primitive) -> [] XErased -> [] XErased;
+  dynamicArguments slots arguments = L.mapMaybe (\((,) expected argument) -> case expected of {
+    Nothing -> Just argument; Just _ -> Nothing
+  }) (L.zip slots arguments);
+  uniformStaticRecursion :: XName -> [] ((,) XName (Maybe Primitive)) -> XErased -> Bool;
+  uniformStaticRecursion worker slots = let {
+    forwarding ((,) ((,) formal expected) argument) = case expected of {
+      Nothing -> True;
+      Just primitive -> case argument of {
+        XEVar name -> eqName formal name;
+        XEPrimitive p -> P.primitiveCode p == P.primitiveCode primitive;
+        _ -> False
+      }
+    };
+    visit term = case applications term of {
+      (,) (XEVar name) args ->
+        if eqName name worker
+        then L.length slots == L.length args && L.all forwarding (L.zip slots args) && L.all visit args
+        else L.all visit args;
+      (,) head args -> L.all visit (subterms head) && L.all visit args
+    }
+  } in visit;
+  contractStaticRecursion :: XName -> [] (Maybe Primitive) -> XErased -> Fresh XErased;
+  contractStaticRecursion worker slots expression = case applications expression of {
+    (,) (XEVar target) args -> if eqName target worker then do {
+      kept <- traverseFresh (contractStaticRecursion worker slots) (dynamicArguments slots args);
+      freshPure (L.foldl XEApp (XEVar worker) kept)
+    } else children (contractStaticRecursion worker slots) expression;
+    _ -> children (contractStaticRecursion worker slots) expression
+  };
   -- Recognize finite nonrecursive iterators by binding identity. A summary is
   -- the number of applications of the first parameter to the second; it does
   -- not depend on source names, types' printed spelling or a benchmark size.
@@ -2013,6 +2596,32 @@ module Bootstrap.LLVM.Optimize where {
     } in body (S.singleton parameter) value;
     _ -> Nothing
   };
+  -- A saturated call to a lambda that returns its parameter does not
+  -- evaluate the remaining arguments. Keep excess applications in order.
+  scopedProjection expression = case lambdas expression of {
+    (,) ((:) first rest) (XEVar selected) -> let {
+      parameters = (:) first rest;
+      arity = L.length parameters;
+      position i remaining = case remaining of {
+        [] -> Nothing;
+        (:) name tail -> if eqName name selected then Just (ProjectsArgument arity i)
+          else position (i - 1) tail
+      }
+    } in position (arity - 1) (L.reverse parameters);
+    _ -> Nothing
+  };
+  projectApplication facts original = case applications original of {
+    (,) (XEVar name) arguments -> case M.lookup compareName name facts of {
+      Just (ProjectsArgument arity index) -> case L.splitAt arity arguments of {
+        (,) prefix rest -> if L.length prefix == arity then case L.drop index prefix of {
+          (:) argument _ -> Just (L.foldl XEApp argument rest);
+          _ -> Nothing
+        } else Nothing
+      };
+      _ -> Nothing
+    };
+    _ -> Nothing
+  };
   data ScopedInput a = OtherInput | LambdaInput XName a |
     LetInput XName a a | RecursiveInput XName a a | ApplicationInput a a;
   erasedScope term = case term of {
@@ -2024,6 +2633,7 @@ module Bootstrap.LLVM.Optimize where {
   };
   typedScope term = case skipTypeWrappers term of {
     XAbs name _ body -> LambdaInput name body;
+    XInstantiationSpine head rows -> typedScope (X.expandInstantiationSpine head rows);
     XLet name value body -> LetInput name value body;
     XLetRec [(,,) name _ rhs] body -> RecursiveInput name rhs body;
     XApp fn arg -> ApplicationInput fn arg;
@@ -2036,11 +2646,16 @@ module Bootstrap.LLVM.Optimize where {
   foldScopedUsing inspect erase foldArgument = let {
     visit facts expression = let { original = erase expression } in case inspect expression of {
       LetInput name value body -> let {
-        following = case scopedUnaryUse (erase value) of {
-          Just role -> M.insert compareName name role facts;
+        normalized = visit facts value;
+        role = case scopedProjection normalized of {
+          Just projection -> Just projection;
+          Nothing -> scopedUnaryUse (erase value)
+        };
+        following = case role of {
+          Just found -> M.insert compareName name found facts;
           Nothing -> M.delete compareName name facts
         }
-      } in XELet name (visit facts value) (visit following body);
+      } in XELet name normalized (visit following body);
       RecursiveInput name value body -> let { rhs = erase value } in case constructorFold name rhs of {
         Just rules -> XELetRec [(,) name rhs]
           (visit (M.insert compareName name (FoldsConstructors rules) facts) body);
@@ -2051,21 +2666,22 @@ module Bootstrap.LLVM.Optimize where {
         affine = case affineField facts original of {
           Just ((,,) name factor offset) -> affineIntTerm name factor offset;
           Nothing -> original
-        }
-      } in if M.null facts then original else case erase fn of {
-        XEVar name -> case M.lookup compareName name facts of {
-          Just (FoldsConstructors rules) -> L.fromMaybe original (foldArgument rules arg);
-          _ -> affine
         };
-        _ -> affine
-      };
+        ordinary = case erase fn of {
+          XEVar name -> case M.lookup compareName name facts of {
+            Just (FoldsConstructors rules) -> L.fromMaybe original (foldArgument rules arg);
+            _ -> affine
+          };
+          _ -> affine
+        }
+      } in if M.null facts then original else L.fromMaybe ordinary (projectApplication facts original);
       OtherInput -> original
     }
   } in visit;
   -- This extra algebraic pass is for finite checked programs. Its rewrites
   -- introduce no binders and preserve evaluation of the single input value.
   optimizeChecked expression = optimizeAfterFields (foldScopedFields M.empty expression);
-  optimizeCheckedTerm term = optimizeAfterFields (eraseScopedFields M.empty term);
+  optimizeCheckedTerm term = compactRecursiveArguments (optimizeAfterFields (eraseScopedFields M.empty term));
   optimizeAfterFields expression = optimizeOwnedWith (optimizeLetSharing True (checkedIdentities M.empty))
     (simplifyIterations M.empty (simplifyTranslations M.empty expression));
   -- A translation evaluates its one Int input once and adds a constant in

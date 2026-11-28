@@ -9,7 +9,7 @@ import argparse
 import hashlib
 from pathlib import Path
 import shutil
-import subprocess
+import sys
 import types
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -23,10 +23,19 @@ CHECKS = ['checked-iteration-algebra-and-scopes',
           'witness-nonvacuity', 'long-chain-admission', 'pending-materialization',
           'fresh-order', 'unsupported-contexts', 'common-call-success-fallback',
           'public-raw-laziness', 'io-lazy-semantics']
-EXPECTED = ''.join('PASS ' + name + '\n' for name in CHECKS).encode()
+sys.path.insert(0, str(ROOT / 'tools/testing'))
+from receipt_selection import inventory_json, select
+
+PREFIX = 'batch-replacement/'
 
 
 def main():
+    if sys.argv[1:2] == ['--framework-list']:
+        print(inventory_json(PREFIX, CHECKS))
+        return
+    chosen = select(PREFIX, CHECKS)
+    checks = CHECKS if chosen is None else [chosen]
+    expected = ''.join('PASS ' + name + '\n' for name in checks).encode()
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--producer', type=Path, default=SCRATCH / 'baseline-producer')
@@ -57,9 +66,8 @@ def main():
                 oracle = args.baseline_source.resolve() / MODULE
                 frozen = oracle.read_bytes()
             else:
-                frozen = subprocess.check_output(['git', 'show', BASELINE_REVISION + ':' + MODULE], cwd=ROOT)
-                oracle = dest / 'frozen-Optimize.hs'
-                oracle.write_bytes(frozen)
+                oracle = HERE / 'oracles/Optimize.hs'
+                frozen = oracle.read_bytes()
             H.require(hashlib.sha256(frozen).hexdigest() == BASELINE_SHA256, 'exact pinned independent baseline oracle required')
             originals = {'LegacyOptimize': oracle, 'CandidateOptimize': ROOT / MODULE}
             transformed = []
@@ -124,13 +132,13 @@ def main():
                          str(producer / 'host.o'), str(producer / 'supervisor.o'), '-o', str(executable)])
             for repeat in (1,):
                 name = 'controls-' + str(repeat)
-                run(name, [str(executable)])
-                H.require((dest / name / 'stdout').read_bytes() == EXPECTED, 'exact independent check inventory')
+                run(name, [str(executable), *([chosen] if chosen is not None else [])])
+                H.require((dest / name / 'stdout').read_bytes() == expected, 'exact independent check inventory')
                 H.require(not (dest / name / 'stderr').read_bytes(), 'empty stderr required')
             H.check_pins(pins)
             H.check_pins(producer_pins)
             H.require(H.authenticate(producer, producer_source) == auth, 'producer changed')
-            record.update(complete=True, checks=CHECKS, executions=1,
+            record.update(complete=True, checks=checks, executions=1,
                           executable_sha256=H.sha(executable), immutable_inputs_verified_after=True)
             save()
     except BaseException as exc:

@@ -94,6 +94,10 @@ def source_imports(text):
     cleaned = ''.join(code)
     imports = []
     for token in re.finditer(r"(?<![\w'])import(?![\w'])", cleaned):
+        # GHC host modules also contain FFI declarations. A foreign import
+        # names a linked symbol, not a Haskell module dependency.
+        if re.search(r"(?<![\w'])foreign\s+$", cleaned[:token.start()]):
+            continue
         tail = cleaned[token.end():]
         matched = re.match(r'\s+(?:qualified\s+)?([A-Z][A-Za-z0-9_\']*(?:\.[A-Z][A-Za-z0-9_\']*)*)(?=\s|[;()}]|$)', tail)
         if not matched:

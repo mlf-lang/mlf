@@ -8,6 +8,7 @@ module Tests.Selection where {
   import qualified Bootstrap.Std as S;
   import qualified Package.Json as J;
   import qualified Package.OS as O;
+  import qualified Tests.ReportJournal as Journal;
   -- Family selection changes scheduling, never the actions or their oracles.
   validId identity =
     ((stringLength identity > 0) &&
@@ -64,10 +65,7 @@ module Tests.Selection where {
       path <- getEnv "MLF_TEST_FAMILY_REPORT";
       if eqString path ""
       then return ()
-      else do {
-             previous <- readFile path;
-             writeFile path (previous ++ (J.render (event unit name values) ++ "\n"))
-           }
+      else Journal.append "MLF_TEST_FAMILY_REPORT" path (J.render (event unit name values) ++ "\n")
     };
   begin :: String -> Bool -> [] String -> IO ();
   begin unit full selected =
@@ -76,13 +74,14 @@ module Tests.Selection where {
       path <- getEnv "MLF_TEST_FAMILY_REPORT";
       if eqString path ""
       then return ()
-      else writeFile path
+      else Journal.begin "MLF_TEST_FAMILY_REPORT" path
              (J.render
                 (event unit "start"
                    ((:) ((,) "scope" (J.str (scope full)))
                       ((:) ((,) "selected" (J.stringArray selected)) []))) ++
               "\n")
     };
+  flush = Journal.flush "MLF_TEST_FAMILY_REPORT";
   passed :: String -> String -> IO ();
   passed unit identity =
     do {
@@ -99,15 +98,16 @@ module Tests.Selection where {
       if eqString path ""
       then return ()
       else do {
-             text <- readFile path;
+             text <- Journal.contents "MLF_TEST_FAMILY_REPORT" path;
              rows <-
                case parse text of {
                  Left error -> O.fatal error;
                  Right value -> return value
                };
-             append unit "summary"
+             let { summary = event unit "summary"
                ((:) ((,) "complete" (J.Boolean True))
-                  ((:) ((,) "families" (J.num (S.length (S.filter (kind "family") rows)))) []))
+                  ((:) ((,) "families" (J.num (S.length (S.filter (kind "family") rows)))) [])) };
+             Journal.publish "MLF_TEST_FAMILY_REPORT" path (text ++ (J.render summary ++ "\n"))
            }
     };
   sameStrings left right =

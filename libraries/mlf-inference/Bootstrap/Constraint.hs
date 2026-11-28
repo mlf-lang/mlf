@@ -29,17 +29,35 @@ module Bootstrap.Constraint where {
   -- The file compiler owns one resolver snapshot. Its module handles remain
   -- meaningful only inside the current declaration binding environment.
   -- Public/manual inputs may combine snapshots and resolve their exact rows.
-  data CandidateMemo = SeparateEnvironments | SharedEnvironments (IntMap ResolvedCandidateEnvironment);
+  data CandidateMemo = SeparateEnvironments | SharedEnvironments (IntMap ResolvedCandidateEnvironment) |
+    BatchedEnvironments (IntMap ResolvedCandidateEnvironment);
+  candidateTable memo = case memo of {
+    SharedEnvironments table -> table; BatchedEnvironments table -> table; SeparateEnvironments -> IM.empty
+  };
+  replaceCandidateTable memo table = case memo of {
+    SharedEnvironments _ -> SharedEnvironments table; BatchedEnvironments _ -> BatchedEnvironments table;
+    SeparateEnvironments -> SeparateEnvironments
+  };
   data Generate a = Generate (Generation -> Either String ((,) a Generation)) |
-    WithCandidates (CandidateMemo -> Generation -> Either String ((,,) a Generation CandidateMemo));
-  runWithCandidates memo action state = case action of {
+    WithCandidates ((Graph -> [] ((,) Int Int) -> [] SolveStep -> Either String Solver) ->
+      CandidateMemo -> Generation -> Either String ((,,) a Generation CandidateMemo));
+  runWithSolver solveGraph memo action state = case action of {
     Generate f -> case f state of {
       Left message -> Left message;
       Right ((,) value after) -> Right ((,,) value after memo)
     };
-    WithCandidates f -> f memo state
+    WithCandidates f -> f solveGraph memo state
   };
-  runGeneration memo action state = case runWithCandidates memo action state of {
+  runWithCandidates = runWithSolver Solver.solveGenerated;
+  runGeneration = runUsing Solver.solveGenerated;
+  -- Only a file builder starting with an empty graph owns every node payload.
+  -- Callers supplying a Generation retain the ordinary survivor demand order.
+  startGeneration memo action = let { solveGraph = case memo of {
+    SeparateEnvironments -> Solver.solveGenerated;
+    SharedEnvironments _ -> Solver.solveFileGraph;
+    BatchedEnvironments _ -> Solver.solveFileGraph
+  } } in runUsing solveGraph memo action (Generation G.emptyGraph [] []);
+  runUsing solveGraph memo action state = case runWithSolver solveGraph memo action state of {
     Left message -> Left message;
     Right ((,,) value after _) -> Right ((,) value after)
   };
@@ -47,16 +65,16 @@ module Bootstrap.Constraint where {
   generatePure :: forall a. a -> Generate a;
   generatePure value = Generate (\state -> Right ((,) value state));
   generateBind :: forall a b. Generate a -> (a -> Generate b) -> Generate b;
-  generateBind action next = WithCandidates (\memo state ->
-    case runWithCandidates memo action state of {
+  generateBind action next = WithCandidates (\solveGraph memo state ->
+    case runWithSolver solveGraph memo action state of {
       Left message -> Left message;
-      Right ((,,) value after memo2) -> seq after (runWithCandidates memo2 (next value) after)
+      Right ((,,) value after memo2) -> seq after (runWithSolver solveGraph memo2 (next value) after)
     });
   -- Lexical binders cannot change a declaration slot. A declaration binder
   -- installs a different slot table, whose memo lives only inside its body.
-  withDeclarationScope action = WithCandidates (\memo state -> case memo of {
-    SeparateEnvironments -> runWithCandidates SeparateEnvironments action state;
-    SharedEnvironments _ -> case runWithCandidates (SharedEnvironments IM.empty) action state of {
+  withDeclarationScope action = WithCandidates (\solveGraph memo state -> case memo of {
+    SeparateEnvironments -> runWithSolver solveGraph SeparateEnvironments action state;
+    _ -> case runWithSolver solveGraph (replaceCandidateTable memo IM.empty) action state of {
       Left message -> Left message;
       Right ((,,) value after _) -> Right ((,,) value after memo)
     }
@@ -152,19 +170,13 @@ module Bootstrap.Constraint where {
   -- or frozen exports. Recursive assumptions contribute equalities only.
   -- Keep the surrounding unfinished graph unnormalized across this boundary.
   flushGeneration :: Generate ();
-  flushGeneration =
-    Generate
-      (\state ->
-         case state of {
-           Generation graph eqs es ->
-             do {
-               prepared <- Solver.prepare graph;
-               initial <- Solver.solverUnify (reverse eqs) prepared;
-               solved <- evaluatePreparedSteps initial (reverse es);
-               finished <- Solver.finish solved;
-               Right ((,) () (Generation finished [] []))
-             }
-         });
+  flushGeneration = WithCandidates (\solveGraph memo state -> case state of {
+    Generation graph eqs es -> do {
+      solved <- solveGraph graph (reverse eqs) (reverse es);
+      finished <- Solver.finish solved;
+      Right ((,,) () (Generation finished [] []) memo)
+    }
+  });
   equality a b =
     Generate
       (\state ->
@@ -196,8 +208,7 @@ module Bootstrap.Constraint where {
     };
   evaluateSteps :: Solver -> [] SolveStep -> Either String Solver;
   evaluateSteps initial steps = foldM evaluateStep initial steps;
-  -- Internal fold: both callers have completed prepare and solverUnify.
-  -- Existing public evaluateStep/evaluateSteps retain the original route.
+  -- These entry points accept an externally supplied prepared solver.
   evaluatePreparedStep :: Solver -> SolveStep -> Either String Solver;
   evaluatePreparedStep solver step =
     case step of {
@@ -276,7 +287,10 @@ module Bootstrap.Constraint where {
       SLam x Nothing body -> CLam x (desugar body);
       SLam x (Just annotation) body ->
         CLam x (CLet x (CApp (CCoerce annotation) (CVar x)) (desugar body));
+      SApp a (SWantedScope dictionary candidates) -> scopedDictionaryApplications a [(,) dictionary candidates];
       SApp a b -> CApp (desugar a) (desugar b);
+      SApplyDictionaries function arguments -> CApplyDictionaries function arguments;
+      SBindDictionaries names body -> CBindDictionaries names (desugar body);
       SLet x a b -> CLet x (desugar a) (desugar b);
       SAnn a annotation -> CApp (CCoerce annotation) (desugar a);
       SSignature a annotation ->
@@ -318,7 +332,20 @@ module Bootstrap.Constraint where {
   generateProgram :: SProgram -> Either String Constraints;
   generateProgram = generateProgramWith SeparateEnvironments;
   generateFileProgram = generateProgramWith (SharedEnvironments IM.empty);
-  generateProgramWith memo program =
+  generateProgramWith memo program = do {
+    constraints <- generateUncheckedProgramWith memo program;
+    G.validateGraph (initialGraph constraints);
+    Right constraints
+  };
+  -- This entry point immediately solves the generated constraints. The
+  -- solver prepares and validates the same initial graph before using it.
+  generateAndSolveFileProgram :: SProgram -> Either String ((,) Constraints Solver);
+  generateAndSolveFileProgram program = do {
+    constraints <- generateUncheckedProgramWith (SharedEnvironments IM.empty) program;
+    solved <- solveFileConstraints constraints;
+    Right ((,) constraints solved)
+  };
+  generateUncheckedProgramWith memo program =
     case program of {
       SClassProgram _ _ _ _ ->
         Left "class declarations must be translated before constraint generation";
@@ -328,18 +355,15 @@ module Bootstrap.Constraint where {
           lowered <- Surface.lowerExpression expression;
           validateAnnotations datatypes lowered;
           result <-
-            runGeneration memo (build datatypes M.empty Nothing M.empty (desugar lowered))
-              (Generation G.emptyGraph [] []);
+            startGeneration memo (build datatypes M.empty Nothing M.empty (desugar lowered));
           case result of {
             (,) typed (Generation graph eqs es) ->
-              do {
-                G.validateGraph graph;
-                Right (Constraints graph typed (reverse eqs) (reverse es))
-              }
+              Right (Constraints graph typed (reverse eqs) (reverse es))
           }
         }
     };
-  data BindingEnv = BindingEnv (Map String Binding) (Map (V.Index Declaration) Binding);
+  data BindingEnv = BindingEnv (Map String Binding) (Map (V.Index Declaration) Binding) |
+    ClosedPrimitiveScope BindingEnv;
   compareRefSlot a b = compareInt (V.toInt a) (V.toInt b);
   compareTermRef a b = case (,) a b of {
     (,) (LexicalRef x) (LexicalRef y) -> compareString x y;
@@ -347,10 +371,12 @@ module Bootstrap.Constraint where {
     (,) (LexicalRef _) _ -> 0 - 1;
     _ -> 1
   };
+  lookupTerm (ClosedPrimitiveScope env) ref = lookupTerm env ref;
   lookupTerm (BindingEnv locals globals) ref = case ref of {
     LexicalRef n -> M.lookup compareString n locals;
     DeclRef i _ -> M.lookup compareRefSlot i globals
   };
+  bindTerm (ClosedPrimitiveScope env) ref value = ClosedPrimitiveScope (bindTerm env ref value);
   bindTerm (BindingEnv locals globals) ref value = case ref of {
     LexicalRef n -> BindingEnv (M.insert compareString n value locals) globals;
     DeclRef i _ -> BindingEnv locals (M.insert compareRefSlot i value globals)
@@ -358,35 +384,49 @@ module Bootstrap.Constraint where {
   bindTerms env entries = foldlStrict (\scope ((,) ref value) -> bindTerm scope ref value) env entries;
   isDeclarationRef ref = case ref of { DeclRef _ _ -> True; _ -> False };
   withBoundRef ref action = if isDeclarationRef ref then withDeclarationScope action else action;
-  evidenceBinding env ((,) role ref) = case lookupTerm env ref of {
+  evidenceBinding = evidenceBindingIn M.empty;
+  evidenceBindingIn imported env ((,) role ref) = case lookupTerm env ref of {
     Just (Mono name identity) -> Right (EvidenceBinding role name identity False);
     Just (Poly name source) -> Right (EvidenceBinding role name source True);
     Just (DeclaredPoly name _ declared) -> Right (DeclaredEvidenceBinding role name declared);
     Just (RecursiveMono _ _ _) -> Left "recursive dictionary interfaces require an explicit signature";
-    Nothing -> Left ("dictionary candidate is out of scope: " ++ termRefName ref)
+    Just (RecursiveDictionaryMono _ _ _ _) -> Left "recursive dictionary interfaces require an explicit signature";
+    Nothing -> let { missing = Left ("dictionary candidate is out of scope: " ++ termRefName ref) } in
+      case ref of {
+        DeclRef i _ -> case M.lookup compareRefSlot i imported of {
+          Just ((,) name declared) -> Right (DeclaredEvidenceBinding role name declared);
+          Nothing -> missing
+        };
+        LexicalRef _ -> missing
+      }
   };
-  resolveCandidateEnvironment env gen (CandidateEnvironment owner refs) =
-    WithCandidates (\memo state -> let {
-      resolve = traverseEither (evidenceBinding env) refs;
+  resolveCandidateEnvironment = resolveCandidateEnvironmentIn M.empty;
+  resolveCandidateEnvironmentIn imported env gen (CandidateEnvironment owner refs) =
+    WithCandidates (\_ memo state -> let {
+      resolve = traverseEither (evidenceBindingIn imported env) refs;
       fresh rows = ResolvedCandidateEnvironment gen rows
     } in case memo of {
       SeparateEnvironments -> mapEither (\rows -> (,,) (fresh rows) state memo) resolve;
-      SharedEnvironments table -> case IM.lookup owner table of {
+      _ -> let { table = candidateTable memo } in case IM.lookup owner table of {
         Just shared -> Right ((,,) shared state memo);
         Nothing -> do {
           -- Only declaration references belong to a module's immutable base.
           ensure (all (compose isDeclarationRef snd) refs) "lexical binding in module evidence environment";
           rows <- resolve;
           let { shared = fresh rows; next = IM.insert owner shared table };
-          seq next (Right ((,,) shared state (SharedEnvironments next)))
+          seq next (Right ((,,) shared state (replaceCandidateTable memo next)))
         }
       }
     });
   build :: DataEnv -> Map String Int -> Maybe Int -> Map String Binding -> Core -> Generate Typed;
   build datatypes typeScope parent locals = buildIn datatypes typeScope parent (BindingEnv locals M.empty);
   buildIn :: DataEnv -> Map String Int -> Maybe Int -> BindingEnv -> Core -> Generate Typed;
-  buildIn datatypes typeScope parent env core =
-    generalize parent (\gen root -> buildCore datatypes typeScope env gen root core);
+  buildIn = buildInWithEvidence M.empty;
+  -- Checked file imports that occur only in wanted inventories belong to the
+  -- evidence namespace. All public builders begin with an empty inventory.
+  buildInWithEvidence imported datatypes typeScope parent env core =
+    generalize parent (\gen root -> withBindingRoot gen (\scopeRoot ->
+      buildCoreUnderIn ((,) scopeRoot imported) datatypes typeScope env gen root core));
   generalize :: Maybe Int -> (Int -> Int -> Generate Form) -> Generate Typed;
   generalize parent makeForm = do {
     gen <- newNode (GGen (-1)) parent Flexible;
@@ -404,16 +444,228 @@ module Bootstrap.Constraint where {
     action (outermost graph gen)
   };
   buildUnder :: Int -> DataEnv -> Map String Int -> Int -> BindingEnv -> Core -> Generate Typed;
-  buildUnder scopeRoot datatypes typeScope parent env core =
-    generalize (Just parent) (\gen root -> buildCoreUnder scopeRoot datatypes typeScope env gen root core);
+  buildUnder root = buildUnderIn ((,) root M.empty);
+  buildUnderIn scopeRoot datatypes typeScope parent env core =
+    generalize (Just parent) (\gen root -> buildCoreUnderIn scopeRoot datatypes typeScope env gen root core);
   buildCore :: DataEnv ->
                Map String Int -> BindingEnv -> Int -> Int -> Core -> Generate Form;
   buildCore datatypes typeScope env gen root core = withBindingRoot gen
     (\scopeRoot -> buildCoreUnder scopeRoot datatypes typeScope env gen root core);
+  -- The authenticated imported scheme has the precise rank-one shape
+  -- forall a. D a -> [Char] -> a. Every constructor in its checked
+  -- embedding is rigid, and the unique flexible hole belongs to the
+  -- outer arrow. Other converters keep ordinary application inference.
+  caseConverter :: BindingEnv -> Graph -> TermRef -> Bool;
+  caseConverter env graph ref =
+    let { node = G.nodeAt graph;
+          nominal parent name ty = case node ty of {
+            Node (GCon actual []) (Just owner) Rigid -> owner == parent && eqString actual name;
+            _ -> False
+          };
+          list parent ty = case node ty of {
+            Node (GTyApp head element) (Just owner) Rigid -> owner == parent &&
+              (case node head of {
+                Node (GTyCon name (KArrow Star Star)) (Just holder) Rigid ->
+                  holder == ty && eqString name "[]" && nominal ty "Char" element;
+                _ -> False
+              });
+            _ -> False
+          };
+          dictionary parent parameter ty = case node ty of {
+            Node (GTyApp head argument) (Just owner) Rigid -> owner == parent && argument == parameter &&
+              (case node head of { Node (GTyCon _ (KArrow Star Star)) (Just holder) Rigid -> holder == ty; _ -> False });
+            _ -> False
+          };
+          scheme source = let { root = G.genRoot graph source } in case node root of {
+            Node (GArr domain range) (Just owner) Flexible -> owner == source && (case node range of {
+              Node (GArr chars parameter) (Just holder) Rigid -> holder == root && dictionary root parameter domain &&
+                list range chars && (case node parameter of {
+                  Node GBot (Just binding) Flexible -> binding == root; _ -> False
+                });
+              _ -> False
+            });
+            _ -> False
+          }
+    } in case ref of {
+      DeclRef _ _ -> case lookupTerm env ref of { Just (Poly _ source) -> scheme source; _ -> False };
+      _ -> False
+    };
+  checkedStringConverterName env graph ref =
+    if not (caseConverter env graph ref) then Nothing else case lookupTerm env ref of {
+      Just (Poly name source) -> case G.tag (G.nodeAt graph (G.genRoot graph source)) of {
+        GArr domain _ -> case G.tag (G.nodeAt graph domain) of {
+          GTyApp head _ -> case G.tag (G.nodeAt graph head) of {
+            GTyCon dictionary _ -> Just ((,) name dictionary); _ -> Nothing
+          }; _ -> Nothing
+        }; _ -> Nothing
+      }; _ -> Nothing
+    };
+  caseCoreRef :: Core -> Maybe TermRef;
+  caseCoreRef expr = case expr of {
+    CVar name -> Just (LexicalRef name); CGlobal i name -> Just (DeclRef i name); _ -> Nothing
+  };
+  caseRefTerm :: TermRef -> Core;
+  caseRefTerm ref = case ref of {
+    LexicalRef name -> CVar name; DeclRef i name -> CGlobal i name
+  };
+  stringArm :: Core -> Maybe ((,,,) TermRef TermRef String String);
+  stringArm expr = case expr of {
+    CApp function (CApp (CApp conversion (CVar dictionary)) (CApp (CPrimitive PTextToChars) (CString text))) -> do {
+      f <- caseCoreRef function; c <- caseCoreRef conversion;
+      Just ((,,,) f c dictionary text)
+    };
+    _ -> Nothing
+  };
+  integerTest :: Core -> Maybe ((,) TermRef Int);
+  integerTest condition = case condition of {
+    CApp (CApp (CPrimitive PEqInt) subject) (CInt key) -> mapOptional (\name -> (,) name key) (caseCoreRef subject);
+    _ -> Nothing
+  };
+  -- Arms stay in source order, including repeated keys. No later literal
+  -- forces its function, evidence, payload or the otherwise branch.
+  stringCallRun :: BindingEnv -> ((,) TermRef Int) -> ((,,,) TermRef TermRef String String) -> Core ->
+    Maybe ((,) ([] ((,,) Int String String)) Core);
+  stringCallRun env ((,) subject key) ((,,,) f convert evidence first) no = let {
+      collect rows expr = case expr of {
+        CApp (CApp (CApp (CPrimitive PIfThenElse) test) arm) rest ->
+          let { next = do {
+            (,) s k <- integerTest test;
+            (,,,) g c d text <- stringArm arm;
+            if compareTermRef s subject /= 0 || compareTermRef g f /= 0 || compareTermRef c convert /= 0 then Nothing
+            else case lookupTerm env (LexicalRef d) of {
+              Just (Mono _ _) -> Just ((,,) k d text); _ -> Nothing
+            }
+          } } in case next of {
+            Just row -> collect ((:) row rows) rest; Nothing -> (,) rows expr
+          };
+        _ -> (,) rows expr
+      }
+    } in case lookupTerm env (LexicalRef evidence) of {
+      Just (Mono _ _) -> case collect [(,,) key evidence first] no of {
+        (,) rows rest -> if null (drop 7 rows) then Nothing else Just ((,) (reverse rows) rest)
+      };
+      _ -> Nothing
+    };
+  -- This surface form can only be issued by the class planner. Collect a
+  -- contiguous prefix once, including when a callee fails admission.
+  scopedDictionaryApplications expression arguments = case expression of {
+    SApp inner (SWantedScope dictionary candidates) ->
+      scopedDictionaryApplications inner ((:) ((,) dictionary candidates) arguments);
+    SGlobal slot hint -> if null (drop 7 arguments) then ordinaryScopedDictionaries (CGlobal slot hint) arguments
+      else CApplyScopedDictionaries (DeclRef slot hint) arguments;
+    _ -> ordinaryScopedDictionaries (desugar expression) arguments
+  };
+  ordinaryScopedDictionaries callee arguments = foldl (\f ((,) dictionary candidates) ->
+    CApp f (CWantedScope dictionary candidates)) callee arguments;
+  -- Only the scheme root may be flexible. Every structural child of the
+  -- saved arrow is rigid, closed and owned by this scheme. No intermediate
+  -- function can generalize a free type or introduce another type argument.
+  groundDictionaryDomains graph source operands = let {
+    root = G.resolve graph (G.genRoot graph source);
+    reached = G.reachable graph root;
+    owns n owner = if n == root then owner == source
+      else owner == source || IS.member (G.resolve graph owner) reached;
+    fixed n = case G.nodeAt graph n of {
+      Node tag (Just owner) flag -> owns n owner && (n == root || G.equalFlag flag Rigid) && (case tag of {
+        GArr _ _ -> True; GCon _ _ -> True; GTyCon _ _ -> True; GTyApp _ _ -> True; _ -> False
+      });
+      _ -> False
+    };
+    named label n = case G.tag (G.nodeAt graph n) of {
+      GCon name _ -> eqString label name;
+      GTyCon name _ -> eqString label name;
+      GTyApp f _ -> named label f;
+      _ -> False
+    };
+    walk n pending = case pending of {
+      [] -> True;
+      (:) ((,) label _) rest -> case G.tag (G.nodeAt graph n) of {
+        GArr domain tail -> named label domain && walk tail rest;
+        _ -> False
+      }
+    }
+  } in walk root operands && all fixed (IS.toList reached);
+  -- Read a complete, monomorphic checked arrow prefix. A first-order tail
+  -- is embedded under the caller; no node of the saved scheme is mutated.
+  repeatedDictionaryCall graph source operands alreadyGround = let {
+    root = G.genRoot graph source;
+    atom n = case G.tag (G.nodeAt graph n) of {
+      GTyApp f a -> case (,) (G.tag (G.nodeAt graph f)) (G.tag (G.nodeAt graph a)) of {
+        (,) (GTyCon c (KArrow Star Star)) (GCon t []) -> Just ((,) c t); _ -> Nothing
+      }; _ -> Nothing
+    };
+    nominal n = case G.tag (G.nodeAt graph n) of { GCon c [] -> Just (SCon c []); _ -> Nothing };
+    tail n = case G.tag (G.nodeAt graph n) of {
+      GArr a b -> do { x <- nominal a; y <- nominal b; Just (SArrow x y) };
+      _ -> nominal n
+    };
+    walk c t first n remaining = case remaining of {
+      [] -> tail n;
+      (:) _ more -> case G.tag (G.nodeAt graph n) of {
+        GArr domain result -> if domain == first then walk c t first result more else do {
+          (,) other actual <- atom domain;
+          if eqString c other && eqString t actual then walk c t first result more else Nothing
+        };
+        _ -> Nothing
+      }
+    }
+  } in case (,) operands (G.tag (G.nodeAt graph root)) of {
+    (,) ((:) _ ((:) _ _)) (GArr first _) -> do {
+      (,) c t <- atom first;
+      result <- walk c t first root operands;
+      if alreadyGround || groundDictionaryDomains graph source (map (\_ -> (,) c ()) operands)
+      then Just ((,,) c t result) else Nothing
+    };
+    _ -> Nothing
+  };
+  fileApplication specialized ordinary = WithCandidates (\solveGraph memo state ->
+    runWithSolver solveGraph memo (case memo of {
+      SeparateEnvironments -> ordinary;
+      _ -> specialized
+    }) state);
+  -- A complete first-order producer can prove that all of these distinct
+  -- binders have one closed nominal predicate. Only their type is shared.
+  buildDictionaryPrefix common root = buildDictionaryPrefixIn common ((,) root M.empty);
+  buildDictionaryPrefixIn common scopeRoot datatypes typeScope env gen root names body = let {
+    bottom = newNode GBot (Just gen) Flexible;
+    setTag tag = setNode root (Node tag (Just gen) Flexible);
+    child = buildUnderIn scopeRoot datatypes typeScope gen
+  } in do {
+        shared <- case common of {
+          Nothing -> return Nothing;
+          Just ((,) constructor argument) -> do {
+            known <- embed datatypes M.empty (SCon constructor [SCon argument []]);
+            attach gen Rigid known;
+            return (Just known)
+          }
+        };
+        parameters <- mapM (\n -> do {
+          name <- freshName n;
+          domain <- case shared of { Nothing -> bottom; Just known -> return known };
+          return ((,,) (LexicalRef n) name domain)
+        }) names;
+        result <- bottom;
+        case parameters of {
+          (:) ((,,) _ _ first) rest -> do {
+            tail <- foldM (\to ((,,) _ _ from) -> newNode (GArr from to) (Just gen) Flexible)
+              result (reverse rest);
+            setTag (GArr first tail)
+          };
+          _ -> failGenerate "missing inferred dictionary binders"
+        };
+        let {
+          bindings = map (\((,,) ref name domain) -> (,) ref (Mono name domain)) parameters
+        };
+        let { scope = bindTerms env bindings };
+        value <- child (case common of { Just _ -> ClosedPrimitiveScope scope; _ -> scope }) body;
+        proof <- edge (generalization value) result;
+        return (FBindDictionaries (map (\((,,) _ name domain) -> (,) name domain) parameters) value proof)
+      };
   buildCoreUnder :: Int -> DataEnv -> Map String Int -> BindingEnv -> Int -> Int -> Core -> Generate Form;
-  buildCoreUnder scopeRoot datatypes typeScope env gen root core =
+  buildCoreUnder root = buildCoreUnderIn ((,) root M.empty);
+  buildCoreUnderIn scopeRoot datatypes typeScope env gen root core =
     let {
-      child = buildUnder scopeRoot datatypes typeScope gen
+      child = buildUnderIn scopeRoot datatypes typeScope gen
     } in
     let {
       bottom = newNode GBot (Just gen) Flexible
@@ -422,10 +674,15 @@ module Bootstrap.Constraint where {
       setTag = \tag -> setNode root (Node tag (Just gen) Flexible)
     } in
     let {
+      recursiveVariable name shared export = do {
+        equality root shared;
+        -- The export does not exist until this group has finished solving.
+        return (FVariable name (Just (Edge export root)))
+      };
       variable ref = case lookupTerm env ref of {
           Nothing -> case ref of {
             LexicalRef x -> case P.lookupPrimitive x of {
-              Just primitive -> buildCoreUnder scopeRoot datatypes typeScope env gen root (CPrimitive primitive);
+              Just primitive -> buildCoreUnderIn scopeRoot datatypes typeScope env gen root (CPrimitive primitive);
               Nothing -> failGenerate ("unbound variable: " ++ x)
             };
             DeclRef _ hint -> failGenerate ("unbound variable: " ++ hint)
@@ -445,12 +702,8 @@ module Bootstrap.Constraint where {
               e <- edge source root;
               return (FDeclaredVariable name declared e)
             };
-          Just (RecursiveMono name shared export) ->
-            do {
-              equality root shared;
-              -- This edge is evidence metadata, never solver work.
-              return (FVariable name (Just (Edge export root)))
-            }
+          Just (RecursiveMono name shared export) -> recursiveVariable name shared export;
+          Just (RecursiveDictionaryMono name shared export _) -> recursiveVariable name shared export
         };
       lambda ref body =
         do {
@@ -470,12 +723,224 @@ module Bootstrap.Constraint where {
           e <- edge (generalization b') root;
           return (FBinding name a' b' e)
         };
-      explicit refs = liftResult (mapEither FEvidence (traverseEither (evidenceBinding env) refs));
+      application a b = do {
+        a' <- child env a;
+        b' <- child env b;
+        domain <- bottom;
+        arrow <- newNode (GArr domain root) (Just gen) Flexible;
+        ea <- edge (generalization a') arrow;
+        eb <- edge (generalization b') domain;
+        return (FApply a' b' ea eb)
+      };
+      -- These operands cannot flush the graph or issue a pattern projection.
+      -- Bound the lookahead so nested calls take linear time to classify.
+      simpleOperand depth operand = case operand of {
+        CVar _ -> True; CGlobal _ _ -> True; CPrimitive _ -> True; CConstructor _ -> True;
+        CInt _ -> True; CString _ -> True; CBool _ -> True; CDouble _ -> True;
+        CApplyDictionaries _ _ -> True;
+        CApp f x -> depth > 0 && simpleOperand (depth - 1) f && simpleOperand (depth - 1) x;
+        _ -> False
+      };
+      -- An ordinary Poly binding already has its generalization. At a known
+      -- arrow head, instantiate it once at this use's own fresh unary arrow.
+      -- A later argument still instantiates the resulting expression normally.
+      variableApplication ref operand ordinary = fileApplication (case lookupTerm env ref of {
+        Just (Poly name source) -> if not (simpleOperand 3 operand) then ordinary else do {
+          graph <- getGraph;
+          case G.tag (G.nodeAt graph (G.genRoot graph source)) of {
+            GArr _ _ -> do {
+              domain <- bottom;
+              arrow <- newNode (GArr domain root) (Just gen) Flexible;
+              use <- edge source arrow;
+              argument <- child env operand;
+              proof <- edge (generalization argument) domain;
+              return (FApplyVariable name use argument proof)
+            };
+            _ -> ordinary
+          }
+        };
+        _ -> ordinary
+      }) ordinary;
+      verifiedCall source ref count alreadyGround = WithCandidates (\solveGraph memo state -> runWithSolver solveGraph memo (case (,) memo ref of {
+        (,) (BatchedEnvironments _) (DeclRef _ _) -> do {
+          graph <- getGraph;
+          case repeatedDictionaryCall graph source count alreadyGround of {
+            Just ((,,) dictionary argument tail) -> do {
+              wanted <- embed datatypes M.empty (SCon dictionary [SCon argument []]);
+              attach gen Rigid wanted;
+              result <- embed datatypes M.empty tail;
+              attach gen Flexible result;
+              equality root result;
+              return (Just ((,) wanted (Edge source (G.genRoot graph source))))
+            };
+            _ -> return Nothing
+          }
+        };
+        _ -> return Nothing
+      }) state);
+      primitiveApplication primitive types operands = let {
+        ordinary expression target = do {
+          argument <- child env expression;
+          proof <- edge (generalization argument) target;
+          return (PrimitiveUse argument proof)
+        };
+        result arity p = let {
+          fixed n ty = case (,) n ty of {
+            (,) 0 (Applied name []) -> Just name;
+            (,) count (Function (Applied _ []) tail) -> if count > 0 then fixed (count - 1) tail else Nothing;
+            _ -> Nothing
+          }
+        } in case P.primitiveSignature p of { (,) [] ty -> fixed arity ty; _ -> Nothing };
+        targetResult expression = case expression of {
+          CApp (CPrimitive p) _ -> result 1 p;
+          CApp (CApp (CPrimitive p) _) _ -> result 2 p;
+          CApp (CApp (CApp (CPrimitive p) _) _) _ -> result 3 p;
+          _ -> Nothing
+        };
+        operand ((,) expression target) = case env of {
+          ClosedPrimitiveScope _ -> case targetResult expression of {
+            Just output -> do {
+              graph <- getGraph;
+              case G.nodeAt graph target of {
+                Node (GCon required []) (Just owner) Flexible ->
+                  if owner == gen && G.resolve graph target == target && eqString output required then
+                    fmap ClosedPrimitiveForm (buildCoreUnderIn scopeRoot datatypes typeScope env gen target expression)
+                  else ordinary expression target;
+                _ -> ordinary expression target
+              }
+            };
+            _ -> ordinary expression target
+          };
+          _ -> ordinary expression target
+        }
+      } in do {
+        arguments <- mapM operand operands;
+        return (FApplyPrimitive primitive types arguments)
+      };
+      -- A complete primitive call with closed nominal operands and result
+      -- has no intermediate scheme to instantiate. Keep one proof for each
+      -- operand, with types taken from the primitive's declared signature.
+      convertedPrimitive primitive operand ordinary = case operand of {
+        CApp (CApp converter (CVar dictionary)) (CApp (CPrimitive PTextToChars) (CString text)) ->
+          case (,,) (P.primitiveSignature primitive) (caseCoreRef converter) (lookupTerm env (LexicalRef dictionary)) of {
+            (,,) ((,) [] (Function (Applied input []) (Applied output []))) (Just ref) (Just (Mono _ supplied)) ->
+              fileApplication (do {
+                graph <- getGraph;
+                case checkedStringConverterName env graph ref of {
+                  Just ((,) name constructor) -> do {
+                    -- The selector has precisely forall a. D a -> [Char] -> a.
+                    -- This saturated primitive fixes a. The actual dictionary
+                    -- retains its own ordinary instantiation at D a.
+                    setTag (GCon output []);
+                    let { closed = case G.nodeAt graph supplied of {
+                            Node (GTyApp h a) _ Rigid -> case (,) (G.nodeAt graph h) (G.nodeAt graph a) of {
+                              (,) (Node (GTyCon c (KArrow Star Star)) (Just p) Rigid)
+                                  (Node (GCon t []) (Just q) Rigid) ->
+                                p == supplied && q == supplied && eqString c constructor && eqString t input;
+                              _ -> False
+                            };
+                            _ -> False
+                          } };
+                    expected <- if closed then return supplied else do {
+                      known <- embed datatypes M.empty (SCon constructor [SCon input []]);
+                      attach gen Flexible known;
+                      return known
+                    };
+                    value <- child env (CVar dictionary);
+                    use <- edge (generalization value) expected;
+                    return (FPrimitiveStringConversion primitive name (XCon input []) value use text)
+                  };
+                  Nothing -> ordinary
+                }
+              }) ordinary;
+            _ -> ordinary
+          };
+        _ -> ordinary
+      };
+      closedPrimitive primitive operands ordinary = fileApplication (let {
+        nominal field = case field of {
+          Applied _ fields -> all nominal fields;
+          _ -> False
+        };
+        signature remaining field = case (,) remaining field of {
+          (,) ((:) expression rest) (Function domain range) ->
+            if nominal domain then mapOptional (\((,) arguments result) ->
+              (,) ((:) ((,) expression domain) arguments) result) (signature rest range)
+            else Nothing;
+          (,) [] result -> if nominal result then Just ((,) [] result) else Nothing;
+          _ -> Nothing
+        };
+        owned field = do {
+          source <- liftResult (sourceField field);
+          identity <- embed datatypes M.empty source;
+          attach gen Flexible identity;
+          return identity
+        }
+      } in case P.primitiveSignature primitive of {
+        (,) [] fields -> case signature operands fields of {
+          Just ((,) arguments result) -> let {
+            normal = do {
+              targets <- mapM (\((,) term field) -> do {
+                identity <- owned field;
+                return ((,) term identity)
+              }) arguments;
+              resultType <- owned result;
+              equality root resultType;
+              primitiveApplication primitive [] targets
+            }
+          } in case (,) env result of {
+            (,) (ClosedPrimitiveScope _) (Applied output []) -> do {
+              -- These primitives have a concrete result. Repeated operands of
+              -- that same nominal type keep separate use proofs against it.
+              setTag (GCon output []);
+              targets <- mapM (\((,) term field) -> do {
+                identity <- case field of {
+                  Applied input [] -> if eqString input output then return root else owned field;
+                  _ -> owned field
+                };
+                return ((,) term identity)
+              }) arguments;
+              primitiveApplication primitive [] targets
+            };
+            _ -> normal
+          };
+          Nothing -> ordinary
+        };
+        _ -> ordinary
+      }) ordinary;
+      -- Each site instantiates a shared lexical function at its own argument
+      -- type. A standard argument edge retains the original dictionary's
+      -- independent subsumption proof, including inside a polymorphic scope.
+      stringCalls subject function convert rows fallback = do {
+        operator <- freshName "stringLiteralBranch";
+        let { dict = "$mlf.case.dictionary"; str = "$mlf.case.text";
+              body = CApp (caseRefTerm function)
+                (CApp (CApp (caseRefTerm convert) (CVar dict)) (CApp (CPrimitive PTextToChars) (CVar str)));
+              worker = CLam dict (CLam str body) };
+        worker' <- child env worker;
+        value <- child env (caseRefTerm subject);
+        integer <- newNode (GCon "Int" []) (Just gen) Flexible;
+        valueProof <- edge (generalization value) integer;
+        string <- newNode (GCon "String" []) (Just gen) Flexible;
+        target <- newNode (GArr string root) (Just gen) Flexible;
+        arms <- mapM (\((,,) key dictionary text) -> do {
+          domain <- bottom;
+          arrow <- newNode (GArr domain target) (Just gen) Flexible;
+          proof <- edge (generalization worker') arrow;
+          argument <- child env (CVar dictionary);
+          operand <- edge (generalization argument) domain;
+          return (StringCallArm key text argument operand proof)
+        }) rows;
+        remaining <- child env fallback;
+        rest <- edge (generalization remaining) root;
+        return (FIntStringCalls operator worker' value valueProof root arms remaining rest)
+      };
+      explicit refs = liftResult (mapEither FEvidence (traverseEither (evidenceBindingIn (snd scopeRoot) env) refs));
       wanted dictionary evidence =
         do {
           declaration <- liftResult (D.lookupDatatype datatypes dictionary);
           parameters <-
-            mapM (\parameter -> newNode (G.bottomTag (snd parameter)) (Just scopeRoot) Flexible)
+            mapM (\parameter -> newNode (G.bottomTag (snd parameter)) (Just (fst scopeRoot)) Flexible)
               (D.datatypeBinders declaration);
           let {
             ps = M.fromList compareString (zip (D.datatypeParameters declaration) parameters)
@@ -491,38 +956,175 @@ module Bootstrap.Constraint where {
       CVar x -> variable (LexicalRef x);
       CGivenScope names body -> do {
         givens <- liftResult (traverseEither (\name -> evidenceBinding env ((,) GivenEvidence (LexicalRef name))) names);
-        enclosed <- buildCoreUnder scopeRoot datatypes typeScope env gen root body;
+        enclosed <- buildCoreUnderIn scopeRoot datatypes typeScope env gen root body;
         return (FWithGivens givens enclosed)
       };
       CGlobal i hint -> variable (DeclRef i hint);
       CLam x body -> lambda (LexicalRef x) body;
+      CBindDictionaries names body -> buildDictionaryPrefixIn Nothing scopeRoot datatypes typeScope env gen root names body;
       CDeclScope ids enclosed -> case (,) ids enclosed of {
         (,) [i] (CLam x body) -> lambda (DeclRef i x) body;
         (,) [i] (CLet x a b) -> binding (DeclRef i x) a b;
         (,) slots (CRec defs body) -> if length slots == length defs
-          then withDeclarationScope (buildRecursiveUnder scopeRoot datatypes typeScope env gen root
+          then withDeclarationScope (buildRecursiveUnderIn scopeRoot datatypes typeScope env gen root
             (zipWith (\i ((,,) n mode rhs) -> (,,) (DeclRef i n) mode rhs) slots defs) body)
           else failGenerate "recursive declaration slot inventory mismatch";
         _ -> failGenerate "declaration scope requires a matching top-level binder"
       };
-      CApp a b ->
-        do {
-          a' <- child env a;
-          b' <- child env b;
-          domain <- bottom;
-          arrow <- newNode (GArr domain root) (Just gen) Flexible;
-          ea <- edge (generalization a') arrow;
-          eb <- edge (generalization b') domain;
-          return (FApply a' b' ea eb)
+      CApp a b -> let { ordinary = application a b } in case a of {
+        -- A saturated conditional constrains both branches to its result.
+        -- The operands still get individual instantiation proofs.
+        CApp (CApp (CPrimitive PIfThenElse) condition) yes -> let {
+          simple = do {
+            boolean <- newNode (GCon "Bool" []) (Just gen) Flexible;
+            primitiveApplication PIfThenElse [root] [(,) condition boolean,(,) yes root,(,) b root]
+          };
+          safeName ref = case ref of {
+            LexicalRef n -> not (eqString n "$mlf.case.dictionary" || eqString n "$mlf.case.text");
+            _ -> True
+          };
+          candidate = case (,) (integerTest condition) (stringArm yes) of {
+            (,) (Just header@((,) subject _)) (Just shape@((,,,) function convert _ _)) ->
+              if not (safeName function && safeName convert) then simple else do {
+                graph <- getGraph;
+                -- Reject an unsupported converter before inspecting the suffix.
+                if not (caseConverter env graph convert) then simple
+                else case stringCallRun env header shape b of {
+                  Just ((,) arms fallback) -> stringCalls subject function convert arms fallback;
+                  Nothing -> simple
+                }
+              };
+            _ -> simple
+          }
+        } in fileApplication candidate ordinary;
+        -- Integer patterns lower to this primitive. Constrain the operands
+        -- directly to Int and record the primitive's known Bool result.
+        CApp (CPrimitive PEqInt) left -> fileApplication (do {
+          setTag (GCon "Bool" []);
+          integer <- newNode (GCon "Int" []) (Just gen) Flexible;
+          primitiveApplication PEqInt [] [(,) left integer,(,) b integer]
+        }) ordinary;
+        CPrimitive primitive -> convertedPrimitive primitive b (closedPrimitive primitive [b] ordinary);
+        CApp (CPrimitive primitive) x -> closedPrimitive primitive [x,b] ordinary;
+        CApp (CApp (CPrimitive primitive) x) y -> closedPrimitive primitive [x,y,b] ordinary;
+        CVar name -> variableApplication (LexicalRef name) b ordinary;
+        CGlobal i hint -> variableApplication (DeclRef i hint) b ordinary;
+        _ -> ordinary
+      };
+      CApplyScopedDictionaries function arguments -> let {
+        ordinary = buildCoreUnderIn scopeRoot datatypes typeScope env gen root
+          (ordinaryScopedDictionaries (caseRefTerm function) arguments);
+        -- The whole source scheme was checked by groundDictionaryDomains.
+        -- Adjacent wants for the same fully ground nominal argument in the
+        -- same lexical frame and immutable module scope have the same proof.
+        -- Distinct application positions keep separate instantiation edges.
+        atom graph n = case G.tag (G.nodeAt graph n) of {
+          GTyApp h a -> case (,) (G.tag (G.nodeAt graph h)) (G.tag (G.nodeAt graph a)) of {
+            (,) (GTyCon c (KArrow Star Star)) (GCon t []) -> Just ((,) c t); _ -> Nothing
+          }; _ -> Nothing
         };
+        values graph n remaining previous = case remaining of {
+          [] -> return [];
+          (:) ((,) ((,) dictionary candidates@(CandidateEnvironment owner _)) domain) tail ->
+            case G.tag (G.nodeAt graph n) of {
+              GArr arg rest -> do {
+                let { key = atom graph arg;
+                      fresh = child env (CWantedScope dictionary candidates) };
+                value <- case (,) key previous of {
+                  (,) (Just ((,) c t)) (Just ((,,,) pc pt po old)) ->
+                    if owner /= po || not (eqString c pc && eqString t pt) then fresh else do {
+                      resolved <- resolveCandidateEnvironmentIn (snd scopeRoot) env gen candidates;
+                      case (,) old resolved of {
+                        (,) (Typed _ (FScopedEvidence (ResolvedCandidateEnvironment previous _)))
+                            (ResolvedCandidateEnvironment actual _) ->
+                          if previous == actual then return old else fresh;
+                        _ -> fresh
+                      }
+                    };
+                  _ -> fresh
+                };
+                use <- edge (generalization value) domain;
+                let { next = mapOptional (\((,) c t) -> (,,,) c t owner value) key };
+                more <- values graph rest tail next;
+                return ((:) ((,) value use) more)
+              };
+              _ -> failGenerate "checked dictionary arrow inventory mismatch"
+            }
+        }
+      } in fileApplication (case lookupTerm env function of {
+        Just (Poly name source) -> do {
+          graph <- getGraph;
+          if not (groundDictionaryDomains graph source arguments) then ordinary else do {
+            -- Each wanted keeps its lexical environment, source order and
+            -- independent instantiation edge, as in the ordinary application.
+            known <- verifiedCall source function arguments True;
+            (,) proof domains <- case known of {
+              Just ((,) target use) -> return ((,) use (map (\_ -> target) arguments));
+              Nothing -> do {
+                pending <- mapM (\_ -> bottom) arguments;
+                arrow <- foldM (\result domain -> newNode (GArr domain result) (Just gen) Flexible)
+                  root (reverse pending);
+                use <- edge source arrow;
+                return ((,) use pending)
+              }
+            };
+            operands <- WithCandidates (\solveGraph memo state -> runWithSolver solveGraph memo (case memo of {
+              BatchedEnvironments _ -> values graph (G.genRoot graph source) (zip arguments domains) Nothing;
+              _ -> mapM (\((,) ((,) dictionary candidates) domain) -> do {
+              value <- child env (CWantedScope dictionary candidates);
+              use <- edge (generalization value) domain;
+              return ((,) value use)
+            }) (zip arguments domains)
+            }) state);
+            return (FApplyGroundDictionaries name proof operands)
+          }
+        };
+        _ -> ordinary
+      }) ordinary;
+      CApplyDictionaries function arguments -> let {
+        callee = case function of { LexicalRef name -> CVar name; DeclRef i hint -> CGlobal i hint };
+        dictionary name = case lookupTerm env (LexicalRef name) of {
+          Just (Mono resolved domain) -> Right ((,) resolved domain);
+          _ -> Left ()
+        };
+        prefixType parameters = foldM (\result ((,) _ domain) -> newNode (GArr domain result) (Just gen) Flexible)
+          root (reverse parameters);
+        ordinary = buildCoreUnderIn scopeRoot datatypes typeScope env gen root
+          (foldl CApp callee (map CVar arguments))
+      } in case (,) (lookupTerm env function) (traverseEither dictionary arguments) of {
+        (,) (Just (Poly name source)) (Right parameters) -> do {
+          -- The callee's binding already owns its scheme. Instantiate it
+          -- at the complete arrow using the caller's monomorphic domains.
+          known <- verifiedCall source function parameters False;
+          proof <- case known of {
+            Just ((,) target use) -> do {
+              mapM (\((,) _ actual) -> equality target actual) parameters;
+              return use
+            };
+            Nothing -> do { arrow <- prefixType parameters; use <- edge source arrow;
+              return use }
+          };
+          return (FApplyDictionaries name proof (map fst parameters))
+        };
+        (,) (Just (RecursiveDictionaryMono name shared export arity)) (Right parameters) ->
+          if arity /= length parameters then ordinary else fileApplication (do {
+            -- The compiler's complete dictionary prefix is monomorphic
+            -- inside this group. Equate it once and retain the export edge
+            -- only for elaborating the eventually checked recursive call.
+            arrow <- prefixType parameters;
+            equality shared arrow;
+            return (FApplyDictionaries name (Edge export arrow) (map fst parameters))
+          }) ordinary;
+        _ -> ordinary
+      };
       CLet x a b -> binding (LexicalRef x) a b;
-      CRec defs body -> buildRecursiveUnder scopeRoot datatypes typeScope env gen root
+      CRec defs body -> buildRecursiveUnderIn scopeRoot datatypes typeScope env gen root
         (map (\((,,) n mode rhs) -> (,,) (LexicalRef n) mode rhs) defs) body;
       CWanted dictionary candidates -> wanted dictionary
         (explicit (map (\((,) role n) -> (,) role (LexicalRef n)) candidates));
       CWantedRefs dictionary candidates -> wanted dictionary (explicit candidates);
       CWantedScope dictionary environment -> wanted dictionary
-        (fmap FScopedEvidence (resolveCandidateEnvironment env gen environment));
+        (fmap FScopedEvidence (resolveCandidateEnvironmentIn (snd scopeRoot) env gen environment));
       CChecked signature expression ->
         do {
           embedded <- embed datatypes typeScope signature;
@@ -564,7 +1166,7 @@ module Bootstrap.Constraint where {
           target <- embed datatypes local expected;
           attach gen Rigid target;
           checked <-
-            buildUnder scopeRoot datatypes local gen env
+            buildUnderIn scopeRoot datatypes local gen env
               (desugar (SAnn (directed expected expression) (SAnnotation [] expected)));
           e <- edge (generalization checked) target;
           return
@@ -694,7 +1296,7 @@ module Bootstrap.Constraint where {
           prepared <- mapM (prepareBranch datatypes gen domain parameters) alternatives;
           let { projections = concatMap preparedProjections prepared };
           unless (null projections) (projectCase projections);
-          branches <- mapM (buildPreparedBranchUnder scopeRoot datatypes typeScope env gen root) prepared;
+          branches <- mapM (buildPreparedBranchUnderIn scopeRoot datatypes typeScope env gen root) prepared;
           return (FMatch a ea branches)
         }
     };
@@ -706,7 +1308,11 @@ module Bootstrap.Constraint where {
   } in case core of {
     CVar n -> [LexicalRef n]; CGlobal i n -> [DeclRef i n];
     CLam n body -> hide [LexicalRef n] (recursiveRefs body);
+    CBindDictionaries ns body -> hide (map LexicalRef ns) (recursiveRefs body);
     CApp a b -> append (recursiveRefs a) (recursiveRefs b);
+    CApplyDictionaries function arguments -> (:) function (map LexicalRef arguments);
+    CApplyScopedDictionaries function arguments -> (:) function
+      (concatMap (\((,) _ (CandidateEnvironment _ refs)) -> map snd refs) arguments);
     CLet n a b -> append (recursiveRefs a) (hide [LexicalRef n] (recursiveRefs b));
     CCase a branches -> append (recursiveRefs a) (concatMap (\((,) pat b) ->
       hide (map LexicalRef (Desugar.patternVariables pat)) (recursiveRefs b)) branches);
@@ -755,7 +1361,8 @@ module Bootstrap.Constraint where {
                     [] ((,,) TermRef RecursiveMode Core) -> Core -> Generate Form;
   buildRecursive datatypes typeScope env gen root definitions body = withBindingRoot gen
     (\scopeRoot -> buildRecursiveUnder scopeRoot datatypes typeScope env gen root definitions body);
-  buildRecursiveUnder scopeRoot datatypes typeScope env gen root definitions body =
+  buildRecursiveUnder root = buildRecursiveUnderIn ((,) root M.empty);
+  buildRecursiveUnderIn scopeRoot datatypes typeScope env gen root definitions body =
     do {
       let { signed = filter checkedRecursive definitions };
       declarations <- mapM (\((,,) ref mode rhs) -> do {
@@ -770,21 +1377,7 @@ module Bootstrap.Constraint where {
         unsigned = filter (\definition -> not (checkedRecursive definition)) definitions
       };
       let { groups = recursiveGroups unsigned };
-      inferred <-
-        foldM
-          (\state names ->
-             case state of {
-               (,) scope done ->
-                 do {
-                   result <- if any (\((,,) ref _ _) -> isDeclarationRef ref) names
-                     then withDeclarationScope (buildRecursiveGroupUnder scopeRoot datatypes typeScope scope gen names)
-                     else buildRecursiveGroupUnder scopeRoot datatypes typeScope scope gen names;
-                   case result of {
-                     (,) scope2 values -> return ((,) scope2 (append done values))
-                   }
-                 }
-             })
-          ((,) signedScope []) groups;
+      inferred <- inferRecursiveGroupsIn scopeRoot datatypes typeScope gen signedScope groups;
       case inferred of {
         (,) scope inferredDefinitions ->
           do {
@@ -792,7 +1385,7 @@ module Bootstrap.Constraint where {
               mapM
                 (\((,) ((,,,) n name source target) ((,,) _ _ rhs)) ->
                    do {
-                     value <- buildUnder scopeRoot datatypes typeScope gen scope rhs;
+                     value <- buildUnderIn scopeRoot datatypes typeScope gen scope rhs;
                      proof <- edge (generalization value) target;
                      return ((,) n (RecursiveDefinition name source value proof Nothing))
                    })
@@ -803,18 +1396,240 @@ module Bootstrap.Constraint where {
                  Nothing -> failGenerate "recursive component lost a declaration";
                  Just value -> return value
                }) definitions;
-            continuation <- buildUnder scopeRoot datatypes typeScope gen scope body;
+            continuation <- buildUnderIn scopeRoot datatypes typeScope gen scope body;
             proof <- edge (generalization continuation) root;
             return (FRecursive ordered continuation proof)
           }
       }
     };
+  -- A batch contains only declaration SCCs with no dependency between
+  -- members of distinct SCCs. Their pre-existing references must be closed
+  -- declarations. Scope and type errors use the established per-SCC order.
+  inferRecursiveGroups root = inferRecursiveGroupsIn ((,) root M.empty);
+  inferRecursiveGroupsIn scopeRoot datatypes typeScope parent signedScope groups = let {
+    build scope group = buildRecursiveGroupUnderIn scopeRoot datatypes typeScope scope parent group;
+    plan scope group = planRecursiveGroupIn scopeRoot datatypes typeScope scope parent group;
+    scoped group action = if any (\((,,) ref _ _) -> isDeclarationRef ref) group
+      then withDeclarationScope action else action;
+    single scope group = scoped group (build scope group);
+    step run ((,) scope done) members = do {
+      (,) next additions <- run scope members;
+      return ((,) next (append done additions))
+    };
+    ordinary = foldM (step single) ((,) signedScope []) groups;
+    -- The memo owns the parsed declaration environment. An artificial
+    -- standalone Core environment keeps the original staging.
+    candidate = foldM (step runBatch) ((,) signedScope []) (independentRecursiveBatches groups);
+    runBatch scope batch = let {
+      sequential = foldM (step single) ((,) scope []) batch;
+      together = do {
+        pending <- mapM (\group -> scoped group (plan scope group)) batch;
+        flushGeneration;
+        finishRecursiveGroupsUsing G.materializeSolvedExportBatch scope parent pending
+      }
+    } in case batch of {
+      (:) _ ((:) _ _) -> WithCandidates (\solveGraph memo state -> case state of {
+        Generation graph [] [] -> if not (closedRecursiveBatchIn (snd scopeRoot) graph scope batch)
+          then runWithSolver solveGraph memo sequential state
+          else runWithSolver solveGraph memo together state;
+        _ -> runWithSolver solveGraph memo sequential state
+      });
+      _ -> sequential
+    }
+  } in WithCandidates (\solveGraph memo state -> case memo of {
+    BatchedEnvironments _ -> runWithSolver solveGraph memo candidate state;
+    _ -> runWithSolver solveGraph memo ordinary state
+  });
+  recursiveDeclarations group = IS.fromList (mapMaybe (\((,,) ref _ _) -> case ref of {
+    DeclRef i _ -> Just (V.toInt i); LexicalRef _ -> Nothing
+  }) group);
+  recursiveMentioned group = concatMap (\((,,) _ _ rhs) -> recursiveRefs rhs) group;
+  recursiveDeclarationReads group = IS.fromList (mapMaybe (\ref -> case ref of {
+    DeclRef i _ -> Just (V.toInt i); LexicalRef _ -> Nothing
+  }) (recursiveMentioned group));
+  independentRecursiveBatches groups = let {
+    batch owners reads ordered remaining = case remaining of {
+      [] -> [reverse ordered];
+      (:) group rest -> let {
+        next = recursiveDeclarations group;
+        needed = recursiveDeclarationReads group;
+        separate = IS.null (IS.intersection owners needed) && IS.null (IS.intersection next reads)
+      } in if separate then batch (IS.union owners next) (IS.union reads needed) ((:) group ordered) rest
+        else (:) (reverse ordered) (batch next needed [group] rest)
+    }
+  } in case groups of {
+    [] -> [];
+    (:) first rest -> batch (recursiveDeclarations first) (recursiveDeclarationReads first) [first] rest
+  };
+  closedRecursiveBatch = closedRecursiveBatchIn M.empty;
+  closedRecursiveBatchIn imported graph scope groups = let {
+    declarations = foldlStrict IS.union IS.empty (map recursiveDeclarations groups);
+    refs = concatMap recursiveMentioned groups;
+    declared group = IS.size (recursiveDeclarations group) == length group;
+    external ref = case ref of {
+      DeclRef i _ -> IS.notMember (V.toInt i) declarations;
+      LexicalRef _ -> True
+    };
+    admit sources ref = case ref of {
+      LexicalRef name -> case (,) (lookupTerm scope ref) (P.lookupPrimitive name) of {
+        (,) Nothing (Just _) -> Right sources;
+        _ -> Left "batch requires closed declarations"
+      };
+      DeclRef i _ -> case lookupTerm scope ref of {
+        Just (Poly _ gen) -> Right (IS.insert gen sources);
+        Nothing -> if M.member compareRefSlot i imported then Right sources
+          else Left "batch requires closed declarations";
+        _ -> Left "batch requires closed declarations"
+      }
+    };
+    closed gen = case G.expansionVisitCached graph gen IM.empty ((,) IS.empty IM.empty) [G.genRoot graph gen] of {
+      (,) visited scopes -> all (\n -> IM.findWithDefault False n scopes) (IS.toList visited)
+    }
+  } in all declared groups && IS.size declarations == sum (map length groups) && (case G.foldE admit IS.empty (filter external refs) of {
+    Left _ -> False;
+    Right sources -> all closed (IS.toList sources)
+  });
+  hasLambdaPrefix :: Int -> Core -> Bool;
+  hasLambdaPrefix count term = if count == 0 then True else case term of {
+    CLam _ body -> hasLambdaPrefix (count - 1) body; _ -> False
+  };
+  -- Each admitted parameter has a use at a closed nominal type. Every call
+  -- in the body is saturated, and its result is closed. Only the contiguous
+  -- leading parameters used exclusively as an authenticated selector's
+  -- dictionary operand can share a binder group. Their actual values and
+  -- operand order remain distinct, and ordinary user lambdas keep their
+  -- own generation scopes.
+  closedDictionaryLambdas :: Graph -> BindingEnv -> Core -> Maybe Core;
+  closedDictionaryLambdas graph env original =
+    mapOptional (\((,,) names body _) -> CBindDictionaries names body)
+      (closedDictionaryLambdasWithDomain graph env original);
+  closedDictionaryLambdasWithDomain graph env original = let {
+    nominal ty = case ty of { XCon _ xs -> all nominal xs; XApply f x -> nominal f && nominal x; _ -> False };
+    field f = case f of {
+      Applied c xs -> mapOptional (XCon c) (mapM field xs);
+      Function a b -> do { x <- field a; y <- field b; Just (XArrow x y) };
+      _ -> Nothing
+    };
+    checked ref = case (,) ref (lookupTerm env ref) of {
+      (,) (DeclRef _ _) (Just (Poly _ source)) -> let {
+        domain parent id = case G.nodeAt graph id of {
+          Node (GCon c []) (Just owner) Rigid -> if owner == parent then Just (XCon c []) else Nothing;
+          _ -> Nothing
+        };
+        read parent root id = case G.nodeAt graph id of {
+          Node tag (Just owner) flag -> if owner /= parent || not (root || G.equalFlag flag Rigid) then Nothing else
+            case tag of {
+              GArr a b -> do { x <- domain id a; y <- read id False b; Just (XArrow x y) };
+              GCon c [] -> Just (XCon c []);
+              _ -> Nothing
+            };
+          _ -> Nothing
+        }
+      } in read source True (G.genRoot graph source);
+      _ -> Nothing
+    };
+    headType expr = case expr of {
+      CPrimitive primitive -> case P.primitiveSignature primitive of {
+        (,) [] signature -> field signature; _ -> Nothing
+      };
+      _ -> case caseCoreRef expr of { Just ref -> checked ref; _ -> Nothing }
+    };
+    spine expression args = case expression of {
+      CApp f a -> spine f ((:) a args); _ -> (,) expression args
+    };
+    result ty args = case (,) ty args of {
+      (,) (XArrow domain tail) ((:) _ more) -> if nominal domain then result tail more else Nothing;
+      (,) end [] -> if nominal end then Just end else Nothing;
+      _ -> Nothing
+    };
+    known expr = case expr of {
+      CInt _ -> Just (XCon "Int" []); CBool _ -> Just (XCon "Bool" []); CString _ -> Just (XCon "String" []);
+      CApp (CApp (CApp (CPrimitive PIfThenElse) _) y) n -> case known y of { Just t -> Just t; _ -> known n };
+      _ -> case spine expr [] of { (,) f args -> do { t <- headType f; result t args } }
+    };
+    converter ref = if not (caseConverter env graph ref) then Nothing else case lookupTerm env ref of {
+      Just (Poly _ source) -> case G.tag (G.nodeAt graph (G.genRoot graph source)) of {
+        GArr domain _ -> case G.tag (G.nodeAt graph domain) of {
+          GTyApp constructor _ -> case G.tag (G.nodeAt graph constructor) of { GTyCon name _ -> Just name; _ -> Nothing };
+          _ -> Nothing
+        }; _ -> Nothing
+      }; _ -> Nothing
+    };
+    check binders expect expr used = let {
+      bind evidence n ty = if not (M.member compareString n binders) then Nothing else case M.lookup compareString n used of {
+        Nothing -> Just (M.insert compareString n ((,) ty evidence) used);
+        Just ((,) previous onlyEvidence) -> if not (T.alphaEq previous ty) then Nothing
+          else if onlyEvidence && not evidence then Just (M.insert compareString n ((,) ty False) used)
+          else Just used
+      };
+      args signature values previous = case (,) signature values of {
+        (,) (XArrow domain tail) ((:) v rest) -> if not (nominal domain) then Nothing else do {
+          now <- check binders domain v previous; args tail rest now
+        };
+        (,) end [] -> if nominal end && T.alphaEq expect end then Just previous else Nothing;
+        _ -> Nothing
+      };
+      application = case spine expr [] of { (,) f values -> do { ty <- headType f; args ty values used } };
+      literal typ = if T.alphaEq expect (XCon typ []) then Just used else Nothing
+    } in case expr of {
+      CVar n -> bind False n expect;
+      CInt _ -> literal "Int"; CBool _ -> literal "Bool"; CString _ -> literal "String";
+      CApp (CApp (CApp (CPrimitive PIfThenElse) condition) yes) no -> do {
+        a <- check binders (XCon "Bool" []) condition used;
+        b <- check binders expect yes a; check binders expect no b
+      };
+      CApp (CApp callee (CVar d)) (CApp (CPrimitive PTextToChars) (CString _)) -> case caseCoreRef callee of {
+        Just ref -> case converter ref of { Just c -> bind True d (XCon c [expect]); Nothing -> application };
+        _ -> application
+      };
+      CApp _ _ -> application;
+      _ -> Nothing
+    };
+    lambdas expression names = case expression of {
+      CLam name body -> lambdas body ((:) name names);
+      _ -> (,) (reverse names) expression
+    }
+  } in case original of {
+    CLam _ (CLam _ _) -> case lambdas original [] of { (,) names body -> do {
+      let { binders = M.fromList compareString (map (\n -> (,) n ()) names) };
+      if M.size binders /= length names then Nothing else do {
+        end <- known body;
+        used <- check binders end body M.empty;
+        let { isEvidence n = case M.lookup compareString n used of {
+                Just ((,) _ True) -> True; _ -> False
+              } };
+        if M.size used /= length names then Nothing else case span isEvidence names of {
+          (,) leading@((:) first ((:) _ _)) trailing -> let {
+            common = case M.lookup compareString first used of {
+              Just ((,) (XCon constructor [XCon argument []]) True) ->
+                if all (\n -> case M.lookup compareString n used of {
+                  Just ((,) (XCon other [XCon actual []]) True) ->
+                    eqString constructor other && eqString argument actual;
+                  _ -> False
+                }) leading then Just ((,) constructor argument) else Nothing;
+              _ -> Nothing
+            }
+          } in Just ((,,) leading (foldr CLam body trailing) common);
+          _ -> Nothing
+        }
+      }
+    } };
+    _ -> Nothing
+  };
   buildRecursiveGroup :: DataEnv -> Map String Int -> BindingEnv -> Int ->
                          [] ((,,) TermRef RecursiveMode Core) ->
                          Generate ((,) BindingEnv ([] ((,) TermRef RecursiveDefinition)));
   buildRecursiveGroup datatypes typeScope env parent definitions = withBindingRoot parent
     (\scopeRoot -> buildRecursiveGroupUnder scopeRoot datatypes typeScope env parent definitions);
-  buildRecursiveGroupUnder scopeRoot datatypes typeScope env parent definitions =
+  buildRecursiveGroupUnder root = buildRecursiveGroupUnderIn ((,) root M.empty);
+  buildRecursiveGroupUnderIn scopeRoot datatypes typeScope env parent definitions = do {
+    pending <- planRecursiveGroupIn scopeRoot datatypes typeScope env parent definitions;
+    flushGeneration;
+    finishRecursiveGroupsUsing G.materializeSolvedExportBatch env parent [pending]
+  };
+  data PendingRecursive = PendingRecursive Int ([] ((,,,) TermRef XName Int Int)) ([] ((,) Typed Edge));
+  planRecursiveGroup root = planRecursiveGroupIn ((,) root M.empty);
+  planRecursiveGroupIn scopeRoot datatypes typeScope env parent definitions =
     do {
       group <- newNode (GGen (-1)) (Just parent) Flexible;
       declarations <- mapM
@@ -827,32 +1642,55 @@ module Bootstrap.Constraint where {
       anchor <- recursiveAnchor group (map (\((,,,) _ _ shared _) -> shared) declarations);
       setNode group (Node (GGen anchor) (Just parent) Flexible);
       let {
-        scope = bindTerms env (map (\((,,,) n name shared export) -> (,) n (RecursiveMono name shared export)) declarations)
+        assumption ((,,,) n name shared export) ((,,) _ _ rhs) =
+          (,) n (case rhs of {
+            CBindDictionaries slots _ -> if null slots then RecursiveMono name shared export
+              else RecursiveDictionaryMono name shared export (length slots);
+            _ -> RecursiveMono name shared export
+          });
+        scope = bindTerms env (zipWith assumption declarations definitions)
       };
       bodies <- mapM
-        (\((,) ((,,,) _ _ shared _) ((,,) _ _ rhs)) -> do {
-           value <- buildUnder scopeRoot datatypes typeScope group scope rhs;
+        (\((,) ((,,,) declaration _ shared _) ((,,) _ _ rhs)) -> do {
+           let { buildBody = buildUnderIn scopeRoot datatypes typeScope group scope; ordinary = buildBody rhs };
+           value <- case declaration of {
+             DeclRef _ _ -> if not (hasLambdaPrefix 8 rhs) then ordinary else fileApplication (do {
+               graph <- getGraph;
+               case closedDictionaryLambdasWithDomain graph scope rhs of {
+                 Nothing -> ordinary;
+                 Just ((,,) names body common) -> let { compact = CBindDictionaries names body } in case common of {
+                   Nothing -> buildBody compact;
+                   Just _ -> WithCandidates (\solveGraph memo state -> runWithSolver solveGraph memo (case memo of {
+                     BatchedEnvironments _ -> generalize (Just group) (\gen root ->
+                       buildDictionaryPrefixIn common scopeRoot datatypes typeScope scope gen root names body);
+                     _ -> buildBody compact
+                   }) state)
+                 }
+               }
+             }) ordinary;
+             _ -> ordinary
+           };
            proof <- edge (generalization value) shared;
            return ((,) value proof)
          }) (zip declarations definitions);
-      flushGeneration;
-      exports <- mapM
-        (\((,) ((,,,) n name shared export) ((,) value proof)) -> do {
-           graph <- getGraph;
-           materialized <- liftResult (G.materializeExport group shared export parent graph);
-           case materialized of {
-             (,) ((,) _ copies) next -> do {
-               setGraph next;
-               return ((,) n (RecursiveDefinition name export value proof
-                 (Just (RecursiveClosure group copies))))
-             }
-           }
-         }) (zip declarations bodies);
-      let {
-        exportedScope = bindTerms env (map (\((,,,) n name _ export) -> (,) n (Poly name export)) declarations)
-      };
-      return ((,) exportedScope exports)
+      return (PendingRecursive group declarations bodies)
     };
+  finishRecursiveGroups = finishRecursiveGroupsUsing G.materializeCheckedExportBatch;
+  finishRecursiveGroupsUsing materialize env parent pending = do {
+    graph <- getGraph;
+    let {
+      items (PendingRecursive group declarations bodies) = map (\((,) declaration body) -> (,,) group declaration body)
+        (zip declarations bodies);
+      members = concatMap items pending;
+      request ((,,) group ((,,,) _ _ shared export) _) = (,,) group shared export;
+      freeze ((,,) group ((,,,) n name _ export) ((,) value proof)) ((,) _ copies) =
+        (,) n (RecursiveDefinition name export value proof (Just (RecursiveClosure group copies)));
+      exportedScope = bindTerms env (map (\((,,) _ ((,,,) n name _ export) _) -> (,) n (Poly name export)) members)
+    };
+    (,) completed next <- liftResult (materialize parent (map request members) graph);
+    setGraph next;
+    return ((,) exportedScope (zipWith freeze members completed))
+  };
   declareRecursive :: DataEnv ->
                       Int -> (,,) String RecursiveMode Core -> Generate ((,,,) String XName Int Int);
   declareRecursive datatypes gen definition =
@@ -966,10 +1804,11 @@ module Bootstrap.Constraint where {
                          Int -> Int -> PreparedBranch -> Generate Branch;
   buildPreparedBranch datatypes typeScope env gen root prepared = withBindingRoot gen
     (\scopeRoot -> buildPreparedBranchUnder scopeRoot datatypes typeScope env gen root prepared);
-  buildPreparedBranchUnder scopeRoot datatypes typeScope env gen root prepared =
+  buildPreparedBranchUnder root = buildPreparedBranchUnderIn ((,) root M.empty);
+  buildPreparedBranchUnderIn scopeRoot datatypes typeScope env gen root prepared =
     case prepared of {
       PreparedBranch pattern bindings body _ -> do {
-        body' <- buildUnder scopeRoot datatypes typeScope gen
+        body' <- buildUnderIn scopeRoot datatypes typeScope gen
           (bindTerms env (map (\((,) n binding) -> (,) (LexicalRef n) binding) bindings)) body;
         e <- edge (generalization body') root;
         return (Branch pattern body' e)
@@ -1109,6 +1948,11 @@ module Bootstrap.Constraint where {
     case expression of {
       SVar _ -> Right ();
       SGlobal _ _ -> Right ();
+      SApplyDictionaries _ _ -> Right ();
+      SBindDictionaries names body -> do {
+        ensure (not (null names)) "missing inferred dictionary binders";
+        validateIn datatypes scope body
+      };
       SDeclScope ids b -> do {
         let { slots = map V.toInt ids };
         ensure (all (\i -> i >= 0) slots && IS.size (IS.fromList slots) == length slots)
@@ -1323,11 +2167,11 @@ module Bootstrap.Constraint where {
   -- finishNormalized checks the whole graph and indexes before this
   -- validity-preserving transformation, then shares the finished indexes.
   solvePrepared :: Constraints -> Either String Solver;
-  solvePrepared constraints =
+  solvePrepared = solveConstraintsUsing Solver.solveGenerated;
+  solveFileConstraints = solveConstraintsUsing Solver.solveFileGraph;
+  solveConstraintsUsing solveGraph constraints =
     do {
-      prepared <- Solver.prepare (initialGraph constraints);
-      initial <- Solver.solverUnify (equalities constraints) prepared;
-      solved <- evaluatePreparedSteps initial (solveSteps constraints);
+      solved <- solveGraph (initialGraph constraints) (equalities constraints) (solveSteps constraints);
       Solver.finishNormalized solved
     };
   eraseEvidence evidence typed = case IM.lookup (generalization typed) evidence of {
@@ -1341,7 +2185,26 @@ module Bootstrap.Constraint where {
       FVariable name _ -> XEVar name;
       FDeclaredVariable name _ _ -> XEVar name;
       FLambda name _ body _ -> XEAbs name (eraseSourceWith evidence body);
+      FBindDictionaries args body _ -> foldr (\((,) n _) b -> XEAbs n b) (eraseSourceWith evidence body) args;
       FApply a b _ _ -> XEApp (eraseSourceWith evidence a) (eraseSourceWith evidence b);
+      FApplyVariable f _ argument _ -> XEApp (XEVar f) (eraseSourceWith evidence argument);
+      FApplyDictionaries f _ arguments -> foldl (\value name -> XEApp value (XEVar name))
+        (XEVar f) arguments;
+      FApplyGroundDictionaries f _ arguments -> foldl (\function ((,) argument _) ->
+        XEApp function (eraseSourceWith evidence argument)) (XEVar f) arguments;
+      FApplyPrimitive primitive _ arguments -> foldl (\function operand -> XEApp function (case operand of {
+        PrimitiveUse argument _ -> eraseSourceWith evidence argument;
+        ClosedPrimitiveForm current -> erase current
+      })) (XEPrimitive primitive) arguments;
+      FPrimitiveStringConversion primitive selector _ dictionary _ text ->
+        XEApp (XEPrimitive primitive) (XEApp (XEApp (XEVar selector) (eraseSourceWith evidence dictionary))
+          (XEApp (XEPrimitive PTextToChars) (XEString text)));
+      FIntStringCalls operator worker value _ _ arms fallback _ -> let {
+        use = eraseSourceWith evidence value;
+        arm (StringCallArm key text argument _ _) rest = XEApp (XEApp (XEApp (XEPrimitive PIfThenElse)
+          (XEApp (XEApp (XEPrimitive PEqInt) use) (XEInt key)))
+          (XEApp (XEApp (XEVar operator) (eraseSourceWith evidence argument)) (XEString text))) rest
+      } in XELet operator (eraseSourceWith evidence worker) (foldr arm (eraseSourceWith evidence fallback) arms);
       FBinding name a b _ -> XELet name (eraseSourceWith evidence a) (eraseSourceWith evidence b);
       FCoercion name _ _ -> XEAbs name (XEVar name);
       FIntegerLiteral n -> XEInt n;

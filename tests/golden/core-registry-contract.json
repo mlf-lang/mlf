@@ -1,0 +1,3800 @@
+{
+  "schema_version": 1,
+  "cases": [
+    {
+      "id": "core/substring-adapter/empty-in-empty",
+      "name": "substring empty-in-empty",
+      "family": "core/substring-adapter"
+    },
+    {
+      "id": "core/substring-adapter/empty-in-nonempty",
+      "name": "substring empty-in-nonempty",
+      "family": "core/substring-adapter"
+    },
+    {
+      "id": "core/substring-adapter/nonempty-in-empty",
+      "name": "substring nonempty-in-empty",
+      "family": "core/substring-adapter"
+    },
+    {
+      "id": "core/substring-adapter/needle-longer-than-text",
+      "name": "substring needle-longer-than-text",
+      "family": "core/substring-adapter"
+    },
+    {
+      "id": "core/substring-adapter/prefix",
+      "name": "substring prefix",
+      "family": "core/substring-adapter"
+    },
+    {
+      "id": "core/substring-adapter/interior",
+      "name": "substring interior",
+      "family": "core/substring-adapter"
+    },
+    {
+      "id": "core/substring-adapter/suffix",
+      "name": "substring suffix",
+      "family": "core/substring-adapter"
+    },
+    {
+      "id": "core/substring-adapter/overlapping-prefix-match",
+      "name": "substring overlapping-prefix-match",
+      "family": "core/substring-adapter"
+    },
+    {
+      "id": "core/substring-adapter/overlapping-prefix-miss",
+      "name": "substring overlapping-prefix-miss",
+      "family": "core/substring-adapter"
+    },
+    {
+      "id": "core/substring-adapter/unicode-match",
+      "name": "substring unicode-match",
+      "family": "core/substring-adapter"
+    },
+    {
+      "id": "core/substring-adapter/unicode-order-miss",
+      "name": "substring unicode-order-miss",
+      "family": "core/substring-adapter"
+    },
+    {
+      "id": "core/substring-adapter/nul-match",
+      "name": "substring nul-match",
+      "family": "core/substring-adapter"
+    },
+    {
+      "id": "core/substring-adapter/nul-miss",
+      "name": "substring nul-miss",
+      "family": "core/substring-adapter"
+    },
+    {
+      "id": "core/optimizer-uses/optimizer-free-use-indices-agree-with-independent-scoped-scans",
+      "name": "optimizer free-use indices agree with independent scoped scans",
+      "family": "core/optimizer-uses"
+    },
+    {
+      "id": "core/optimizer-uses/indexed-optimizer-agrees-with-legacy-traversal-and-fresh-identities",
+      "name": "indexed optimizer agrees with legacy traversal and fresh identities",
+      "family": "core/optimizer-uses"
+    },
+    {
+      "id": "core/crate-codegen/code-generation-query-agrees-with-uncached-checked-emission",
+      "name": "code generation query agrees with uncached checked emission",
+      "family": "core/crate-codegen"
+    },
+    {
+      "id": "core/crate-codegen/erased-query-reuses-alpha-and-annotation-changes",
+      "name": "erased query reuses alpha and annotation changes",
+      "family": "core/crate-codegen"
+    },
+    {
+      "id": "core/crate-codegen/optimized-query-reuses-changed-unused-bodies",
+      "name": "optimized query reuses changed unused bodies",
+      "family": "core/crate-codegen"
+    },
+    {
+      "id": "core/crate-codegen/code-generation-cache-separates-io-and-constructor-abis",
+      "name": "code generation cache separates IO and constructor ABIs",
+      "family": "core/crate-codegen"
+    },
+    {
+      "id": "core/crate-codegen/corrupt-cached-llvm-is-rebuilt",
+      "name": "corrupt cached LLVM is rebuilt",
+      "family": "core/crate-codegen"
+    },
+    {
+      "id": "core/crate-codegen/prepared-entries-and-stale-crate-dependencies-retain-visibility",
+      "name": "prepared entries and stale crate dependencies retain visibility",
+      "family": "core/crate-codegen"
+    },
+    {
+      "id": "core/declaration-queries/declaration-scc-order-and-inventory-permutation",
+      "name": "declaration SCC order and inventory permutation",
+      "family": "core/declaration-queries"
+    },
+    {
+      "id": "core/declaration-queries/recursive-scc-excludes-unrelated-declarations",
+      "name": "recursive SCC excludes unrelated declarations",
+      "family": "core/declaration-queries"
+    },
+    {
+      "id": "core/declaration-queries/indexed-scc-traversal-handles-2000-declarations",
+      "name": "indexed SCC traversal handles 2000 declarations",
+      "family": "core/declaration-queries"
+    },
+    {
+      "id": "core/declaration-queries/term-type-class-and-constructor-observations-remain-distinct",
+      "name": "term, type, class and constructor observations remain distinct",
+      "family": "core/declaration-queries"
+    },
+    {
+      "id": "core/declaration-queries/checked-group-inference-preserves-principal-polymorphism",
+      "name": "checked group inference preserves principal polymorphism",
+      "family": "core/declaration-queries"
+    },
+    {
+      "id": "core/declaration-queries/closed-signature-recursion-remains-checked-across-groups",
+      "name": "closed-signature recursion remains checked across groups",
+      "family": "core/declaration-queries"
+    },
+    {
+      "id": "core/declaration-queries/inference-rejects-an-open-imported-environment",
+      "name": "inference rejects an open imported environment",
+      "family": "core/declaration-queries"
+    },
+    {
+      "id": "core/incremental-crate-cache/persistent-no-op-reuse-and-corrupt-cache-recovery",
+      "name": "persistent no-op reuse and corrupt-cache recovery",
+      "family": "core/incremental-crate-cache"
+    },
+    {
+      "id": "core/incremental-crate-cache/implementation-edits-preserve-consumer-caches-and-clean-equivalence",
+      "name": "implementation edits preserve consumer caches and clean equivalence",
+      "family": "core/incremental-crate-cache"
+    },
+    {
+      "id": "core/incremental-crate-cache/changed-schemes-invalidate-actual-consumers",
+      "name": "changed schemes invalidate actual consumers",
+      "family": "core/incremental-crate-cache"
+    },
+    {
+      "id": "core/incremental-crate-cache/datatype-closure-invalidates-relevant-changes-only",
+      "name": "datatype closure invalidates relevant changes only",
+      "family": "core/incremental-crate-cache"
+    },
+    {
+      "id": "core/incremental-crate-cache/instance-candidate-visibility-participates-in-query-keys",
+      "name": "instance candidate visibility participates in query keys",
+      "family": "core/incremental-crate-cache"
+    },
+    {
+      "id": "core/incremental-crate-cache/query-encodings-preserve-semantics-and-normalize-lexical-names",
+      "name": "query encodings preserve semantics and normalize lexical names",
+      "family": "core/incremental-crate-cache"
+    },
+    {
+      "id": "core/incremental-crate-cache/cache-schemes-are-checked-against-stored-implementations",
+      "name": "cache schemes are checked against stored implementations",
+      "family": "core/incremental-crate-cache"
+    },
+    {
+      "id": "core/component-projection/component-scopes-agree-with-independent-edge-enumeration",
+      "name": "component scopes agree with independent edge enumeration",
+      "family": "core/component-projection"
+    },
+    {
+      "id": "core/component-projection/projected-nodes-preserve-explicit-rank-identities",
+      "name": "projected nodes preserve explicit rank identities",
+      "family": "core/component-projection"
+    },
+    {
+      "id": "core/component-projection/ordered-restoration-preserves-checked-inverse-identities",
+      "name": "ordered restoration preserves checked inverse identities",
+      "family": "core/component-projection"
+    },
+    {
+      "id": "core/int-set-unions/size-biased-set-unions-agree-with-independent-sorted-lists",
+      "name": "size-biased set unions agree with independent sorted lists",
+      "family": "core/int-set-unions"
+    },
+    {
+      "id": "core/index-edges/incremental-reverse-indices-agree-with-independent-edge-enumeration",
+      "name": "incremental reverse indices agree with independent edge enumeration",
+      "family": "core/index-edges"
+    },
+    {
+      "id": "core/index-edges/reverse-index-edits-agree-with-independent-edge-lists",
+      "name": "reverse-index edits agree with independent edge lists",
+      "family": "core/index-edges"
+    },
+    {
+      "id": "core/projection-ranks/ordered-component-ranks-agree-with-independent-renaming-maps",
+      "name": "ordered component ranks agree with independent renaming maps",
+      "family": "core/projection-ranks"
+    },
+    {
+      "id": "core/projection-changes/linear-projection-patches-agree-with-independent-map-differences",
+      "name": "linear projection patches agree with independent map differences",
+      "family": "core/projection-changes"
+    },
+    {
+      "id": "core/strict-wrappers/strict-unary-representation-requires-whole-program-evaluated-fields",
+      "name": "strict unary representation requires whole-program evaluated fields",
+      "family": "core/strict-wrappers"
+    },
+    {
+      "id": "core/solver-index-audit/incremental-index-audit-agrees-with-independent-reconstruction",
+      "name": "incremental index audit agrees with independent reconstruction",
+      "family": "core/solver-index-audit"
+    },
+    {
+      "id": "core/dense-normalization/dense-normalization-agrees-with-an-independent-list-oracle",
+      "name": "dense normalization agrees with an independent list oracle",
+      "family": "core/dense-normalization"
+    },
+    {
+      "id": "core/checked-emission/checked-emission-agrees-with-raw-independently-checked-emission",
+      "name": "checked emission agrees with raw independently checked emission",
+      "family": "core/checked-emission"
+    },
+    {
+      "id": "core/checked-emission/external-xmlf-emission-still-rejects-malformed-terms",
+      "name": "external xMLF emission still rejects malformed terms",
+      "family": "core/checked-emission"
+    },
+    {
+      "id": "core/checked-emission/checked-emission-still-enforces-io-entry-types",
+      "name": "checked emission still enforces IO entry types",
+      "family": "core/checked-emission"
+    },
+    {
+      "id": "core/checked-emission/checked-witness-and-compilation-constructors-are-private",
+      "name": "checked witness and compilation constructors are private",
+      "family": "core/checked-emission"
+    },
+    {
+      "id": "core/solver-allocation/strict-graph-builder-agrees-with-independent-insertion",
+      "name": "strict graph builder agrees with independent insertion",
+      "family": "core/solver-allocation"
+    },
+    {
+      "id": "core/solver-allocation/node-forcing-preserves-arbitrary-identities-and-lazy-constructor-fields",
+      "name": "node forcing preserves arbitrary identities and lazy constructor fields",
+      "family": "core/solver-allocation"
+    },
+    {
+      "id": "core/solver-allocation/graph-expansion-preserves-independent-allocation-and-frontier-identities",
+      "name": "graph expansion preserves independent allocation and frontier identities",
+      "family": "core/solver-allocation"
+    },
+    {
+      "id": "core/inference-and-annotations/identity",
+      "name": "identity",
+      "family": "core/inference-and-annotations"
+    },
+    {
+      "id": "core/inference-and-annotations/constant-42",
+      "name": "constant 42",
+      "family": "core/inference-and-annotations"
+    },
+    {
+      "id": "core/inference-and-annotations/boolean",
+      "name": "boolean",
+      "family": "core/inference-and-annotations"
+    },
+    {
+      "id": "core/inference-and-annotations/identity-self-application",
+      "name": "identity self-application",
+      "family": "core/inference-and-annotations"
+    },
+    {
+      "id": "core/inference-and-annotations/let-polymorphism",
+      "name": "let polymorphism",
+      "family": "core/inference-and-annotations"
+    },
+    {
+      "id": "core/inference-and-annotations/lambda-scope-is-not-generalized",
+      "name": "lambda scope is not generalized",
+      "family": "core/inference-and-annotations"
+    },
+    {
+      "id": "core/inference-and-annotations/lexical-shadowing",
+      "name": "lexical shadowing",
+      "family": "core/inference-and-annotations"
+    },
+    {
+      "id": "core/inference-and-annotations/let-rhs-sees-outer-binding",
+      "name": "let RHS sees outer binding",
+      "family": "core/inference-and-annotations"
+    },
+    {
+      "id": "core/inference-and-annotations/application-under-an-unannotated-lambda",
+      "name": "application under an unannotated lambda",
+      "family": "core/inference-and-annotations"
+    },
+    {
+      "id": "core/inference-and-annotations/k-preserves-its-polymorphic-return-bound",
+      "name": "K preserves its polymorphic return bound",
+      "family": "core/inference-and-annotations"
+    },
+    {
+      "id": "core/inference-and-annotations/g-g",
+      "name": "g g",
+      "family": "core/inference-and-annotations"
+    },
+    {
+      "id": "core/inference-and-annotations/g-g-applied-to-identity",
+      "name": "g g applied to identity",
+      "family": "core/inference-and-annotations"
+    },
+    {
+      "id": "core/inference-and-annotations/g-g-retains-its-identity-lower-bound",
+      "name": "g g retains its identity lower bound",
+      "family": "core/inference-and-annotations"
+    },
+    {
+      "id": "core/inference-and-annotations/closed-annotation",
+      "name": "closed annotation",
+      "family": "core/inference-and-annotations"
+    },
+    {
+      "id": "core/inference-and-annotations/let-annotation",
+      "name": "let annotation",
+      "family": "core/inference-and-annotations"
+    },
+    {
+      "id": "core/inference-and-annotations/bounded-annotation",
+      "name": "bounded annotation",
+      "family": "core/inference-and-annotations"
+    },
+    {
+      "id": "core/inference-and-annotations/annotated-self-application",
+      "name": "annotated self-application",
+      "family": "core/inference-and-annotations"
+    },
+    {
+      "id": "core/inference-and-annotations/polymorphic-parameter-at-distinct-instances",
+      "name": "polymorphic parameter at distinct instances",
+      "family": "core/inference-and-annotations"
+    },
+    {
+      "id": "core/inference-and-annotations/impredicative-result",
+      "name": "impredicative result",
+      "family": "core/inference-and-annotations"
+    },
+    {
+      "id": "core/inference-and-annotations/partial-annotation",
+      "name": "partial annotation",
+      "family": "core/inference-and-annotations"
+    },
+    {
+      "id": "core/inference-and-annotations/existential-root",
+      "name": "existential root",
+      "family": "core/inference-and-annotations"
+    },
+    {
+      "id": "core/inference-and-annotations/existential-annotation-shares-both-sides",
+      "name": "existential annotation shares both sides",
+      "family": "core/inference-and-annotations"
+    },
+    {
+      "id": "core/inference-and-annotations/alias-bounds-normalized-before-xmlf",
+      "name": "alias bounds normalized before xMLF",
+      "family": "core/inference-and-annotations"
+    },
+    {
+      "id": "core/inference-and-annotations/inert-bounds-inlined",
+      "name": "inert bounds inlined",
+      "family": "core/inference-and-annotations"
+    },
+    {
+      "id": "core/inference-and-annotations/unused-bounds-disappear",
+      "name": "unused bounds disappear",
+      "family": "core/inference-and-annotations"
+    },
+    {
+      "id": "core/inference-and-annotations/forall-a-a-equivalent-to-its-bound",
+      "name": "forall a.a equivalent to its bound",
+      "family": "core/inference-and-annotations"
+    },
+    {
+      "id": "core/inference-and-annotations/annotation-alpha-renaming",
+      "name": "annotation alpha-renaming",
+      "family": "core/inference-and-annotations"
+    },
+    {
+      "id": "core/inference-and-annotations/parameterized-type-constructor",
+      "name": "parameterized type constructor",
+      "family": "core/inference-and-annotations"
+    },
+    {
+      "id": "core/inference-and-annotations/rigid-polymorphic-bound",
+      "name": "rigid polymorphic bound",
+      "family": "core/inference-and-annotations"
+    },
+    {
+      "id": "core/inference-and-annotations/multiple-quantified-variables",
+      "name": "multiple quantified variables",
+      "family": "core/inference-and-annotations"
+    },
+    {
+      "id": "core/inference-and-annotations/shared-type-has-independent-lexical-binders",
+      "name": "shared type has independent lexical binders",
+      "family": "core/inference-and-annotations"
+    },
+    {
+      "id": "core/inference-and-annotations/arbitrary-rank-annotation",
+      "name": "arbitrary-rank annotation",
+      "family": "core/inference-and-annotations"
+    },
+    {
+      "id": "core/inference-and-annotations/unannotated-self-application",
+      "name": "unannotated self-application",
+      "family": "core/inference-and-annotations"
+    },
+    {
+      "id": "core/inference-and-annotations/inconsistent-monomorphic-argument",
+      "name": "inconsistent monomorphic argument",
+      "family": "core/inference-and-annotations"
+    },
+    {
+      "id": "core/inference-and-annotations/integer-is-not-a-function",
+      "name": "integer is not a function",
+      "family": "core/inference-and-annotations"
+    },
+    {
+      "id": "core/inference-and-annotations/cannot-satisfy-universal-identity-with-an-integer-result",
+      "name": "cannot satisfy universal identity with an integer result",
+      "family": "core/inference-and-annotations"
+    },
+    {
+      "id": "core/inference-and-annotations/distinct-skolems-cannot-merge",
+      "name": "distinct skolems cannot merge",
+      "family": "core/inference-and-annotations"
+    },
+    {
+      "id": "core/inference-and-annotations/wrong-closed-annotation",
+      "name": "wrong closed annotation",
+      "family": "core/inference-and-annotations"
+    },
+    {
+      "id": "core/inference-and-annotations/cannot-invent-a-polymorphic-value",
+      "name": "cannot invent a polymorphic value",
+      "family": "core/inference-and-annotations"
+    },
+    {
+      "id": "core/inference-and-annotations/free-source-variable",
+      "name": "free source variable",
+      "family": "core/inference-and-annotations"
+    },
+    {
+      "id": "core/inference-and-annotations/recursive-let-is-not-implicit",
+      "name": "recursive let is not implicit",
+      "family": "core/inference-and-annotations"
+    },
+    {
+      "id": "core/inference-and-annotations/type-annotation-has-a-free-variable",
+      "name": "type annotation has a free variable",
+      "family": "core/inference-and-annotations"
+    },
+    {
+      "id": "core/inference-and-annotations/constructor-arity",
+      "name": "constructor arity",
+      "family": "core/inference-and-annotations"
+    },
+    {
+      "id": "core/inference-and-annotations/trailing-input-is-rejected",
+      "name": "trailing input is rejected",
+      "family": "core/inference-and-annotations"
+    },
+    {
+      "id": "core/inference-and-annotations/parser-handles-nested-comments",
+      "name": "parser handles nested comments",
+      "family": "core/inference-and-annotations"
+    },
+    {
+      "id": "core/inference-and-annotations/generated-computations-are-necessary",
+      "name": "generated computations are necessary",
+      "family": "core/inference-and-annotations"
+    },
+    {
+      "id": "core/type-computations/inst-reflex",
+      "name": "Inst-Reflex",
+      "family": "core/type-computations"
+    },
+    {
+      "id": "core/type-computations/inst-bot",
+      "name": "Inst-Bot",
+      "family": "core/type-computations"
+    },
+    {
+      "id": "core/type-computations/inst-hyp",
+      "name": "Inst-Hyp",
+      "family": "core/type-computations"
+    },
+    {
+      "id": "core/type-computations/inst-inner",
+      "name": "Inst-Inner",
+      "family": "core/type-computations"
+    },
+    {
+      "id": "core/type-computations/inst-outer",
+      "name": "Inst-Outer",
+      "family": "core/type-computations"
+    },
+    {
+      "id": "core/type-computations/inst-quant-elim",
+      "name": "Inst-Quant-Elim",
+      "family": "core/type-computations"
+    },
+    {
+      "id": "core/type-computations/inst-quant-intro",
+      "name": "Inst-Quant-Intro",
+      "family": "core/type-computations"
+    },
+    {
+      "id": "core/type-computations/inst-trans-system-f-application",
+      "name": "Inst-Trans / System F application",
+      "family": "core/type-computations"
+    },
+    {
+      "id": "core/type-computations/outer-alpha-conversion",
+      "name": "outer alpha conversion",
+      "family": "core/type-computations"
+    },
+    {
+      "id": "core/type-computations/inst-hyp-checks-its-bound",
+      "name": "Inst-Hyp checks its bound",
+      "family": "core/type-computations"
+    },
+    {
+      "id": "core/type-computations/inst-hyp-requires-a-binding",
+      "name": "Inst-Hyp requires a binding",
+      "family": "core/type-computations"
+    },
+    {
+      "id": "core/type-computations/inst-bot-requires-bottom-source",
+      "name": "Inst-Bot requires bottom source",
+      "family": "core/type-computations"
+    },
+    {
+      "id": "core/type-computations/elimination-requires-a-quantifier",
+      "name": "elimination requires a quantifier",
+      "family": "core/type-computations"
+    },
+    {
+      "id": "core/type-computations/inner-does-not-cross-arrows",
+      "name": "inner does not cross arrows",
+      "family": "core/type-computations"
+    },
+    {
+      "id": "core/type-computations/introduction-cannot-capture",
+      "name": "introduction cannot capture",
+      "family": "core/type-computations"
+    },
+    {
+      "id": "core/type-computations/outer-cannot-capture",
+      "name": "outer cannot capture",
+      "family": "core/type-computations"
+    },
+    {
+      "id": "core/type-computations/cyclic-environments-rejected",
+      "name": "cyclic environments rejected",
+      "family": "core/type-computations"
+    },
+    {
+      "id": "core/type-computations/malformed-term-environment-rejected",
+      "name": "malformed term environment rejected",
+      "family": "core/type-computations"
+    },
+    {
+      "id": "core/binding-hygiene/capture-avoiding-substitution",
+      "name": "capture-avoiding substitution",
+      "family": "core/binding-hygiene"
+    },
+    {
+      "id": "core/binding-hygiene/quantifier-does-not-scope-over-its-own-bound",
+      "name": "quantifier does not scope over its own bound",
+      "family": "core/binding-hygiene"
+    },
+    {
+      "id": "core/binding-hygiene/alpha-equivalence-tracks-shadowing",
+      "name": "alpha-equivalence tracks shadowing",
+      "family": "core/binding-hygiene"
+    },
+    {
+      "id": "core/binding-hygiene/type-quantifiers-have-lexical-scope",
+      "name": "type quantifiers have lexical scope",
+      "family": "core/binding-hygiene"
+    },
+    {
+      "id": "core/binding-hygiene/xmlf-does-not-identify-inert-or-alias-bounds",
+      "name": "xMLF does not identify inert or alias bounds",
+      "family": "core/binding-hygiene"
+    },
+    {
+      "id": "core/graph-expansion/recursive-exports-preserve-scoped-identities-and-independent-copies",
+      "name": "recursive exports preserve scoped identities and independent copies",
+      "family": "core/graph-expansion"
+    },
+    {
+      "id": "core/graph-expansion/expansion-resets-scheme-flag-and-binding",
+      "name": "expansion resets scheme flag and binding",
+      "family": "core/graph-expansion"
+    },
+    {
+      "id": "core/graph-expansion/all-inert-nodes-normalized",
+      "name": "all inert nodes normalized",
+      "family": "core/graph-expansion"
+    },
+    {
+      "id": "core/graph-expansion/well-domination-enforced",
+      "name": "well-domination enforced",
+      "family": "core/graph-expansion"
+    },
+    {
+      "id": "core/graph-validation/graph-validation-agrees-with-uncached-reference",
+      "name": "graph validation agrees with uncached reference",
+      "family": "core/graph-validation"
+    },
+    {
+      "id": "core/graph-validation/graph-validation-checks-deeply-nested-binding-scopes",
+      "name": "graph validation checks deeply nested binding scopes",
+      "family": "core/graph-validation"
+    },
+    {
+      "id": "core/graph-validation/graph-validation-checks-shared-higher-kinded-subgraphs",
+      "name": "graph validation checks shared higher-kinded subgraphs",
+      "family": "core/graph-validation"
+    },
+    {
+      "id": "core/graph-unification/indexed-unification-and-identity-renaming-agree-with-map-based-reference",
+      "name": "indexed unification and identity renaming agree with map-based reference",
+      "family": "core/graph-unification"
+    },
+    {
+      "id": "core/graph-unification/indexed-unification-agrees-on-successive-scoped-expansions",
+      "name": "indexed unification agrees on successive scoped expansions",
+      "family": "core/graph-unification"
+    },
+    {
+      "id": "core/graph-unification/dependency-traversal-rejects-structural-cycles-created-by-merging",
+      "name": "dependency traversal rejects structural cycles created by merging",
+      "family": "core/graph-unification"
+    },
+    {
+      "id": "core/graph-solver/component-solver-matches-every-full-graph-inference-step",
+      "name": "component solver matches every full-graph inference step",
+      "family": "core/graph-solver"
+    },
+    {
+      "id": "core/graph-solver/component-witnesses-preserve-separate-frontier-solving-and-identities",
+      "name": "component witnesses preserve separate frontier solving and identities",
+      "family": "core/graph-solver"
+    },
+    {
+      "id": "core/graph-solver/component-solver-includes-incoming-references-and-protected-siblings",
+      "name": "component solver includes incoming references and protected siblings",
+      "family": "core/graph-solver"
+    },
+    {
+      "id": "core/graph-solver/component-solver-rejects-malformed-disconnected-input",
+      "name": "component solver rejects malformed disconnected input",
+      "family": "core/graph-solver"
+    },
+    {
+      "id": "core/graph-solver/component-solver-preserves-deep-branching-scopes-and-separate-type-components",
+      "name": "component solver preserves deep branching scopes and separate type components",
+      "family": "core/graph-solver"
+    },
+    {
+      "id": "core/graph-solver/expansion-preserves-the-exact-fresh-identity-budget-across-word-boundaries",
+      "name": "expansion preserves the exact fresh identity budget across word boundaries",
+      "family": "core/graph-solver"
+    },
+    {
+      "id": "core/graph-solver/closed-instance-optimization-preserves-all-original-schemes",
+      "name": "closed-instance optimization preserves all original schemes",
+      "family": "core/graph-solver"
+    },
+    {
+      "id": "core/graph-solver/closed-instance-matching-checks-repeated-rigid-and-frontier-variables",
+      "name": "closed-instance matching checks repeated, rigid and frontier variables",
+      "family": "core/graph-solver"
+    },
+    {
+      "id": "core/embedding-pruning/embedding-pruning-preserves-identities-and-values-over-allocation-histories",
+      "name": "embedding pruning preserves identities and values over allocation histories",
+      "family": "core/embedding-pruning"
+    },
+    {
+      "id": "core/embedding-pruning/embedding-pruning-preserves-old-updates-aliases-and-allocation-gaps",
+      "name": "embedding pruning preserves old updates, aliases and allocation gaps",
+      "family": "core/embedding-pruning"
+    },
+    {
+      "id": "core/embedding-pruning/embedding-pruning-preserves-source-bound-and-existential-semantics",
+      "name": "embedding pruning preserves source bound and existential semantics",
+      "family": "core/embedding-pruning"
+    },
+    {
+      "id": "core/datatypes/data-nullary-constructor",
+      "name": "data: nullary constructor",
+      "family": "core/datatypes"
+    },
+    {
+      "id": "core/datatypes/data-polymorphic-nullary-constructor",
+      "name": "data: polymorphic nullary constructor",
+      "family": "core/datatypes"
+    },
+    {
+      "id": "core/datatypes/data-constructor-is-a-first-class-function",
+      "name": "data: constructor is a first-class function",
+      "family": "core/datatypes"
+    },
+    {
+      "id": "core/datatypes/data-constructor-application",
+      "name": "data: constructor application",
+      "family": "core/datatypes"
+    },
+    {
+      "id": "core/datatypes/data-partial-constructor-application",
+      "name": "data: partial constructor application",
+      "family": "core/datatypes"
+    },
+    {
+      "id": "core/datatypes/data-multiple-parameters",
+      "name": "data: multiple parameters",
+      "family": "core/datatypes"
+    },
+    {
+      "id": "core/datatypes/data-let-bound-constructor-has-independent-instances",
+      "name": "data: let-bound constructor has independent instances",
+      "family": "core/datatypes"
+    },
+    {
+      "id": "core/datatypes/data-phantom-parameter",
+      "name": "data: phantom parameter",
+      "family": "core/datatypes"
+    },
+    {
+      "id": "core/datatypes/data-exhaustive-case",
+      "name": "data: exhaustive case",
+      "family": "core/datatypes"
+    },
+    {
+      "id": "core/datatypes/data-nested-patterns",
+      "name": "data: nested patterns",
+      "family": "core/datatypes"
+    },
+    {
+      "id": "core/datatypes/data-reordered-alternatives",
+      "name": "data: reordered alternatives",
+      "family": "core/datatypes"
+    },
+    {
+      "id": "core/datatypes/data-case-constrains-scrutinee",
+      "name": "data: case constrains scrutinee",
+      "family": "core/datatypes"
+    },
+    {
+      "id": "core/datatypes/data-case-returns-its-polymorphic-scrutinee",
+      "name": "data: case returns its polymorphic scrutinee",
+      "family": "core/datatypes"
+    },
+    {
+      "id": "core/datatypes/data-case-rebuilds-polymorphic-data",
+      "name": "data: case rebuilds polymorphic data",
+      "family": "core/datatypes"
+    },
+    {
+      "id": "core/datatypes/data-case-generalizes-an-unconstrained-result",
+      "name": "data: case generalizes an unconstrained result",
+      "family": "core/datatypes"
+    },
+    {
+      "id": "core/datatypes/data-case-retains-an-mlf-result-bound",
+      "name": "data: case retains an MLF result bound",
+      "family": "core/datatypes"
+    },
+    {
+      "id": "core/datatypes/data-generalized-case-function",
+      "name": "data: generalized case function",
+      "family": "core/datatypes"
+    },
+    {
+      "id": "core/datatypes/data-pattern-field-order",
+      "name": "data: pattern field order",
+      "family": "core/datatypes"
+    },
+    {
+      "id": "core/datatypes/data-wildcard-field",
+      "name": "data: wildcard field",
+      "family": "core/datatypes"
+    },
+    {
+      "id": "core/datatypes/data-multiple-wildcard-fields",
+      "name": "data: multiple wildcard fields",
+      "family": "core/datatypes"
+    },
+    {
+      "id": "core/datatypes/data-wildcard-alternative",
+      "name": "data: wildcard alternative",
+      "family": "core/datatypes"
+    },
+    {
+      "id": "core/datatypes/data-variable-alternative-and-nested-case",
+      "name": "data: variable alternative and nested case",
+      "family": "core/datatypes"
+    },
+    {
+      "id": "core/datatypes/data-wildcard-only-case",
+      "name": "data: wildcard-only case",
+      "family": "core/datatypes"
+    },
+    {
+      "id": "core/datatypes/data-variable-only-case",
+      "name": "data: variable-only case",
+      "family": "core/datatypes"
+    },
+    {
+      "id": "core/datatypes/data-pattern-shadows-outer-variable",
+      "name": "data: pattern shadows outer variable",
+      "family": "core/datatypes"
+    },
+    {
+      "id": "core/datatypes/data-recursive-list",
+      "name": "data: recursive list",
+      "family": "core/datatypes"
+    },
+    {
+      "id": "core/datatypes/data-recursive-list-deconstruction",
+      "name": "data: recursive list deconstruction",
+      "family": "core/datatypes"
+    },
+    {
+      "id": "core/datatypes/data-recursive-tree",
+      "name": "data: recursive tree",
+      "family": "core/datatypes"
+    },
+    {
+      "id": "core/datatypes/data-mutually-recursive-declarations",
+      "name": "data: mutually recursive declarations",
+      "family": "core/datatypes"
+    },
+    {
+      "id": "core/datatypes/data-non-regular-recursive-declaration",
+      "name": "data: non-regular recursive declaration",
+      "family": "core/datatypes"
+    },
+    {
+      "id": "core/datatypes/data-function-field",
+      "name": "data: function field",
+      "family": "core/datatypes"
+    },
+    {
+      "id": "core/datatypes/data-polymorphic-type-argument",
+      "name": "data: polymorphic type argument",
+      "family": "core/datatypes"
+    },
+    {
+      "id": "core/datatypes/data-polymorphic-case-result",
+      "name": "data: polymorphic case result",
+      "family": "core/datatypes"
+    },
+    {
+      "id": "core/datatypes/data-polymorphic-field-used-with-an-explicit-annotation",
+      "name": "data: polymorphic field used with an explicit annotation",
+      "family": "core/datatypes"
+    },
+    {
+      "id": "core/datatypes/data-declaration-parameter-is-not-a-target-keyword",
+      "name": "data: declaration parameter is not a target keyword",
+      "family": "core/datatypes"
+    },
+    {
+      "id": "core/datatypes/data-explicitly-polymorphic-field",
+      "name": "data: explicitly polymorphic field",
+      "family": "core/datatypes"
+    },
+    {
+      "id": "core/datatypes/data-unknown-constructor",
+      "name": "data: unknown constructor",
+      "family": "core/datatypes"
+    },
+    {
+      "id": "core/datatypes/data-wrong-field-type",
+      "name": "data: wrong field type",
+      "family": "core/datatypes"
+    },
+    {
+      "id": "core/datatypes/data-pattern-fields-are-not-implicitly-generalized",
+      "name": "data: pattern fields are not implicitly generalized",
+      "family": "core/datatypes"
+    },
+    {
+      "id": "core/datatypes/data-overapplied-nullary-constructor",
+      "name": "data: overapplied nullary constructor",
+      "family": "core/datatypes"
+    },
+    {
+      "id": "core/datatypes/data-wrong-scrutinee-type",
+      "name": "data: wrong scrutinee type",
+      "family": "core/datatypes"
+    },
+    {
+      "id": "core/datatypes/data-inconsistent-branch-results",
+      "name": "data: inconsistent branch results",
+      "family": "core/datatypes"
+    },
+    {
+      "id": "core/datatypes/data-non-exhaustive-case",
+      "name": "data: non-exhaustive case",
+      "family": "core/datatypes"
+    },
+    {
+      "id": "core/datatypes/data-too-few-pattern-fields",
+      "name": "data: too few pattern fields",
+      "family": "core/datatypes"
+    },
+    {
+      "id": "core/datatypes/data-too-many-pattern-fields",
+      "name": "data: too many pattern fields",
+      "family": "core/datatypes"
+    },
+    {
+      "id": "core/datatypes/data-duplicate-constructor-alternative",
+      "name": "data: duplicate constructor alternative",
+      "family": "core/datatypes"
+    },
+    {
+      "id": "core/datatypes/data-mixed-datatype-alternatives",
+      "name": "data: mixed datatype alternatives",
+      "family": "core/datatypes"
+    },
+    {
+      "id": "core/datatypes/data-default-must-be-last",
+      "name": "data: default must be last",
+      "family": "core/datatypes"
+    },
+    {
+      "id": "core/datatypes/data-duplicate-pattern-variable",
+      "name": "data: duplicate pattern variable",
+      "family": "core/datatypes"
+    },
+    {
+      "id": "core/datatypes/data-pattern-variables-do-not-escape",
+      "name": "data: pattern variables do not escape",
+      "family": "core/datatypes"
+    },
+    {
+      "id": "core/datatypes/data-pattern-variable-unavailable-in-sibling-branch",
+      "name": "data: pattern variable unavailable in sibling branch",
+      "family": "core/datatypes"
+    },
+    {
+      "id": "core/datatypes/data-duplicate-datatype",
+      "name": "data: duplicate datatype",
+      "family": "core/datatypes"
+    },
+    {
+      "id": "core/datatypes/data-duplicate-constructor-across-datatypes",
+      "name": "data: duplicate constructor across datatypes",
+      "family": "core/datatypes"
+    },
+    {
+      "id": "core/datatypes/data-duplicate-constructor-within-datatype",
+      "name": "data: duplicate constructor within datatype",
+      "family": "core/datatypes"
+    },
+    {
+      "id": "core/datatypes/data-duplicate-type-parameter",
+      "name": "data: duplicate type parameter",
+      "family": "core/datatypes"
+    },
+    {
+      "id": "core/datatypes/data-free-field-type-parameter",
+      "name": "data: free field type parameter",
+      "family": "core/datatypes"
+    },
+    {
+      "id": "core/datatypes/data-unknown-field-type",
+      "name": "data: unknown field type",
+      "family": "core/datatypes"
+    },
+    {
+      "id": "core/datatypes/data-recursive-type-arity",
+      "name": "data: recursive type arity",
+      "family": "core/datatypes"
+    },
+    {
+      "id": "core/datatypes/data-declared-annotation-arity",
+      "name": "data: declared annotation arity",
+      "family": "core/datatypes"
+    },
+    {
+      "id": "core/datatypes/data-primitive-type-redefinition",
+      "name": "data: primitive type redefinition",
+      "family": "core/datatypes"
+    },
+    {
+      "id": "core/datatypes/data-reserved-datatype-name",
+      "name": "data: reserved datatype name",
+      "family": "core/datatypes"
+    },
+    {
+      "id": "core/datatypes/data-primitive-constructor-redefinition",
+      "name": "data: primitive constructor redefinition",
+      "family": "core/datatypes"
+    },
+    {
+      "id": "core/datatypes/data-declaration-and-case-parse-tree",
+      "name": "data: declaration and case parse tree",
+      "family": "core/datatypes"
+    },
+    {
+      "id": "core/datatypes/data-empty-declaration-rejected-by-ast-api",
+      "name": "data: empty declaration rejected by AST API",
+      "family": "core/datatypes"
+    },
+    {
+      "id": "core/datatypes/data-constructor-and-case-erasure",
+      "name": "data: constructor and case erasure",
+      "family": "core/datatypes"
+    },
+    {
+      "id": "core/datatypes/data-target-independent-constructor-and-case-typing",
+      "name": "data target: independent constructor and case typing",
+      "family": "core/datatypes"
+    },
+    {
+      "id": "core/datatypes/data-target-unknown-constructor",
+      "name": "data target: unknown constructor",
+      "family": "core/datatypes"
+    },
+    {
+      "id": "core/datatypes/data-target-constructor-type-argument-count",
+      "name": "data target: constructor type argument count",
+      "family": "core/datatypes"
+    },
+    {
+      "id": "core/datatypes/data-target-constructor-type-argument-is-well-formed",
+      "name": "data target: constructor type argument is well formed",
+      "family": "core/datatypes"
+    },
+    {
+      "id": "core/datatypes/data-target-constructor-field-type",
+      "name": "data target: constructor field type",
+      "family": "core/datatypes"
+    },
+    {
+      "id": "core/datatypes/data-target-non-exhaustive-case",
+      "name": "data target: non-exhaustive case",
+      "family": "core/datatypes"
+    },
+    {
+      "id": "core/datatypes/data-target-empty-case",
+      "name": "data target: empty case",
+      "family": "core/datatypes"
+    },
+    {
+      "id": "core/datatypes/data-target-case-result-type",
+      "name": "data target: case result type",
+      "family": "core/datatypes"
+    },
+    {
+      "id": "core/datatypes/data-target-case-scrutinee-type",
+      "name": "data target: case scrutinee type",
+      "family": "core/datatypes"
+    },
+    {
+      "id": "core/datatypes/data-target-pattern-field-count",
+      "name": "data target: pattern field count",
+      "family": "core/datatypes"
+    },
+    {
+      "id": "core/datatypes/data-target-repeated-alternative",
+      "name": "data target: repeated alternative",
+      "family": "core/datatypes"
+    },
+    {
+      "id": "core/datatypes/data-target-pattern-binder-freshness",
+      "name": "data target: pattern binder freshness",
+      "family": "core/datatypes"
+    },
+    {
+      "id": "core/datatypes/data-target-pattern-scope",
+      "name": "data target: pattern scope",
+      "family": "core/datatypes"
+    },
+    {
+      "id": "core/datatypes/data-target-declared-arity-in-an-annotation",
+      "name": "data target: declared arity in an annotation",
+      "family": "core/datatypes"
+    },
+    {
+      "id": "core/datatypes/data-target-declared-arity-inside-a-type-computation",
+      "name": "data target: declared arity inside a type computation",
+      "family": "core/datatypes"
+    },
+    {
+      "id": "core/datatypes/data-target-invalid-declaration",
+      "name": "data target: invalid declaration",
+      "family": "core/datatypes"
+    },
+    {
+      "id": "core/datatypes/data-target-nested-declaration-scope",
+      "name": "data target: nested declaration scope",
+      "family": "core/datatypes"
+    },
+    {
+      "id": "core/datatypes/data-syntax-declaration-separator-required",
+      "name": "data syntax: declaration separator required",
+      "family": "core/datatypes"
+    },
+    {
+      "id": "core/datatypes/data-syntax-lowercase-constructor",
+      "name": "data syntax: lowercase constructor",
+      "family": "core/datatypes"
+    },
+    {
+      "id": "core/datatypes/data-syntax-empty-case",
+      "name": "data syntax: empty case",
+      "family": "core/datatypes"
+    },
+    {
+      "id": "core/datatypes/data-syntax-wildcard-token-boundary",
+      "name": "data syntax: wildcard token boundary",
+      "family": "core/datatypes"
+    },
+    {
+      "id": "core/typeclasses/class-concrete-method",
+      "name": "class: concrete method",
+      "family": "core/typeclasses"
+    },
+    {
+      "id": "core/typeclasses/class-inferred-constrained-let-at-distinct-instances",
+      "name": "class: inferred constrained let at distinct instances",
+      "family": "core/typeclasses"
+    },
+    {
+      "id": "core/typeclasses/class-implicit-method-quantification",
+      "name": "class: implicit method quantification",
+      "family": "core/typeclasses"
+    },
+    {
+      "id": "core/typeclasses/class-explicit-qualified-function",
+      "name": "class: explicit qualified function",
+      "family": "core/typeclasses"
+    },
+    {
+      "id": "core/typeclasses/class-qualified-expression-in-function-position",
+      "name": "class: qualified expression in function position",
+      "family": "core/typeclasses"
+    },
+    {
+      "id": "core/typeclasses/class-qualified-function-parameter",
+      "name": "class: qualified function parameter",
+      "family": "core/typeclasses"
+    },
+    {
+      "id": "core/typeclasses/class-two-givens-of-the-same-class",
+      "name": "class: two givens of the same class",
+      "family": "core/typeclasses"
+    },
+    {
+      "id": "core/typeclasses/class-concrete-call-inside-a-generic-constraint",
+      "name": "class: concrete call inside a generic constraint",
+      "family": "core/typeclasses"
+    },
+    {
+      "id": "core/typeclasses/class-lambda-shadows-method",
+      "name": "class: lambda shadows method",
+      "family": "core/typeclasses"
+    },
+    {
+      "id": "core/typeclasses/class-let-shadows-method",
+      "name": "class: let shadows method",
+      "family": "core/typeclasses"
+    },
+    {
+      "id": "core/typeclasses/class-pattern-shadows-method",
+      "name": "class: pattern shadows method",
+      "family": "core/typeclasses"
+    },
+    {
+      "id": "core/typeclasses/class-higher-kinded-method",
+      "name": "class: higher-kinded method",
+      "family": "core/typeclasses"
+    },
+    {
+      "id": "core/typeclasses/class-partial-type-constructor-instance",
+      "name": "class: partial type constructor instance",
+      "family": "core/typeclasses"
+    },
+    {
+      "id": "core/typeclasses/class-instance-definitions-are-order-independent",
+      "name": "class: instance definitions are order independent",
+      "family": "core/typeclasses"
+    },
+    {
+      "id": "core/typeclasses/class-superclass-given-without-concrete-instances",
+      "name": "class: superclass given without concrete instances",
+      "family": "core/typeclasses"
+    },
+    {
+      "id": "core/typeclasses/class-mutually-recursive-methods",
+      "name": "class: mutually recursive methods",
+      "family": "core/typeclasses"
+    },
+    {
+      "id": "core/typeclasses/class-higher-kinded-datatype-application",
+      "name": "class: higher-kinded datatype application",
+      "family": "core/typeclasses"
+    },
+    {
+      "id": "core/typeclasses/class-higher-kinded-annotation",
+      "name": "class: higher-kinded annotation",
+      "family": "core/typeclasses"
+    },
+    {
+      "id": "core/typeclasses/class-monad-hierarchy-example",
+      "name": "class: Monad hierarchy example",
+      "family": "core/typeclasses"
+    },
+    {
+      "id": "core/typeclasses/class-contextual-recursive-instance-example",
+      "name": "class: contextual recursive instance example",
+      "family": "core/typeclasses"
+    },
+    {
+      "id": "core/typeclasses/class-qualified-result-is-displayed-using-its-class-name",
+      "name": "class: qualified result is displayed using its class name",
+      "family": "core/typeclasses"
+    },
+    {
+      "id": "core/typeclasses/class-rejection-missing-concrete-instance",
+      "name": "class rejection: missing concrete instance",
+      "family": "core/typeclasses"
+    },
+    {
+      "id": "core/typeclasses/class-rejection-does-not-pick-the-only-instance-for-an-unknown-type",
+      "name": "class rejection: does not pick the only instance for an unknown type",
+      "family": "core/typeclasses"
+    },
+    {
+      "id": "core/typeclasses/class-rejection-wrong-instance-body",
+      "name": "class rejection: wrong instance body",
+      "family": "core/typeclasses"
+    },
+    {
+      "id": "core/typeclasses/class-rejection-method-body-is-checked-polymorphically",
+      "name": "class rejection: method body is checked polymorphically",
+      "family": "core/typeclasses"
+    },
+    {
+      "id": "core/typeclasses/class-rejection-missing-method",
+      "name": "class rejection: missing method",
+      "family": "core/typeclasses"
+    },
+    {
+      "id": "core/typeclasses/class-rejection-extra-method",
+      "name": "class rejection: extra method",
+      "family": "core/typeclasses"
+    },
+    {
+      "id": "core/typeclasses/class-rejection-duplicate-method-implementation",
+      "name": "class rejection: duplicate method implementation",
+      "family": "core/typeclasses"
+    },
+    {
+      "id": "core/typeclasses/class-rejection-duplicate-class",
+      "name": "class rejection: duplicate class",
+      "family": "core/typeclasses"
+    },
+    {
+      "id": "core/typeclasses/class-rejection-methods-share-a-global-namespace",
+      "name": "class rejection: methods share a global namespace",
+      "family": "core/typeclasses"
+    },
+    {
+      "id": "core/typeclasses/class-rejection-method-must-mention-its-class-parameter",
+      "name": "class rejection: method must mention its class parameter",
+      "family": "core/typeclasses"
+    },
+    {
+      "id": "core/typeclasses/class-rejection-unknown-class",
+      "name": "class rejection: unknown class",
+      "family": "core/typeclasses"
+    },
+    {
+      "id": "core/typeclasses/class-rejection-duplicate-instance",
+      "name": "class rejection: duplicate instance",
+      "family": "core/typeclasses"
+    },
+    {
+      "id": "core/typeclasses/class-rejection-overlapping-generic-and-concrete-instances",
+      "name": "class rejection: overlapping generic and concrete instances",
+      "family": "core/typeclasses"
+    },
+    {
+      "id": "core/typeclasses/class-rejection-variable-instance-head",
+      "name": "class rejection: variable instance head",
+      "family": "core/typeclasses"
+    },
+    {
+      "id": "core/typeclasses/class-rejection-nondecreasing-instance-context",
+      "name": "class rejection: nondecreasing instance context",
+      "family": "core/typeclasses"
+    },
+    {
+      "id": "core/typeclasses/class-rejection-instance-context-variable-absent-from-head",
+      "name": "class rejection: instance context variable absent from head",
+      "family": "core/typeclasses"
+    },
+    {
+      "id": "core/typeclasses/class-rejection-cyclic-superclasses",
+      "name": "class rejection: cyclic superclasses",
+      "family": "core/typeclasses"
+    },
+    {
+      "id": "core/typeclasses/class-rejection-missing-superclass-instance",
+      "name": "class rejection: missing superclass instance",
+      "family": "core/typeclasses"
+    },
+    {
+      "id": "core/typeclasses/class-rejection-class-instance-kind",
+      "name": "class rejection: class instance kind",
+      "family": "core/typeclasses"
+    },
+    {
+      "id": "core/typeclasses/class-rejection-class-context-kind",
+      "name": "class rejection: class context kind",
+      "family": "core/typeclasses"
+    },
+    {
+      "id": "core/typeclasses/class-rejection-higher-kinded-argument-must-have-the-declared-kind",
+      "name": "class rejection: higher-kinded argument must have the declared kind",
+      "family": "core/typeclasses"
+    },
+    {
+      "id": "core/typeclasses/class-rejection-ordinary-type-variable-cannot-be-applied",
+      "name": "class rejection: ordinary type variable cannot be applied",
+      "family": "core/typeclasses"
+    },
+    {
+      "id": "core/typeclasses/class-rejection-method-constraints-require-supported-signatures",
+      "name": "class rejection: method constraints require supported signatures",
+      "family": "core/typeclasses"
+    },
+    {
+      "id": "core/typeclasses/class-target-recursive-dictionary-body-has-wrong-declared-type",
+      "name": "class target: recursive dictionary body has wrong declared type",
+      "family": "core/typeclasses"
+    },
+    {
+      "id": "core/typeclasses/class-target-recursive-binders-must-be-unique",
+      "name": "class target: recursive binders must be unique",
+      "family": "core/typeclasses"
+    },
+    {
+      "id": "core/typeclasses/class-target-recursive-binding-cannot-reuse-an-outer-binder",
+      "name": "class target: recursive binding cannot reuse an outer binder",
+      "family": "core/typeclasses"
+    },
+    {
+      "id": "core/typeclasses/class-target-term-annotation-has-kind-star",
+      "name": "class target: term annotation has kind star",
+      "family": "core/typeclasses"
+    },
+    {
+      "id": "core/typeclasses/class-target-constructor-checks-the-kind-of-a-type-argument",
+      "name": "class target: constructor checks the kind of a type argument",
+      "family": "core/typeclasses"
+    },
+    {
+      "id": "core/typeclasses/class-target-compact-and-general-application-spines-agree",
+      "name": "class target: compact and general application spines agree",
+      "family": "core/typeclasses"
+    },
+    {
+      "id": "core/typeclasses/class-target-inst-bot-cannot-change-kinds",
+      "name": "class target: Inst-Bot cannot change kinds",
+      "family": "core/typeclasses"
+    },
+    {
+      "id": "core/typeclasses/class-evidence-chooses-the-given-by-its-type",
+      "name": "class evidence: chooses the given by its type",
+      "family": "core/typeclasses"
+    },
+    {
+      "id": "core/typeclasses/class-two-parameters",
+      "name": "class: two parameters",
+      "family": "core/typeclasses"
+    },
+    {
+      "id": "core/typeclasses/class-instances-with-the-same-first-parameter-are-disjoint",
+      "name": "class: instances with the same first parameter are disjoint",
+      "family": "core/typeclasses"
+    },
+    {
+      "id": "core/typeclasses/class-instances-with-the-same-second-parameter-are-disjoint",
+      "name": "class: instances with the same second parameter are disjoint",
+      "family": "core/typeclasses"
+    },
+    {
+      "id": "core/typeclasses/class-repeated-variables-are-shared-across-instance-arguments",
+      "name": "class: repeated variables are shared across instance arguments",
+      "family": "core/typeclasses"
+    },
+    {
+      "id": "core/typeclasses/class-class-parameter-substitution-is-simultaneous",
+      "name": "class: class parameter substitution is simultaneous",
+      "family": "core/typeclasses"
+    },
+    {
+      "id": "core/typeclasses/class-inferred-multiparameter-constraint",
+      "name": "class: inferred multiparameter constraint",
+      "family": "core/typeclasses"
+    },
+    {
+      "id": "core/typeclasses/class-explicit-multiparameter-constraint",
+      "name": "class: explicit multiparameter constraint",
+      "family": "core/typeclasses"
+    },
+    {
+      "id": "core/typeclasses/class-three-parameters",
+      "name": "class: three parameters",
+      "family": "core/typeclasses"
+    },
+    {
+      "id": "core/typeclasses/class-superclass-can-discard-a-parameter",
+      "name": "class: superclass can discard a parameter",
+      "family": "core/typeclasses"
+    },
+    {
+      "id": "core/typeclasses/class-superclass-can-reorder-parameters",
+      "name": "class: superclass can reorder parameters",
+      "family": "core/typeclasses"
+    },
+    {
+      "id": "core/typeclasses/class-same-class-givens-with-different-second-arguments",
+      "name": "class: same class givens with different second arguments",
+      "family": "core/typeclasses"
+    },
+    {
+      "id": "core/typeclasses/class-recursive-multiparameter-instance-example",
+      "name": "class: recursive multiparameter instance example",
+      "family": "core/typeclasses"
+    },
+    {
+      "id": "core/typeclasses/class-multi-parameter-constraint-display",
+      "name": "class: multi-parameter constraint display",
+      "family": "core/typeclasses"
+    },
+    {
+      "id": "core/typeclasses/class-rejection-instance-is-missing-a-parameter",
+      "name": "class rejection: instance is missing a parameter",
+      "family": "core/typeclasses"
+    },
+    {
+      "id": "core/typeclasses/class-rejection-instance-has-an-extra-parameter",
+      "name": "class rejection: instance has an extra parameter",
+      "family": "core/typeclasses"
+    },
+    {
+      "id": "core/typeclasses/class-rejection-constraint-is-missing-a-parameter",
+      "name": "class rejection: constraint is missing a parameter",
+      "family": "core/typeclasses"
+    },
+    {
+      "id": "core/typeclasses/class-rejection-duplicate-class-parameter",
+      "name": "class rejection: duplicate class parameter",
+      "family": "core/typeclasses"
+    },
+    {
+      "id": "core/typeclasses/class-rejection-method-omits-a-class-parameter",
+      "name": "class rejection: method omits a class parameter",
+      "family": "core/typeclasses"
+    },
+    {
+      "id": "core/typeclasses/class-rejection-does-not-infer-an-output-parameter-from-the-only-instance",
+      "name": "class rejection: does not infer an output parameter from the only instance",
+      "family": "core/typeclasses"
+    },
+    {
+      "id": "core/typeclasses/class-rejection-matches-every-repeated-parameter",
+      "name": "class rejection: matches every repeated parameter",
+      "family": "core/typeclasses"
+    },
+    {
+      "id": "core/typeclasses/class-rejection-overlap-needs-joint-unification-across-parameters",
+      "name": "class rejection: overlap needs joint unification across parameters",
+      "family": "core/typeclasses"
+    },
+    {
+      "id": "core/typeclasses/class-rejection-overlapping-variable-and-concrete-argument",
+      "name": "class rejection: overlapping variable and concrete argument",
+      "family": "core/typeclasses"
+    },
+    {
+      "id": "core/typeclasses/class-rejection-context-must-decrease-across-the-whole-argument-tuple",
+      "name": "class rejection: context must decrease across the whole argument tuple",
+      "family": "core/typeclasses"
+    },
+    {
+      "id": "core/typeclasses/class-rejection-context-cannot-duplicate-a-variable",
+      "name": "class rejection: context cannot duplicate a variable",
+      "family": "core/typeclasses"
+    },
+    {
+      "id": "core/typeclasses/class-rejection-later-parameter-kind-is-checked",
+      "name": "class rejection: later parameter kind is checked",
+      "family": "core/typeclasses"
+    },
+    {
+      "id": "core/typeclasses/class-evidence-superclass-projection-preserves-caller-variable-identities",
+      "name": "class evidence: superclass projection preserves caller variable identities",
+      "family": "core/typeclasses"
+    },
+    {
+      "id": "core/do-notation/do-single-expression",
+      "name": "do: single expression",
+      "family": "core/do-notation"
+    },
+    {
+      "id": "core/do-notation/do-local-let-needs-no-bind",
+      "name": "do: local let needs no bind",
+      "family": "core/do-notation"
+    },
+    {
+      "id": "core/do-notation/do-binding",
+      "name": "do: binding",
+      "family": "core/do-notation"
+    },
+    {
+      "id": "core/do-notation/do-sequencing",
+      "name": "do: sequencing",
+      "family": "core/do-notation"
+    },
+    {
+      "id": "core/do-notation/do-wildcard-binding",
+      "name": "do: wildcard binding",
+      "family": "core/do-notation"
+    },
+    {
+      "id": "core/do-notation/do-optional-trailing-semicolon",
+      "name": "do: optional trailing semicolon",
+      "family": "core/do-notation"
+    },
+    {
+      "id": "core/do-notation/do-nested-blocks",
+      "name": "do: nested blocks",
+      "family": "core/do-notation"
+    },
+    {
+      "id": "core/do-notation/do-bind-statement-sees-the-outer-binding",
+      "name": "do: bind statement sees the outer binding",
+      "family": "core/do-notation"
+    },
+    {
+      "id": "core/do-notation/do-distinct-do-let-binder-sees-the-outer-binding",
+      "name": "do: distinct do-let binder sees the outer binding",
+      "family": "core/do-notation"
+    },
+    {
+      "id": "core/do-notation/do-local-let-is-generalized",
+      "name": "do: local let is generalized",
+      "family": "core/do-notation"
+    },
+    {
+      "id": "core/do-notation/do-local-let-annotation",
+      "name": "do: local let annotation",
+      "family": "core/do-notation"
+    },
+    {
+      "id": "core/do-notation/do-let-in-expression-is-an-action",
+      "name": "do: let-in expression is an action",
+      "family": "core/do-notation"
+    },
+    {
+      "id": "core/do-notation/do-do-expression-used-as-an-argument",
+      "name": "do: do expression used as an argument",
+      "family": "core/do-notation"
+    },
+    {
+      "id": "core/do-notation/do-do-expression-annotation",
+      "name": "do: do expression annotation",
+      "family": "core/do-notation"
+    },
+    {
+      "id": "core/do-notation/do-constructor-pattern",
+      "name": "do: constructor pattern",
+      "family": "core/do-notation"
+    },
+    {
+      "id": "core/do-notation/do-constructor-wildcard-field",
+      "name": "do: constructor wildcard field",
+      "family": "core/do-notation"
+    },
+    {
+      "id": "core/do-notation/do-discarded-action-cannot-capture-an-outer-name",
+      "name": "do: discarded action cannot capture an outer name",
+      "family": "core/do-notation"
+    },
+    {
+      "id": "core/do-notation/do-pattern-temporary-cannot-capture-an-outer-name",
+      "name": "do: pattern temporary cannot capture an outer name",
+      "family": "core/do-notation"
+    },
+    {
+      "id": "core/do-notation/do-explicit-bind-remains-lexical",
+      "name": "do: explicit bind remains lexical",
+      "family": "core/do-notation"
+    },
+    {
+      "id": "core/do-notation/do-rejection-lexical-bind-cannot-intercept-do",
+      "name": "do rejection: lexical bind cannot intercept do",
+      "family": "core/do-notation"
+    },
+    {
+      "id": "core/do-notation/do-rejection-same-name-do-let-is-recursive-not-an-outer-reference",
+      "name": "do rejection: same-name do-let is recursive, not an outer reference",
+      "family": "core/do-notation"
+    },
+    {
+      "id": "core/do-notation/do-annotated-recursive-do-let-keeps-its-own-binding",
+      "name": "do: annotated recursive do-let keeps its own binding",
+      "family": "core/do-notation"
+    },
+    {
+      "id": "core/do-notation/do-rejection-empty-block",
+      "name": "do rejection: empty block",
+      "family": "core/do-notation"
+    },
+    {
+      "id": "core/do-notation/do-rejection-final-statement-must-be-an-expression",
+      "name": "do rejection: final statement must be an expression",
+      "family": "core/do-notation"
+    },
+    {
+      "id": "core/do-notation/do-rejection-cannot-end-with-a-local-declaration",
+      "name": "do rejection: cannot end with a local declaration",
+      "family": "core/do-notation"
+    },
+    {
+      "id": "core/do-notation/do-rejection-statements-need-separators",
+      "name": "do rejection: statements need separators",
+      "family": "core/do-notation"
+    },
+    {
+      "id": "core/do-notation/do-rejection-default-io-bind-requires-an-action",
+      "name": "do rejection: default IO bind requires an action",
+      "family": "core/do-notation"
+    },
+    {
+      "id": "core/do-notation/do-rejection-bound-variable-cannot-escape",
+      "name": "do rejection: bound variable cannot escape",
+      "family": "core/do-notation"
+    },
+    {
+      "id": "core/do-notation/do-rejection-binding-is-not-recursive",
+      "name": "do rejection: binding is not recursive",
+      "family": "core/do-notation"
+    },
+    {
+      "id": "core/do-notation/do-rejection-later-binding-is-unavailable",
+      "name": "do rejection: later binding is unavailable",
+      "family": "core/do-notation"
+    },
+    {
+      "id": "core/do-notation/do-rejection-action-type-mismatch",
+      "name": "do rejection: action type mismatch",
+      "family": "core/do-notation"
+    },
+    {
+      "id": "core/do-notation/do-rejection-final-action-has-the-right-monadic-type",
+      "name": "do rejection: final action has the right monadic type",
+      "family": "core/do-notation"
+    },
+    {
+      "id": "core/do-notation/do-rejection-refutable-pattern-requires-canonical-monadfail",
+      "name": "do rejection: refutable pattern requires canonical MonadFail",
+      "family": "core/do-notation"
+    },
+    {
+      "id": "core/do-notation/do-rejection-pattern-binder-duplicates",
+      "name": "do rejection: pattern binder duplicates",
+      "family": "core/do-notation"
+    },
+    {
+      "id": "core/do-notation/do-parser-preserves-statement-forms",
+      "name": "do: parser preserves statement forms",
+      "family": "core/do-notation"
+    },
+    {
+      "id": "core/do-notation/do-lowering-preserves-binding-order-and-the-final-action",
+      "name": "do: lowering preserves binding order and the final action",
+      "family": "core/do-notation"
+    },
+    {
+      "id": "core/do-notation/do-multiparameter-monadstate-example",
+      "name": "do: multiparameter MonadState example",
+      "family": "core/do-notation"
+    },
+    {
+      "id": "core/surface-syntax/surface-parser-multiplication-binds-above-addition",
+      "name": "surface parser: multiplication binds above addition",
+      "family": "core/surface-syntax"
+    },
+    {
+      "id": "core/surface-syntax/surface-parser-application-binds-above-arithmetic",
+      "name": "surface parser: application binds above arithmetic",
+      "family": "core/surface-syntax"
+    },
+    {
+      "id": "core/surface-syntax/surface-parser-subtraction-associates-left",
+      "name": "surface parser: subtraction associates left",
+      "family": "core/surface-syntax"
+    },
+    {
+      "id": "core/surface-syntax/surface-parser-quotient-and-remainder-associate-left",
+      "name": "surface parser: quotient and remainder associate left",
+      "family": "core/surface-syntax"
+    },
+    {
+      "id": "core/surface-syntax/surface-parser-parentheses-override-precedence",
+      "name": "surface parser: parentheses override precedence",
+      "family": "core/surface-syntax"
+    },
+    {
+      "id": "core/surface-syntax/surface-parser-boolean-precedence",
+      "name": "surface parser: Boolean precedence",
+      "family": "core/surface-syntax"
+    },
+    {
+      "id": "core/surface-syntax/surface-parser-concatenation-associates-right",
+      "name": "surface parser: concatenation associates right",
+      "family": "core/surface-syntax"
+    },
+    {
+      "id": "core/surface-syntax/surface-parser-subtraction-without-spaces-is-not-signed-application",
+      "name": "surface parser: subtraction without spaces is not signed application",
+      "family": "core/surface-syntax"
+    },
+    {
+      "id": "core/surface-syntax/surface-parser-negative-argument-is-parenthesized",
+      "name": "surface parser: negative argument is parenthesized",
+      "family": "core/surface-syntax"
+    },
+    {
+      "id": "core/surface-syntax/surface-parser-unary-minus-applies-after-function-application",
+      "name": "surface parser: unary minus applies after function application",
+      "family": "core/surface-syntax"
+    },
+    {
+      "id": "core/surface-syntax/surface-parser-signed-double-exponent",
+      "name": "surface parser: signed Double exponent",
+      "family": "core/surface-syntax"
+    },
+    {
+      "id": "core/surface-syntax/surface-parser-signed-hexadecimal-integer",
+      "name": "surface parser: signed hexadecimal integer",
+      "family": "core/surface-syntax"
+    },
+    {
+      "id": "core/surface-syntax/surface-parser-plus-sign-and-negative-right-operand",
+      "name": "surface parser: plus sign and negative right operand",
+      "family": "core/surface-syntax"
+    },
+    {
+      "id": "core/surface-syntax/surface-parser-comments-at-operators",
+      "name": "surface parser: comments at operators",
+      "family": "core/surface-syntax"
+    },
+    {
+      "id": "core/surface-syntax/surface-parser-nearest-else",
+      "name": "surface parser: nearest else",
+      "family": "core/surface-syntax"
+    },
+    {
+      "id": "core/surface-syntax/surface-parser-arithmetic-inside-branches",
+      "name": "surface parser: arithmetic inside branches",
+      "family": "core/surface-syntax"
+    },
+    {
+      "id": "core/surface-syntax/surface-parser-control-expression-as-right-operand",
+      "name": "surface parser: control expression as right operand",
+      "family": "core/surface-syntax"
+    },
+    {
+      "id": "core/surface-syntax/surface-parser-annotation-covers-the-infix-expression",
+      "name": "surface parser: annotation covers the infix expression",
+      "family": "core/surface-syntax"
+    },
+    {
+      "id": "core/surface-syntax/surface-parser-local-parameters-lower-to-lambdas",
+      "name": "surface parser: local parameters lower to lambdas",
+      "family": "core/surface-syntax"
+    },
+    {
+      "id": "core/surface-syntax/surface-program-declarations-have-ordered-let-scopes",
+      "name": "surface program: declarations have ordered let scopes",
+      "family": "core/surface-syntax"
+    },
+    {
+      "id": "core/surface-syntax/surface-program-implicit-main-with-trailing-semicolon",
+      "name": "surface program: implicit main with trailing semicolon",
+      "family": "core/surface-syntax"
+    },
+    {
+      "id": "core/surface-syntax/surface-program-implicit-main-without-trailing-semicolon",
+      "name": "surface program: implicit main without trailing semicolon",
+      "family": "core/surface-syntax"
+    },
+    {
+      "id": "core/surface-syntax/surface-program-explicit-entry-overrides-main",
+      "name": "surface program: explicit entry overrides main",
+      "family": "core/surface-syntax"
+    },
+    {
+      "id": "core/surface-syntax/surface-program-separate-signature-covers-the-whole-function",
+      "name": "surface program: separate signature covers the whole function",
+      "family": "core/surface-syntax"
+    },
+    {
+      "id": "core/surface-syntax/surface-checking-declarations-generalize",
+      "name": "surface checking: declarations generalize",
+      "family": "core/surface-syntax"
+    },
+    {
+      "id": "core/surface-syntax/surface-checking-annotated-function-parameter",
+      "name": "surface checking: annotated function parameter",
+      "family": "core/surface-syntax"
+    },
+    {
+      "id": "core/surface-syntax/surface-checking-inline-whole-function-signature",
+      "name": "surface checking: inline whole-function signature",
+      "family": "core/surface-syntax"
+    },
+    {
+      "id": "core/surface-syntax/surface-checking-annotated-local-function",
+      "name": "surface checking: annotated local function",
+      "family": "core/surface-syntax"
+    },
+    {
+      "id": "core/surface-syntax/surface-checking-do-local-function-generalizes",
+      "name": "surface checking: do-local function generalizes",
+      "family": "core/surface-syntax"
+    },
+    {
+      "id": "core/surface-syntax/surface-checking-distinct-do-local-function-sees-outer-binding",
+      "name": "surface checking: distinct do-local function sees outer binding",
+      "family": "core/surface-syntax"
+    },
+    {
+      "id": "core/surface-syntax/surface-checking-conditional-returns-polymorphic-function",
+      "name": "surface checking: conditional returns polymorphic function",
+      "family": "core/surface-syntax"
+    },
+    {
+      "id": "core/surface-syntax/surface-checking-conditional-works-in-a-case-scrutinee",
+      "name": "surface checking: conditional works in a case scrutinee",
+      "family": "core/surface-syntax"
+    },
+    {
+      "id": "core/surface-syntax/surface-checking-keyword-prefixes-remain-identifiers",
+      "name": "surface checking: keyword prefixes remain identifiers",
+      "family": "core/surface-syntax"
+    },
+    {
+      "id": "core/surface-syntax/surface-checking-instance-method-parameters",
+      "name": "surface checking: instance method parameters",
+      "family": "core/surface-syntax"
+    },
+    {
+      "id": "core/surface-syntax/surface-checking-qualified-function-declaration",
+      "name": "surface checking: qualified function declaration",
+      "family": "core/surface-syntax"
+    },
+    {
+      "id": "core/surface-syntax/surface-checking-syntax-needs-no-implicit-prelude",
+      "name": "surface checking: syntax needs no implicit prelude",
+      "family": "core/surface-syntax"
+    },
+    {
+      "id": "core/surface-syntax/surface-checking-same-name-do-local-function-is-recursive",
+      "name": "surface checking: same-name do-local function is recursive",
+      "family": "core/surface-syntax"
+    },
+    {
+      "id": "core/surface-syntax/surface-checking-unsigned-recursion-infers-bottom",
+      "name": "surface checking: unsigned recursion infers bottom",
+      "family": "core/surface-syntax"
+    },
+    {
+      "id": "core/surface-syntax/surface-checking-forward-value-references",
+      "name": "surface checking: forward value references",
+      "family": "core/surface-syntax"
+    },
+    {
+      "id": "core/surface-syntax/surface-rejection-branch-types-must-agree",
+      "name": "surface rejection: branch types must agree",
+      "family": "core/surface-syntax"
+    },
+    {
+      "id": "core/surface-syntax/surface-rejection-condition-must-be-bool",
+      "name": "surface rejection: condition must be Bool",
+      "family": "core/surface-syntax"
+    },
+    {
+      "id": "core/surface-syntax/surface-rejection-arithmetic-does-not-overload-double",
+      "name": "surface rejection: arithmetic does not overload Double",
+      "family": "core/surface-syntax"
+    },
+    {
+      "id": "core/surface-syntax/surface-rejection-unary-plus-requires-a-number",
+      "name": "surface rejection: unary plus requires a number",
+      "family": "core/surface-syntax"
+    },
+    {
+      "id": "core/surface-syntax/surface-rejection-unary-minus-requires-a-number",
+      "name": "surface rejection: unary minus requires a number",
+      "family": "core/surface-syntax"
+    },
+    {
+      "id": "core/surface-syntax/surface-checking-equality-supports-annotated-strings",
+      "name": "surface checking: equality supports annotated strings",
+      "family": "core/surface-syntax"
+    },
+    {
+      "id": "core/surface-syntax/surface-rejection-whole-function-signature-is-checked",
+      "name": "surface rejection: whole function signature is checked",
+      "family": "core/surface-syntax"
+    },
+    {
+      "id": "core/surface-syntax/surface-rejection-chained-comparisons",
+      "name": "surface rejection: chained comparisons",
+      "family": "core/surface-syntax"
+    },
+    {
+      "id": "core/surface-syntax/surface-rejection-mixed-chained-comparisons",
+      "name": "surface rejection: mixed chained comparisons",
+      "family": "core/surface-syntax"
+    },
+    {
+      "id": "core/surface-syntax/surface-rejection-missing-else",
+      "name": "surface rejection: missing else",
+      "family": "core/surface-syntax"
+    },
+    {
+      "id": "core/surface-syntax/surface-rejection-missing-then",
+      "name": "surface rejection: missing then",
+      "family": "core/surface-syntax"
+    },
+    {
+      "id": "core/surface-syntax/surface-checking-layout-declaration-separator",
+      "name": "surface checking: layout declaration separator",
+      "family": "core/surface-syntax"
+    },
+    {
+      "id": "core/surface-syntax/surface-rejection-declaration-only-file-needs-main",
+      "name": "surface rejection: declaration-only file needs main",
+      "family": "core/surface-syntax"
+    },
+    {
+      "id": "core/surface-syntax/surface-rejection-unreachable-equation",
+      "name": "surface rejection: unreachable equation",
+      "family": "core/surface-syntax"
+    },
+    {
+      "id": "core/surface-syntax/surface-rejection-duplicate-function-parameters",
+      "name": "surface rejection: duplicate function parameters",
+      "family": "core/surface-syntax"
+    },
+    {
+      "id": "core/surface-syntax/surface-rejection-signature-must-name-its-next-definition",
+      "name": "surface rejection: signature must name its next definition",
+      "family": "core/surface-syntax"
+    },
+    {
+      "id": "core/surface-syntax/surface-rejection-duplicate-signatures",
+      "name": "surface rejection: duplicate signatures",
+      "family": "core/surface-syntax"
+    },
+    {
+      "id": "core/surface-syntax/surface-rejection-signature-without-equation",
+      "name": "surface rejection: signature without equation",
+      "family": "core/surface-syntax"
+    },
+    {
+      "id": "core/surface-syntax/surface-rejection-reserved-conditional-word",
+      "name": "surface rejection: reserved conditional word",
+      "family": "core/surface-syntax"
+    },
+    {
+      "id": "core/surface-syntax/surface-rejection-reserved-word-in-datatype-parameter",
+      "name": "surface rejection: reserved word in datatype parameter",
+      "family": "core/surface-syntax"
+    },
+    {
+      "id": "core/readability/layout-top-level-data-signatures-and-equations",
+      "name": "layout: top-level data, signatures and equations",
+      "family": "core/readability"
+    },
+    {
+      "id": "core/readability/layout-nested-do-with-a-trailing-semicolon",
+      "name": "layout: nested do with a trailing semicolon",
+      "family": "core/readability"
+    },
+    {
+      "id": "core/readability/layout-nested-case-and-do",
+      "name": "layout: nested case and do",
+      "family": "core/readability"
+    },
+    {
+      "id": "core/readability/layout-parenthesized-implicit-block",
+      "name": "layout: parenthesized implicit block",
+      "family": "core/readability"
+    },
+    {
+      "id": "core/readability/layout-implicit-block-in-explicit-block",
+      "name": "layout: implicit block in explicit block",
+      "family": "core/readability"
+    },
+    {
+      "id": "core/readability/layout-same-line-else-closes-do",
+      "name": "layout: same-line else closes do",
+      "family": "core/readability"
+    },
+    {
+      "id": "core/readability/layout-local-declaration-layout",
+      "name": "layout: local declaration layout",
+      "family": "core/readability"
+    },
+    {
+      "id": "core/readability/layout-do-local-group-followed-by-another-statement",
+      "name": "layout: do local group followed by another statement",
+      "family": "core/readability"
+    },
+    {
+      "id": "core/readability/layout-nested-explicit-let-matches-its-own-in",
+      "name": "layout: nested explicit let matches its own in",
+      "family": "core/readability"
+    },
+    {
+      "id": "core/readability/layout-class-and-instance-layout",
+      "name": "layout: class and instance layout",
+      "family": "core/readability"
+    },
+    {
+      "id": "core/readability/layout-explicit-braces-after-a-keyword-on-another-line",
+      "name": "layout: explicit braces after a keyword on another line",
+      "family": "core/readability"
+    },
+    {
+      "id": "core/readability/layout-keywords-in-comments-and-strings",
+      "name": "layout: keywords in comments and strings",
+      "family": "core/readability"
+    },
+    {
+      "id": "core/readability/layout-tabs-have-tab-stop-indentation",
+      "name": "layout: tabs have tab-stop indentation",
+      "family": "core/readability"
+    },
+    {
+      "id": "core/readability/layout-indented-file",
+      "name": "layout: indented file",
+      "family": "core/readability"
+    },
+    {
+      "id": "core/readability/layout-leading-comment-does-not-set-the-top-level-column",
+      "name": "layout: leading comment does not set the top-level column",
+      "family": "core/readability"
+    },
+    {
+      "id": "core/readability/layout-string-gap-ending-before-the-closing-quote",
+      "name": "layout: string gap ending before the closing quote",
+      "family": "core/readability"
+    },
+    {
+      "id": "core/readability/layout-explicit-top-level-braces",
+      "name": "layout: explicit top-level braces",
+      "family": "core/readability"
+    },
+    {
+      "id": "core/readability/layout-parseexpr-accepts-an-implicit-do",
+      "name": "layout: parseExpr accepts an implicit do",
+      "family": "core/readability"
+    },
+    {
+      "id": "core/readability/layout-diagnostics-keep-original-line-and-column",
+      "name": "layout: diagnostics keep original line and column",
+      "family": "core/readability"
+    },
+    {
+      "id": "core/readability/recursion-declared-polymorphism-is-independently-checked",
+      "name": "recursion: declared polymorphism is independently checked",
+      "family": "core/readability"
+    },
+    {
+      "id": "core/readability/recursion-monomorphic-closure-captures-an-outer-value",
+      "name": "recursion: monomorphic closure captures an outer value",
+      "family": "core/readability"
+    },
+    {
+      "id": "core/readability/recursion-explicit-quantifiers-preserve-their-declared-order",
+      "name": "recursion: explicit quantifiers preserve their declared order",
+      "family": "core/readability"
+    },
+    {
+      "id": "core/readability/recursion-unused-explicit-quantified-variables-are-discharged",
+      "name": "recursion: unused explicit quantified variables are discharged",
+      "family": "core/readability"
+    },
+    {
+      "id": "core/readability/equations-parameter-can-shadow-the-function-name",
+      "name": "equations: parameter can shadow the function name",
+      "family": "core/readability"
+    },
+    {
+      "id": "core/readability/readability-rejection-recursive-forall-cannot-specialize-to-int",
+      "name": "readability rejection: recursive forall cannot specialize to Int",
+      "family": "core/readability"
+    },
+    {
+      "id": "core/readability/recursion-mixed-signed-and-inferred-group",
+      "name": "recursion: mixed signed and inferred group",
+      "family": "core/readability"
+    },
+    {
+      "id": "core/readability/recursion-unsigned-local-group",
+      "name": "recursion: unsigned local group",
+      "family": "core/readability"
+    },
+    {
+      "id": "core/readability/readability-rejection-recursive-existentials-are-not-closed-signatures",
+      "name": "readability rejection: recursive existentials are not closed signatures",
+      "family": "core/readability"
+    },
+    {
+      "id": "core/readability/readability-rejection-recursive-signature-free-variable",
+      "name": "readability rejection: recursive signature free variable",
+      "family": "core/readability"
+    },
+    {
+      "id": "core/readability/readability-rejection-equation-arity",
+      "name": "readability rejection: equation arity",
+      "family": "core/readability"
+    },
+    {
+      "id": "core/readability/readability-rejection-equations-must-be-contiguous",
+      "name": "readability rejection: equations must be contiguous",
+      "family": "core/readability"
+    },
+    {
+      "id": "core/readability/readability-rejection-missing-constructor-equation",
+      "name": "readability rejection: missing constructor equation",
+      "family": "core/readability"
+    },
+    {
+      "id": "core/readability/readability-rejection-missing-nested-constructor",
+      "name": "readability rejection: missing nested constructor",
+      "family": "core/readability"
+    },
+    {
+      "id": "core/readability/readability-rejection-integer-equations-need-fallback",
+      "name": "readability rejection: integer equations need fallback",
+      "family": "core/readability"
+    },
+    {
+      "id": "core/readability/readability-rejection-boolean-coverage",
+      "name": "readability rejection: Boolean coverage",
+      "family": "core/readability"
+    },
+    {
+      "id": "core/readability/readability-rejection-mixed-literal-types",
+      "name": "readability rejection: mixed literal types",
+      "family": "core/readability"
+    },
+    {
+      "id": "core/readability/readability-rejection-nested-case-duplicate-binder",
+      "name": "readability rejection: nested case duplicate binder",
+      "family": "core/readability"
+    },
+    {
+      "id": "core/readability/readability-rejection-constructor-arity-in-function-pattern",
+      "name": "readability rejection: constructor arity in function pattern",
+      "family": "core/readability"
+    },
+    {
+      "id": "core/readability/readability-rejection-pattern-variable-cannot-escape-an-equation",
+      "name": "readability rejection: pattern variable cannot escape an equation",
+      "family": "core/readability"
+    },
+    {
+      "id": "core/readability/readability-rejection-empty-implicit-do",
+      "name": "readability rejection: empty implicit do",
+      "family": "core/readability"
+    },
+    {
+      "id": "core/readability/readability-rejection-dedent-closes-do-before-application",
+      "name": "readability rejection: dedent closes do before application",
+      "family": "core/readability"
+    },
+    {
+      "id": "core/readability/readability-checking-readability-factorial-equations",
+      "name": "readability checking: readability: factorial equations",
+      "family": "core/readability"
+    },
+    {
+      "id": "core/readability/readability-checking-readability-recursive-forall-order",
+      "name": "readability checking: readability: recursive forall order",
+      "family": "core/readability"
+    },
+    {
+      "id": "core/readability/readability-checking-readability-unused-recursive-forall",
+      "name": "readability checking: readability: unused recursive forall",
+      "family": "core/readability"
+    },
+    {
+      "id": "core/readability/readability-checking-readability-mutual-recursion",
+      "name": "readability checking: readability: mutual recursion",
+      "family": "core/readability"
+    },
+    {
+      "id": "core/readability/readability-checking-readability-recursive-io-and-do-local-recursion",
+      "name": "readability checking: readability: recursive IO and do-local recursion",
+      "family": "core/readability"
+    },
+    {
+      "id": "core/readability/readability-checking-readability-qualified-recursive-function",
+      "name": "readability checking: readability: qualified recursive function",
+      "family": "core/readability"
+    },
+    {
+      "id": "core/readability/readability-checking-readability-polymorphic-recursion",
+      "name": "readability checking: readability: polymorphic recursion",
+      "family": "core/readability"
+    },
+    {
+      "id": "core/readability/readability-checking-readability-cyclic-lazy-value",
+      "name": "readability checking: readability: cyclic lazy value",
+      "family": "core/readability"
+    },
+    {
+      "id": "core/readability/readability-checking-readability-nested-patterns-and-fallback",
+      "name": "readability checking: readability: nested patterns and fallback",
+      "family": "core/readability"
+    },
+    {
+      "id": "core/readability/readability-checking-readability-constructor-equation-order-keeps-wildcard-lazy",
+      "name": "readability checking: readability: constructor equation order keeps wildcard lazy",
+      "family": "core/readability"
+    },
+    {
+      "id": "core/readability/readability-checking-readability-nested-lambda-and-do-patterns",
+      "name": "readability checking: readability: nested lambda and do patterns",
+      "family": "core/readability"
+    },
+    {
+      "id": "core/readability/readability-checking-readability-pattern-annotation-imports-the-prelude",
+      "name": "readability checking: readability: pattern annotation imports the prelude",
+      "family": "core/readability"
+    },
+    {
+      "id": "core/readability/readability-checking-readability-pattern-temporary-hygiene",
+      "name": "readability checking: readability: pattern temporary hygiene",
+      "family": "core/readability"
+    },
+    {
+      "id": "core/readability/readability-checking-readability-literal-patterns",
+      "name": "readability checking: readability: literal patterns",
+      "family": "core/readability"
+    },
+    {
+      "id": "core/readability/readability-checking-readability-literal-case-order-and-wildcard-laziness",
+      "name": "readability checking: readability: literal case order and wildcard laziness",
+      "family": "core/readability"
+    },
+    {
+      "id": "core/readability/readability-checking-readability-instance-equations",
+      "name": "readability checking: readability: instance equations",
+      "family": "core/readability"
+    },
+    {
+      "id": "core/readability/readability-checking-readability-nested-conditional-io-layout",
+      "name": "readability checking: readability: nested conditional IO layout",
+      "family": "core/readability"
+    },
+    {
+      "id": "core/readability/readability-checking-readability-local-equation-group",
+      "name": "readability checking: readability: local equation group",
+      "family": "core/readability"
+    },
+    {
+      "id": "core/modules/modules-checking-selective-and-qualified-imports",
+      "name": "modules checking: selective and qualified imports",
+      "family": "core/modules"
+    },
+    {
+      "id": "core/modules/modules-checking-unnamed-entry-expression-imports",
+      "name": "modules checking: unnamed entry expression imports",
+      "family": "core/modules"
+    },
+    {
+      "id": "core/modules/modules-checking-qualified-types-fields-and-nested-patterns",
+      "name": "modules checking: qualified types, fields and nested patterns",
+      "family": "core/modules"
+    },
+    {
+      "id": "core/modules/modules-checking-private-names-and-constructor-identities",
+      "name": "modules checking: private names and constructor identities",
+      "family": "core/modules"
+    },
+    {
+      "id": "core/modules/modules-checking-diamond-reexports-preserve-identity",
+      "name": "modules checking: diamond reexports preserve identity",
+      "family": "core/modules"
+    },
+    {
+      "id": "core/modules/modules-checking-transitive-empty-imports-carry-instances-and-private-helpers",
+      "name": "modules checking: transitive empty imports carry instances and private helpers",
+      "family": "core/modules"
+    },
+    {
+      "id": "core/modules/modules-checking-qualified-class-hidden-methods-in-instance-declaration",
+      "name": "modules checking: qualified class, hidden methods in instance declaration",
+      "family": "core/modules"
+    },
+    {
+      "id": "core/modules/modules-checking-abstract-datatype-used-by-exported-functions",
+      "name": "modules checking: abstract datatype used by exported functions",
+      "family": "core/modules"
+    },
+    {
+      "id": "core/modules/modules-checking-local-shadowing-and-self-qualification",
+      "name": "modules checking: local shadowing and self qualification",
+      "family": "core/modules"
+    },
+    {
+      "id": "core/modules/modules-checking-explicit-qualified-prelude",
+      "name": "modules checking: explicit qualified Prelude",
+      "family": "core/modules"
+    },
+    {
+      "id": "core/modules/modules-checking-explicit-prelude-with-implicit-import-disabled",
+      "name": "modules checking: explicit Prelude with implicit import disabled",
+      "family": "core/modules"
+    },
+    {
+      "id": "core/modules/modules-checking-hiding-prelude-method-for-local-definition",
+      "name": "modules checking: hiding Prelude method for local definition",
+      "family": "core/modules"
+    },
+    {
+      "id": "core/modules/modules-checking-module-lexical-scope-protects-imported-do",
+      "name": "modules checking: module lexical scope protects imported do",
+      "family": "core/modules"
+    },
+    {
+      "id": "core/modules/modules-checking-polymorphic-monad-function-across-modules",
+      "name": "modules checking: polymorphic Monad function across modules",
+      "family": "core/modules"
+    },
+    {
+      "id": "core/modules/modules-checking-qualified-boolean-constructor-patterns",
+      "name": "modules checking: qualified Boolean constructor patterns",
+      "family": "core/modules"
+    },
+    {
+      "id": "core/modules/modules-checking-internal-name-hygiene",
+      "name": "modules checking: internal name hygiene",
+      "family": "core/modules"
+    },
+    {
+      "id": "core/modules/modules-checking-same-method-name-from-distinct-classes",
+      "name": "modules checking: same method name from distinct classes",
+      "family": "core/modules"
+    },
+    {
+      "id": "core/modules/modules-checking-instance-may-recursively-use-an-exported-helper",
+      "name": "modules checking: instance may recursively use an exported helper",
+      "family": "core/modules"
+    },
+    {
+      "id": "core/modules/modules-checking-bare-primitive-fallback-without-implicit-prelude",
+      "name": "modules checking: bare primitive fallback without implicit Prelude",
+      "family": "core/modules"
+    },
+    {
+      "id": "core/modules/modules-checking-entry-selects-its-own-main",
+      "name": "modules checking: entry selects its own main",
+      "family": "core/modules"
+    },
+    {
+      "id": "core/modules/modules-checking-primitive-fallback-permits-local-definitions",
+      "name": "modules checking: primitive fallback permits local definitions",
+      "family": "core/modules"
+    },
+    {
+      "id": "core/modules/modules-checking-cyclic-imports-preserve-independent-polymorphic-values",
+      "name": "modules checking: cyclic imports preserve independent polymorphic values",
+      "family": "core/modules"
+    },
+    {
+      "id": "core/modules/modules-checking-cross-module-recursive-declaration-scc",
+      "name": "modules checking: cross-module recursive declaration SCC",
+      "family": "core/modules"
+    },
+    {
+      "id": "core/modules/modules-checking-cross-module-recursive-nominal-types",
+      "name": "modules checking: cross-module recursive nominal types",
+      "family": "core/modules"
+    },
+    {
+      "id": "core/modules/modules-checking-cyclic-reexports-retain-the-originating-identity",
+      "name": "modules checking: cyclic reexports retain the originating identity",
+      "family": "core/modules"
+    },
+    {
+      "id": "core/modules/modules-checking-cyclic-type-reexports-preserve-selective-member-hiding",
+      "name": "modules checking: cyclic type reexports preserve selective member hiding",
+      "family": "core/modules"
+    },
+    {
+      "id": "core/modules/modules-checking-cyclic-empty-imports-carry-defining-module-instances",
+      "name": "modules checking: cyclic empty imports carry defining-module instances",
+      "family": "core/modules"
+    },
+    {
+      "id": "core/modules/modules-checking-self-import-is-a-namespace-edge",
+      "name": "modules checking: self import is a namespace edge",
+      "family": "core/modules"
+    },
+    {
+      "id": "core/modules/modules-rejection-private-function",
+      "name": "modules rejection: private function",
+      "family": "core/modules"
+    },
+    {
+      "id": "core/modules/modules-rejection-qualified-private-function",
+      "name": "modules rejection: qualified private function",
+      "family": "core/modules"
+    },
+    {
+      "id": "core/modules/modules-rejection-selected-imports-exclude-others",
+      "name": "modules rejection: selected imports exclude others",
+      "family": "core/modules"
+    },
+    {
+      "id": "core/modules/modules-rejection-qualified-only-is-not-unqualified",
+      "name": "modules rejection: qualified-only is not unqualified",
+      "family": "core/modules"
+    },
+    {
+      "id": "core/modules/modules-rejection-alias-replaces-qualified-module-name",
+      "name": "modules rejection: alias replaces qualified module name",
+      "family": "core/modules"
+    },
+    {
+      "id": "core/modules/modules-rejection-hiding-also-affects-qualification",
+      "name": "modules rejection: hiding also affects qualification",
+      "family": "core/modules"
+    },
+    {
+      "id": "core/modules/modules-rejection-unknown-import-selection",
+      "name": "modules rejection: unknown import selection",
+      "family": "core/modules"
+    },
+    {
+      "id": "core/modules/modules-rejection-unknown-hidden-name",
+      "name": "modules rejection: unknown hidden name",
+      "family": "core/modules"
+    },
+    {
+      "id": "core/modules/modules-rejection-private-constructor",
+      "name": "modules rejection: private constructor",
+      "family": "core/modules"
+    },
+    {
+      "id": "core/modules/modules-rejection-type-only-selective-import",
+      "name": "modules rejection: type-only selective import",
+      "family": "core/modules"
+    },
+    {
+      "id": "core/modules/modules-rejection-member-belongs-to-selected-type",
+      "name": "modules rejection: member belongs to selected type",
+      "family": "core/modules"
+    },
+    {
+      "id": "core/modules/modules-rejection-private-type-annotation",
+      "name": "modules rejection: private type annotation",
+      "family": "core/modules"
+    },
+    {
+      "id": "core/modules/modules-rejection-hidden-members-cannot-be-reexported",
+      "name": "modules rejection: hidden members cannot be reexported",
+      "family": "core/modules"
+    },
+    {
+      "id": "core/modules/modules-rejection-default-exports-exclude-imports",
+      "name": "modules rejection: default exports exclude imports",
+      "family": "core/modules"
+    },
+    {
+      "id": "core/modules/modules-rejection-transitive-names-are-not-imported",
+      "name": "modules rejection: transitive names are not imported",
+      "family": "core/modules"
+    },
+    {
+      "id": "core/modules/modules-rejection-distinct-imports-are-ambiguous",
+      "name": "modules rejection: distinct imports are ambiguous",
+      "family": "core/modules"
+    },
+    {
+      "id": "core/modules/modules-rejection-top-level-import-collision-requires-hiding",
+      "name": "modules rejection: top-level import collision requires hiding",
+      "family": "core/modules"
+    },
+    {
+      "id": "core/modules/modules-rejection-explicit-reexport-conflict",
+      "name": "modules rejection: explicit reexport conflict",
+      "family": "core/modules"
+    },
+    {
+      "id": "core/modules/modules-rejection-unknown-module-reexport",
+      "name": "modules rejection: unknown module reexport",
+      "family": "core/modules"
+    },
+    {
+      "id": "core/modules/modules-rejection-qualified-only-module-reexport-has-no-unqualified-names",
+      "name": "modules rejection: qualified-only module reexport has no unqualified names",
+      "family": "core/modules"
+    },
+    {
+      "id": "core/modules/modules-rejection-empty-exports",
+      "name": "modules rejection: empty exports",
+      "family": "core/modules"
+    },
+    {
+      "id": "core/modules/modules-rejection-missing-module",
+      "name": "modules rejection: missing module",
+      "family": "core/modules"
+    },
+    {
+      "id": "core/modules/modules-rejection-mismatched-module-header",
+      "name": "modules rejection: mismatched module header",
+      "family": "core/modules"
+    },
+    {
+      "id": "core/modules/modules-rejection-unnamed-library",
+      "name": "modules rejection: unnamed library",
+      "family": "core/modules"
+    },
+    {
+      "id": "core/modules/modules-rejection-cyclic-import-still-checks-invalid-declarations",
+      "name": "modules rejection: cyclic import still checks invalid declarations",
+      "family": "core/modules"
+    },
+    {
+      "id": "core/modules/modules-rejection-self-import-still-checks-invalid-declarations",
+      "name": "modules rejection: self import still checks invalid declarations",
+      "family": "core/modules"
+    },
+    {
+      "id": "core/modules/modules-rejection-module-header-followed-by-bare-expression",
+      "name": "modules rejection: module header followed by bare expression",
+      "family": "core/modules"
+    },
+    {
+      "id": "core/modules/modules-rejection-imports-must-precede-definitions",
+      "name": "modules rejection: imports must precede definitions",
+      "family": "core/modules"
+    },
+    {
+      "id": "core/modules/modules-rejection-definitions-cannot-be-qualified",
+      "name": "modules rejection: definitions cannot be qualified",
+      "family": "core/modules"
+    },
+    {
+      "id": "core/modules/modules-rejection-explicit-empty-prelude-removes-value-names",
+      "name": "modules rejection: explicit empty Prelude removes value names",
+      "family": "core/modules"
+    },
+    {
+      "id": "core/modules/modules-rejection-qualified-prelude-suppresses-implicit-prelude",
+      "name": "modules rejection: qualified Prelude suppresses implicit Prelude",
+      "family": "core/modules"
+    },
+    {
+      "id": "core/modules/modules-rejection-prelude-cannot-be-redefined",
+      "name": "modules rejection: Prelude cannot be redefined",
+      "family": "core/modules"
+    },
+    {
+      "id": "core/modules/modules-rejection-ordinary-unit-constructor-is-not-builtin-unit",
+      "name": "modules rejection: ordinary Unit constructor is not builtin unit",
+      "family": "core/modules"
+    },
+    {
+      "id": "core/modules/modules-rejection-primitive-type-cannot-be-redefined",
+      "name": "modules rejection: primitive type cannot be redefined",
+      "family": "core/modules"
+    },
+    {
+      "id": "core/modules/modules-rejection-unused-private-definitions-still-checked",
+      "name": "modules rejection: unused private definitions still checked",
+      "family": "core/modules"
+    },
+    {
+      "id": "core/modules/modules-rejection-export-list-cannot-name-missing-value",
+      "name": "modules rejection: export list cannot name missing value",
+      "family": "core/modules"
+    },
+    {
+      "id": "core/modules/modules-rejection-recursive-signature-error-names-the-source-function",
+      "name": "modules rejection: recursive signature error names the source function",
+      "family": "core/modules"
+    },
+    {
+      "id": "core/modules/modules-rejection-instance-not-visible-in-imported-signed-definition",
+      "name": "modules rejection: instance not visible in imported signed definition",
+      "family": "core/modules"
+    },
+    {
+      "id": "core/modules/modules-rejection-instance-not-visible-in-another-instance",
+      "name": "modules rejection: instance not visible in another instance",
+      "family": "core/modules"
+    },
+    {
+      "id": "core/modules/modules-rejection-cyclic-private-constructor-remains-hidden",
+      "name": "modules rejection: cyclic private constructor remains hidden",
+      "family": "core/modules"
+    },
+    {
+      "id": "core/modules/modules-rejection-cyclic-reexports-cannot-invent-a-missing-identity",
+      "name": "modules rejection: cyclic reexports cannot invent a missing identity",
+      "family": "core/modules"
+    },
+    {
+      "id": "core/modules/modules-rejection-downstream-orphan-cannot-leak-into-an-import-cycle",
+      "name": "modules rejection: downstream orphan cannot leak into an import cycle",
+      "family": "core/modules"
+    },
+    {
+      "id": "core/modules/modules-original-source-type-names",
+      "name": "modules: original source type names",
+      "family": "core/modules"
+    },
+    {
+      "id": "core/modules/modules-unit-syntax-is-intrinsic",
+      "name": "modules: unit syntax is intrinsic",
+      "family": "core/modules"
+    },
+    {
+      "id": "core/modules/modules-empty-libraries-and-multiline-headers",
+      "name": "modules: empty libraries and multiline headers",
+      "family": "core/modules"
+    },
+    {
+      "id": "core/modules/modules-explicit-braces-and-layout-parse-identically",
+      "name": "modules: explicit braces and layout parse identically",
+      "family": "core/modules"
+    },
+    {
+      "id": "core/modules/modules-libraries-can-be-parsed-without-main",
+      "name": "modules: libraries can be parsed without main",
+      "family": "core/modules"
+    },
+    {
+      "id": "core/modules/modules-unused-imports-do-not-cause-value-ambiguity",
+      "name": "modules: unused imports do not cause value ambiguity",
+      "family": "core/modules"
+    },
+    {
+      "id": "core/modules/modules-legacy-compile-path-preserves-checked-output",
+      "name": "modules: legacy compile path preserves checked output",
+      "family": "core/modules"
+    },
+    {
+      "id": "core/modules/modules-file-loader-includes-hierarchy-and-errors",
+      "name": "modules: file loader, includes, hierarchy and errors",
+      "family": "core/modules"
+    },
+    {
+      "id": "core/modules/modules-typing-cross-module-recursion-infers-unsigned-cycle",
+      "name": "modules typing: cross-module recursion infers unsigned cycle",
+      "family": "core/modules"
+    },
+    {
+      "id": "core/modules/modules-typing-cross-module-qualified-recursion-generalizes-shared-exports",
+      "name": "modules typing: cross-module qualified recursion generalizes shared exports",
+      "family": "core/modules"
+    },
+    {
+      "id": "core/modules/crate-namespaces-resolve-recursive-declarations-before-inference",
+      "name": "crate namespaces resolve recursive declarations before inference",
+      "family": "core/modules"
+    },
+    {
+      "id": "core/modules/crate-namespace-resolution-preserves-external-ownership-and-mangling",
+      "name": "crate namespace resolution preserves external ownership and mangling",
+      "family": "core/modules"
+    },
+    {
+      "id": "core/modules/cyclic-export-fixed-point-is-invariant-under-source-order",
+      "name": "cyclic export fixed point is invariant under source order",
+      "family": "core/modules"
+    },
+    {
+      "id": "core/separate-compilation/crate-checking-selective-and-qualified-imports",
+      "name": "crate checking: selective and qualified imports",
+      "family": "core/separate-compilation"
+    },
+    {
+      "id": "core/separate-compilation/crate-checking-unnamed-entry-expression-imports",
+      "name": "crate checking: unnamed entry expression imports",
+      "family": "core/separate-compilation"
+    },
+    {
+      "id": "core/separate-compilation/crate-checking-qualified-types-fields-and-nested-patterns",
+      "name": "crate checking: qualified types, fields and nested patterns",
+      "family": "core/separate-compilation"
+    },
+    {
+      "id": "core/separate-compilation/crate-checking-private-names-and-constructor-identities",
+      "name": "crate checking: private names and constructor identities",
+      "family": "core/separate-compilation"
+    },
+    {
+      "id": "core/separate-compilation/crate-checking-diamond-reexports-preserve-identity",
+      "name": "crate checking: diamond reexports preserve identity",
+      "family": "core/separate-compilation"
+    },
+    {
+      "id": "core/separate-compilation/crate-checking-transitive-empty-imports-carry-instances-and-private-helpers",
+      "name": "crate checking: transitive empty imports carry instances and private helpers",
+      "family": "core/separate-compilation"
+    },
+    {
+      "id": "core/separate-compilation/crate-checking-qualified-class-hidden-methods-in-instance-declaration",
+      "name": "crate checking: qualified class, hidden methods in instance declaration",
+      "family": "core/separate-compilation"
+    },
+    {
+      "id": "core/separate-compilation/crate-checking-abstract-datatype-used-by-exported-functions",
+      "name": "crate checking: abstract datatype used by exported functions",
+      "family": "core/separate-compilation"
+    },
+    {
+      "id": "core/separate-compilation/crate-checking-local-shadowing-and-self-qualification",
+      "name": "crate checking: local shadowing and self qualification",
+      "family": "core/separate-compilation"
+    },
+    {
+      "id": "core/separate-compilation/crate-checking-explicit-qualified-prelude",
+      "name": "crate checking: explicit qualified Prelude",
+      "family": "core/separate-compilation"
+    },
+    {
+      "id": "core/separate-compilation/crate-checking-explicit-prelude-with-implicit-import-disabled",
+      "name": "crate checking: explicit Prelude with implicit import disabled",
+      "family": "core/separate-compilation"
+    },
+    {
+      "id": "core/separate-compilation/crate-checking-hiding-prelude-method-for-local-definition",
+      "name": "crate checking: hiding Prelude method for local definition",
+      "family": "core/separate-compilation"
+    },
+    {
+      "id": "core/separate-compilation/crate-checking-module-lexical-scope-protects-imported-do",
+      "name": "crate checking: module lexical scope protects imported do",
+      "family": "core/separate-compilation"
+    },
+    {
+      "id": "core/separate-compilation/crate-checking-polymorphic-monad-function-across-modules",
+      "name": "crate checking: polymorphic Monad function across modules",
+      "family": "core/separate-compilation"
+    },
+    {
+      "id": "core/separate-compilation/crate-checking-qualified-boolean-constructor-patterns",
+      "name": "crate checking: qualified Boolean constructor patterns",
+      "family": "core/separate-compilation"
+    },
+    {
+      "id": "core/separate-compilation/crate-checking-internal-name-hygiene",
+      "name": "crate checking: internal name hygiene",
+      "family": "core/separate-compilation"
+    },
+    {
+      "id": "core/separate-compilation/crate-checking-same-method-name-from-distinct-classes",
+      "name": "crate checking: same method name from distinct classes",
+      "family": "core/separate-compilation"
+    },
+    {
+      "id": "core/separate-compilation/crate-checking-instance-may-recursively-use-an-exported-helper",
+      "name": "crate checking: instance may recursively use an exported helper",
+      "family": "core/separate-compilation"
+    },
+    {
+      "id": "core/separate-compilation/crate-checking-bare-primitive-fallback-without-implicit-prelude",
+      "name": "crate checking: bare primitive fallback without implicit Prelude",
+      "family": "core/separate-compilation"
+    },
+    {
+      "id": "core/separate-compilation/crate-checking-entry-selects-its-own-main",
+      "name": "crate checking: entry selects its own main",
+      "family": "core/separate-compilation"
+    },
+    {
+      "id": "core/separate-compilation/crate-checking-primitive-fallback-permits-local-definitions",
+      "name": "crate checking: primitive fallback permits local definitions",
+      "family": "core/separate-compilation"
+    },
+    {
+      "id": "core/separate-compilation/crate-checking-cyclic-imports-preserve-independent-polymorphic-values",
+      "name": "crate checking: cyclic imports preserve independent polymorphic values",
+      "family": "core/separate-compilation"
+    },
+    {
+      "id": "core/separate-compilation/crate-checking-cross-module-recursive-declaration-scc",
+      "name": "crate checking: cross-module recursive declaration SCC",
+      "family": "core/separate-compilation"
+    },
+    {
+      "id": "core/separate-compilation/crate-checking-cross-module-recursive-nominal-types",
+      "name": "crate checking: cross-module recursive nominal types",
+      "family": "core/separate-compilation"
+    },
+    {
+      "id": "core/separate-compilation/crate-checking-cyclic-reexports-retain-the-originating-identity",
+      "name": "crate checking: cyclic reexports retain the originating identity",
+      "family": "core/separate-compilation"
+    },
+    {
+      "id": "core/separate-compilation/crate-checking-cyclic-type-reexports-preserve-selective-member-hiding",
+      "name": "crate checking: cyclic type reexports preserve selective member hiding",
+      "family": "core/separate-compilation"
+    },
+    {
+      "id": "core/separate-compilation/crate-checking-cyclic-empty-imports-carry-defining-module-instances",
+      "name": "crate checking: cyclic empty imports carry defining-module instances",
+      "family": "core/separate-compilation"
+    },
+    {
+      "id": "core/separate-compilation/crate-checking-self-import-is-a-namespace-edge",
+      "name": "crate checking: self import is a namespace edge",
+      "family": "core/separate-compilation"
+    },
+    {
+      "id": "core/separate-compilation/crate-checking-inferred-overloaded-export",
+      "name": "crate checking: inferred overloaded export",
+      "family": "core/separate-compilation"
+    },
+    {
+      "id": "core/separate-compilation/crate-checking-rank-n-constructor-field",
+      "name": "crate checking: rank-n constructor field",
+      "family": "core/separate-compilation"
+    },
+    {
+      "id": "core/separate-compilation/crate-checking-class-free-bounded-annotation-rules",
+      "name": "crate checking: class-free bounded annotation rules",
+      "family": "core/separate-compilation"
+    },
+    {
+      "id": "core/separate-compilation/crate-checking-unexported-nominal-type-in-inferred-signature",
+      "name": "crate checking: unexported nominal type in inferred signature",
+      "family": "core/separate-compilation"
+    },
+    {
+      "id": "core/separate-compilation/crate-checking-mutually-recursive-module-values",
+      "name": "crate checking: mutually recursive module values",
+      "family": "core/separate-compilation"
+    },
+    {
+      "id": "core/separate-compilation/crate-checking-unicode-interface-identity",
+      "name": "crate checking: Unicode interface identity",
+      "family": "core/separate-compilation"
+    },
+    {
+      "id": "core/separate-compilation/crate-checking-nominal-global-cannot-capture-local-binder",
+      "name": "crate checking: nominal global cannot capture local binder",
+      "family": "core/separate-compilation"
+    },
+    {
+      "id": "core/separate-compilation/crate-checking-imported-entry-binding",
+      "name": "crate checking: imported entry binding",
+      "family": "core/separate-compilation"
+    },
+    {
+      "id": "core/separate-compilation/crate-checking-crate-local-and-dictionary-fresh-names-avoid-user-globals",
+      "name": "crate checking: crate local and dictionary fresh names avoid user globals",
+      "family": "core/separate-compilation"
+    },
+    {
+      "id": "core/separate-compilation/crate-rejects-private-function",
+      "name": "crate rejects: private function",
+      "family": "core/separate-compilation"
+    },
+    {
+      "id": "core/separate-compilation/crate-rejects-qualified-private-function",
+      "name": "crate rejects: qualified private function",
+      "family": "core/separate-compilation"
+    },
+    {
+      "id": "core/separate-compilation/crate-rejects-selected-imports-exclude-others",
+      "name": "crate rejects: selected imports exclude others",
+      "family": "core/separate-compilation"
+    },
+    {
+      "id": "core/separate-compilation/crate-rejects-qualified-only-is-not-unqualified",
+      "name": "crate rejects: qualified-only is not unqualified",
+      "family": "core/separate-compilation"
+    },
+    {
+      "id": "core/separate-compilation/crate-rejects-alias-replaces-qualified-module-name",
+      "name": "crate rejects: alias replaces qualified module name",
+      "family": "core/separate-compilation"
+    },
+    {
+      "id": "core/separate-compilation/crate-rejects-hiding-also-affects-qualification",
+      "name": "crate rejects: hiding also affects qualification",
+      "family": "core/separate-compilation"
+    },
+    {
+      "id": "core/separate-compilation/crate-rejects-unknown-import-selection",
+      "name": "crate rejects: unknown import selection",
+      "family": "core/separate-compilation"
+    },
+    {
+      "id": "core/separate-compilation/crate-rejects-unknown-hidden-name",
+      "name": "crate rejects: unknown hidden name",
+      "family": "core/separate-compilation"
+    },
+    {
+      "id": "core/separate-compilation/crate-rejects-private-constructor",
+      "name": "crate rejects: private constructor",
+      "family": "core/separate-compilation"
+    },
+    {
+      "id": "core/separate-compilation/crate-rejects-type-only-selective-import",
+      "name": "crate rejects: type-only selective import",
+      "family": "core/separate-compilation"
+    },
+    {
+      "id": "core/separate-compilation/crate-rejects-member-belongs-to-selected-type",
+      "name": "crate rejects: member belongs to selected type",
+      "family": "core/separate-compilation"
+    },
+    {
+      "id": "core/separate-compilation/crate-rejects-private-type-annotation",
+      "name": "crate rejects: private type annotation",
+      "family": "core/separate-compilation"
+    },
+    {
+      "id": "core/separate-compilation/crate-rejects-hidden-members-cannot-be-reexported",
+      "name": "crate rejects: hidden members cannot be reexported",
+      "family": "core/separate-compilation"
+    },
+    {
+      "id": "core/separate-compilation/crate-rejects-default-exports-exclude-imports",
+      "name": "crate rejects: default exports exclude imports",
+      "family": "core/separate-compilation"
+    },
+    {
+      "id": "core/separate-compilation/crate-rejects-transitive-names-are-not-imported",
+      "name": "crate rejects: transitive names are not imported",
+      "family": "core/separate-compilation"
+    },
+    {
+      "id": "core/separate-compilation/crate-rejects-distinct-imports-are-ambiguous",
+      "name": "crate rejects: distinct imports are ambiguous",
+      "family": "core/separate-compilation"
+    },
+    {
+      "id": "core/separate-compilation/crate-rejects-top-level-import-collision-requires-hiding",
+      "name": "crate rejects: top-level import collision requires hiding",
+      "family": "core/separate-compilation"
+    },
+    {
+      "id": "core/separate-compilation/crate-rejects-explicit-reexport-conflict",
+      "name": "crate rejects: explicit reexport conflict",
+      "family": "core/separate-compilation"
+    },
+    {
+      "id": "core/separate-compilation/crate-rejects-unknown-module-reexport",
+      "name": "crate rejects: unknown module reexport",
+      "family": "core/separate-compilation"
+    },
+    {
+      "id": "core/separate-compilation/crate-rejects-qualified-only-module-reexport-has-no-unqualified-names",
+      "name": "crate rejects: qualified-only module reexport has no unqualified names",
+      "family": "core/separate-compilation"
+    },
+    {
+      "id": "core/separate-compilation/crate-rejects-empty-exports",
+      "name": "crate rejects: empty exports",
+      "family": "core/separate-compilation"
+    },
+    {
+      "id": "core/separate-compilation/crate-rejects-missing-module",
+      "name": "crate rejects: missing module",
+      "family": "core/separate-compilation"
+    },
+    {
+      "id": "core/separate-compilation/crate-rejects-mismatched-module-header",
+      "name": "crate rejects: mismatched module header",
+      "family": "core/separate-compilation"
+    },
+    {
+      "id": "core/separate-compilation/crate-rejects-unnamed-library",
+      "name": "crate rejects: unnamed library",
+      "family": "core/separate-compilation"
+    },
+    {
+      "id": "core/separate-compilation/crate-rejects-cyclic-import-still-checks-invalid-declarations",
+      "name": "crate rejects: cyclic import still checks invalid declarations",
+      "family": "core/separate-compilation"
+    },
+    {
+      "id": "core/separate-compilation/crate-rejects-self-import-still-checks-invalid-declarations",
+      "name": "crate rejects: self import still checks invalid declarations",
+      "family": "core/separate-compilation"
+    },
+    {
+      "id": "core/separate-compilation/crate-rejects-module-header-followed-by-bare-expression",
+      "name": "crate rejects: module header followed by bare expression",
+      "family": "core/separate-compilation"
+    },
+    {
+      "id": "core/separate-compilation/crate-rejects-imports-must-precede-definitions",
+      "name": "crate rejects: imports must precede definitions",
+      "family": "core/separate-compilation"
+    },
+    {
+      "id": "core/separate-compilation/crate-rejects-definitions-cannot-be-qualified",
+      "name": "crate rejects: definitions cannot be qualified",
+      "family": "core/separate-compilation"
+    },
+    {
+      "id": "core/separate-compilation/crate-rejects-explicit-empty-prelude-removes-value-names",
+      "name": "crate rejects: explicit empty Prelude removes value names",
+      "family": "core/separate-compilation"
+    },
+    {
+      "id": "core/separate-compilation/crate-rejects-qualified-prelude-suppresses-implicit-prelude",
+      "name": "crate rejects: qualified Prelude suppresses implicit Prelude",
+      "family": "core/separate-compilation"
+    },
+    {
+      "id": "core/separate-compilation/crate-rejects-prelude-cannot-be-redefined",
+      "name": "crate rejects: Prelude cannot be redefined",
+      "family": "core/separate-compilation"
+    },
+    {
+      "id": "core/separate-compilation/crate-rejects-ordinary-unit-constructor-is-not-builtin-unit",
+      "name": "crate rejects: ordinary Unit constructor is not builtin unit",
+      "family": "core/separate-compilation"
+    },
+    {
+      "id": "core/separate-compilation/crate-rejects-primitive-type-cannot-be-redefined",
+      "name": "crate rejects: primitive type cannot be redefined",
+      "family": "core/separate-compilation"
+    },
+    {
+      "id": "core/separate-compilation/crate-rejects-unused-private-definitions-still-checked",
+      "name": "crate rejects: unused private definitions still checked",
+      "family": "core/separate-compilation"
+    },
+    {
+      "id": "core/separate-compilation/crate-rejects-export-list-cannot-name-missing-value",
+      "name": "crate rejects: export list cannot name missing value",
+      "family": "core/separate-compilation"
+    },
+    {
+      "id": "core/separate-compilation/crate-rejects-recursive-signature-error-names-the-source-function",
+      "name": "crate rejects: recursive signature error names the source function",
+      "family": "core/separate-compilation"
+    },
+    {
+      "id": "core/separate-compilation/crate-rejects-instance-not-visible-in-imported-signed-definition",
+      "name": "crate rejects: instance not visible in imported signed definition",
+      "family": "core/separate-compilation"
+    },
+    {
+      "id": "core/separate-compilation/crate-rejects-instance-not-visible-in-another-instance",
+      "name": "crate rejects: instance not visible in another instance",
+      "family": "core/separate-compilation"
+    },
+    {
+      "id": "core/separate-compilation/crate-rejects-cyclic-private-constructor-remains-hidden",
+      "name": "crate rejects: cyclic private constructor remains hidden",
+      "family": "core/separate-compilation"
+    },
+    {
+      "id": "core/separate-compilation/crate-rejects-cyclic-reexports-cannot-invent-a-missing-identity",
+      "name": "crate rejects: cyclic reexports cannot invent a missing identity",
+      "family": "core/separate-compilation"
+    },
+    {
+      "id": "core/separate-compilation/crate-rejects-downstream-orphan-cannot-leak-into-an-import-cycle",
+      "name": "crate rejects: downstream orphan cannot leak into an import cycle",
+      "family": "core/separate-compilation"
+    },
+    {
+      "id": "core/separate-compilation/crate-typing-cross-module-recursion-infers-unsigned-cycle",
+      "name": "crate typing: cross-module recursion infers unsigned cycle",
+      "family": "core/separate-compilation"
+    },
+    {
+      "id": "core/separate-compilation/crate-typing-cross-module-qualified-recursion-generalizes-shared-exports",
+      "name": "crate typing: cross-module qualified recursion generalizes shared exports",
+      "family": "core/separate-compilation"
+    },
+    {
+      "id": "core/separate-compilation/crate-paths-and-native-cache-commands",
+      "name": "crate paths and native cache commands",
+      "family": "core/separate-compilation"
+    },
+    {
+      "id": "core/separate-compilation/crate-metadata-version-rejection",
+      "name": "crate metadata version rejection",
+      "family": "core/separate-compilation"
+    },
+    {
+      "id": "core/separate-compilation/crate-object-binding-schemes-are-independently-checked",
+      "name": "crate object binding schemes are independently checked",
+      "family": "core/separate-compilation"
+    },
+    {
+      "id": "core/separate-compilation/crate-datatype-metadata-is-independently-reconstructed",
+      "name": "crate datatype metadata is independently reconstructed",
+      "family": "core/separate-compilation"
+    },
+    {
+      "id": "core/separate-compilation/crate-unused-import-parameters-retain-checked-schemes",
+      "name": "crate unused import parameters retain checked schemes",
+      "family": "core/separate-compilation"
+    },
+    {
+      "id": "core/state-types/st-source-type-return",
+      "name": "ST source type: return",
+      "family": "core/state-types"
+    },
+    {
+      "id": "core/state-types/st-source-type-bind",
+      "name": "ST source type: bind",
+      "family": "core/state-types"
+    },
+    {
+      "id": "core/state-types/st-source-type-array-read",
+      "name": "ST source type: array-read",
+      "family": "core/state-types"
+    },
+    {
+      "id": "core/state-types/st-source-type-array-write",
+      "name": "ST source type: array-write",
+      "family": "core/state-types"
+    },
+    {
+      "id": "core/state-types/st-source-type-array-length",
+      "name": "ST source type: array-length",
+      "family": "core/state-types"
+    },
+    {
+      "id": "core/state-types/st-source-type-implicit-do",
+      "name": "ST source type: implicit-do",
+      "family": "core/state-types"
+    },
+    {
+      "id": "core/state-types/st-source-type-implicit-return",
+      "name": "ST source type: implicit-return",
+      "family": "core/state-types"
+    },
+    {
+      "id": "core/state-types/st-source-type-explicit-action-signature",
+      "name": "ST source type: explicit-action-signature",
+      "family": "core/state-types"
+    },
+    {
+      "id": "core/state-types/st-source-type-polymorphic-result",
+      "name": "ST source type: polymorphic-result",
+      "family": "core/state-types"
+    },
+    {
+      "id": "core/state-types/st-source-type-impredicative-array-functions",
+      "name": "ST source type: impredicative-array-functions",
+      "family": "core/state-types"
+    },
+    {
+      "id": "core/state-types/st-source-type-nested-independent",
+      "name": "ST source type: nested-independent",
+      "family": "core/state-types"
+    },
+    {
+      "id": "core/state-types/st-source-type-reuse-independent-allocation",
+      "name": "ST source type: reuse-independent-allocation",
+      "family": "core/state-types"
+    },
+    {
+      "id": "core/state-types/st-source-type-pure-io-description-result",
+      "name": "ST source type: pure-io-description-result",
+      "family": "core/state-types"
+    },
+    {
+      "id": "core/state-types/st-source-type-unused-poisoned-cell",
+      "name": "ST source type: unused-poisoned-cell",
+      "family": "core/state-types"
+    },
+    {
+      "id": "core/state-types/st-source-type-snapshot",
+      "name": "ST source type: snapshot",
+      "family": "core/state-types"
+    },
+    {
+      "id": "core/state-types/st-source-type-repeated-read-action",
+      "name": "ST source type: repeated-read-action",
+      "family": "core/state-types"
+    },
+    {
+      "id": "core/state-types/st-source-type-higher-order-runner",
+      "name": "ST source type: higher-order-runner",
+      "family": "core/state-types"
+    },
+    {
+      "id": "core/state-types/st-source-type-primitive-shadowing",
+      "name": "ST source type: primitive-shadowing",
+      "family": "core/state-types"
+    },
+    {
+      "id": "core/state-types/st-source-type-qualified-prelude-import",
+      "name": "ST source type: qualified-prelude-import",
+      "family": "core/state-types"
+    },
+    {
+      "id": "core/state-types/st-source-type-explicit-prelude-types",
+      "name": "ST source type: explicit-prelude-types",
+      "family": "core/state-types"
+    },
+    {
+      "id": "core/state-types/st-source-type-opaque-existential-package",
+      "name": "ST source type: opaque-existential-package",
+      "family": "core/state-types"
+    },
+    {
+      "id": "core/state-types/st-source-type-opaque-parametric-callback",
+      "name": "ST source type: opaque-parametric-callback",
+      "family": "core/state-types"
+    },
+    {
+      "id": "core/state-types/st-source-type-escape-array",
+      "name": "ST source type: escape-array",
+      "family": "core/state-types"
+    },
+    {
+      "id": "core/state-types/st-source-type-escape-through-bind",
+      "name": "ST source type: escape-through-bind",
+      "family": "core/state-types"
+    },
+    {
+      "id": "core/state-types/st-source-type-escape-through-data",
+      "name": "ST source type: escape-through-data",
+      "family": "core/state-types"
+    },
+    {
+      "id": "core/state-types/st-source-type-escape-read-action",
+      "name": "ST source type: escape-read-action",
+      "family": "core/state-types"
+    },
+    {
+      "id": "core/state-types/st-source-type-escape-write-action",
+      "name": "ST source type: escape-write-action",
+      "family": "core/state-types"
+    },
+    {
+      "id": "core/state-types/st-source-type-escape-reader-closure",
+      "name": "ST source type: escape-reader-closure",
+      "family": "core/state-types"
+    },
+    {
+      "id": "core/state-types/st-source-type-nested-read-outer-region",
+      "name": "ST source type: nested-read-outer-region",
+      "family": "core/state-types"
+    },
+    {
+      "id": "core/state-types/st-source-type-nested-write-outer-region",
+      "name": "ST source type: nested-write-outer-region",
+      "family": "core/state-types"
+    },
+    {
+      "id": "core/state-types/st-source-type-cross-region-read-signature",
+      "name": "ST source type: cross-region-read-signature",
+      "family": "core/state-types"
+    },
+    {
+      "id": "core/state-types/st-source-type-cross-region-write-signature",
+      "name": "ST source type: cross-region-write-signature",
+      "family": "core/state-types"
+    },
+    {
+      "id": "core/state-types/st-source-type-monomorphic-argument",
+      "name": "ST source type: monomorphic-argument",
+      "family": "core/state-types"
+    },
+    {
+      "id": "core/state-types/st-source-type-monomorphic-bound-argument",
+      "name": "ST source type: monomorphic-bound-argument",
+      "family": "core/state-types"
+    },
+    {
+      "id": "core/state-types/st-source-type-monomorphic-runner-signature",
+      "name": "ST source type: monomorphic-runner-signature",
+      "family": "core/state-types"
+    },
+    {
+      "id": "core/state-types/st-source-type-io-as-st",
+      "name": "ST source type: io-as-st",
+      "family": "core/state-types"
+    },
+    {
+      "id": "core/state-types/st-source-type-bind-io-action",
+      "name": "ST source type: bind-io-action",
+      "family": "core/state-types"
+    },
+    {
+      "id": "core/state-types/st-source-type-bind-io-continuation",
+      "name": "ST source type: bind-io-continuation",
+      "family": "core/state-types"
+    },
+    {
+      "id": "core/state-types/st-source-type-io-bind-st-action",
+      "name": "ST source type: io-bind-st-action",
+      "family": "core/state-types"
+    },
+    {
+      "id": "core/state-types/st-source-type-io-array-as-st-array",
+      "name": "ST source type: io-array-as-st-array",
+      "family": "core/state-types"
+    },
+    {
+      "id": "core/state-types/st-source-type-wrong-array-value-type",
+      "name": "ST source type: wrong-array-value-type",
+      "family": "core/state-types"
+    },
+    {
+      "id": "core/state-types/st-source-type-polymorphic-reference-attack",
+      "name": "ST source type: polymorphic-reference-attack",
+      "family": "core/state-types"
+    },
+    {
+      "id": "core/state-types/st-source-type-impredicative-reference-attack",
+      "name": "ST source type: impredicative-reference-attack",
+      "family": "core/state-types"
+    },
+    {
+      "id": "core/state-types/st-source-type-repackage-action-as-region-polymorphic",
+      "name": "ST source type: repackage-action-as-region-polymorphic",
+      "family": "core/state-types"
+    },
+    {
+      "id": "core/state-types/st-source-type-existential-coercion-escape",
+      "name": "ST source type: existential-coercion-escape",
+      "family": "core/state-types"
+    },
+    {
+      "id": "core/state-types/st-source-type-opaque-package-read-attack",
+      "name": "ST source type: opaque-package-read-attack",
+      "family": "core/state-types"
+    },
+    {
+      "id": "core/state-types/st-source-type-opaque-package-write-attack",
+      "name": "ST source type: opaque-package-write-attack",
+      "family": "core/state-types"
+    },
+    {
+      "id": "core/state-types/st-source-type-redefine-st",
+      "name": "ST source type: redefine-st",
+      "family": "core/state-types"
+    },
+    {
+      "id": "core/state-types/st-source-type-redefine-array",
+      "name": "ST source type: redefine-array",
+      "family": "core/state-types"
+    },
+    {
+      "id": "core/state-types/st-source-type-construct-opaque-st",
+      "name": "ST source type: construct-opaque-st",
+      "family": "core/state-types"
+    },
+    {
+      "id": "core/state-types/st-source-type-construct-opaque-array",
+      "name": "ST source type: construct-opaque-array",
+      "family": "core/state-types"
+    },
+    {
+      "id": "core/state-types/st-source-type-pattern-opaque-st",
+      "name": "ST source type: pattern-opaque-st",
+      "family": "core/state-types"
+    },
+    {
+      "id": "core/state-types/st-source-type-st-wrong-arity",
+      "name": "ST source type: st-wrong-arity",
+      "family": "core/state-types"
+    },
+    {
+      "id": "core/state-types/st-source-type-array-wrong-arity",
+      "name": "ST source type: array-wrong-arity",
+      "family": "core/state-types"
+    },
+    {
+      "id": "core/state-types/st-source-type-st-region-wrong-kind",
+      "name": "ST source type: st-region-wrong-kind",
+      "family": "core/state-types"
+    },
+    {
+      "id": "core/state-types/st-source-type-array-element-wrong-kind",
+      "name": "ST source type: array-element-wrong-kind",
+      "family": "core/state-types"
+    },
+    {
+      "id": "core/state-types/st-target-type-rank2-runner",
+      "name": "ST target type: rank2-runner",
+      "family": "core/state-types"
+    },
+    {
+      "id": "core/state-types/st-target-type-monomorphic-action-value",
+      "name": "ST target type: monomorphic-action-value",
+      "family": "core/state-types"
+    },
+    {
+      "id": "core/state-types/st-target-type-rank2-region-action",
+      "name": "ST target type: rank2-region-action",
+      "family": "core/state-types"
+    },
+    {
+      "id": "core/state-types/st-target-type-monomorphic-runst-input",
+      "name": "ST target type: monomorphic-runST-input",
+      "family": "core/state-types"
+    },
+    {
+      "id": "core/state-types/st-target-type-outer-forall-cannot-replace-inner",
+      "name": "ST target type: outer-forall-cannot-replace-inner",
+      "family": "core/state-types"
+    },
+    {
+      "id": "core/state-types/st-target-type-io-to-st-cast",
+      "name": "ST target type: io-to-st-cast",
+      "family": "core/state-types"
+    },
+    {
+      "id": "core/state-types/st-target-type-cross-region-read",
+      "name": "ST target type: cross-region-read",
+      "family": "core/state-types"
+    },
+    {
+      "id": "core/state-types/st-target-type-cross-region-write",
+      "name": "ST target type: cross-region-write",
+      "family": "core/state-types"
+    },
+    {
+      "id": "core/state-types/st-target-type-unbound-region",
+      "name": "ST target type: unbound-region",
+      "family": "core/state-types"
+    },
+    {
+      "id": "core/state-types/st-target-type-runst-extra-type-argument",
+      "name": "ST target type: runST-extra-type-argument",
+      "family": "core/state-types"
+    },
+    {
+      "id": "core/state-types/st-target-type-higher-kind-region",
+      "name": "ST target type: higher-kind-region",
+      "family": "core/state-types"
+    },
+    {
+      "id": "core/state-types/st-target-type-unexecuted-array-action",
+      "name": "ST target type: unexecuted-array-action",
+      "family": "core/state-types"
+    },
+    {
+      "id": "core/state-types/st-primitive-abi-is-appended-and-action-construction-stays-lazy",
+      "name": "ST primitive ABI is appended and action construction stays lazy",
+      "family": "core/state-types"
+    },
+    {
+      "id": "core/state-types/st-primitives-work-with-implicit-prelude-disabled",
+      "name": "ST primitives work with implicit prelude disabled",
+      "family": "core/state-types"
+    },
+    {
+      "id": "core/hm-oracle/independent-ml-typability-oracle",
+      "name": "independent ML typability oracle",
+      "family": "core/hm-oracle"
+    },
+    {
+      "id": "core/annotation-corpus/annotation-corpus",
+      "name": "annotation corpus",
+      "family": "core/annotation-corpus"
+    },
+    {
+      "id": "core/example-files/example-files",
+      "name": "example files",
+      "family": "core/example-files"
+    },
+    {
+      "id": "core/guards/guards-parser-ordered-expression-arms",
+      "name": "guards parser: ordered expression arms",
+      "family": "core/guards"
+    },
+    {
+      "id": "core/guards/guards-parser-fallback-only-expression",
+      "name": "guards parser: fallback-only expression",
+      "family": "core/guards"
+    },
+    {
+      "id": "core/guards/guards-parser-expression-trailing-separator",
+      "name": "guards parser: expression trailing separator",
+      "family": "core/guards"
+    },
+    {
+      "id": "core/guards/guards-parser-nested-expression-arms",
+      "name": "guards parser: nested expression arms",
+      "family": "core/guards"
+    },
+    {
+      "id": "core/guards/guards-parser-ordinary-if-inside-guarded-branches",
+      "name": "guards parser: ordinary if inside guarded branches",
+      "family": "core/guards"
+    },
+    {
+      "id": "core/guards/guards-parser-arithmetic-and-boolean-precedence",
+      "name": "guards parser: arithmetic and Boolean precedence",
+      "family": "core/guards"
+    },
+    {
+      "id": "core/guards/guards-parser-otherwise-call-remains-a-condition",
+      "name": "guards parser: otherwise call remains a condition",
+      "family": "core/guards"
+    },
+    {
+      "id": "core/guards/guards-parser-qualified-otherwise-remains-a-condition",
+      "name": "guards parser: qualified otherwise remains a condition",
+      "family": "core/guards"
+    },
+    {
+      "id": "core/guards/guards-parser-parenthesized-otherwise-remains-a-condition",
+      "name": "guards parser: parenthesized otherwise remains a condition",
+      "family": "core/guards"
+    },
+    {
+      "id": "core/guards/guards-program-function-guard-layout",
+      "name": "guards program: function guard layout",
+      "family": "core/guards"
+    },
+    {
+      "id": "core/guards/guards-program-function-guard-nested-block-layout",
+      "name": "guards program: function guard nested block layout",
+      "family": "core/guards"
+    },
+    {
+      "id": "core/guards/guards-program-expression-guard-inside-ordinary-then-do-layout",
+      "name": "guards program: expression guard inside ordinary then-do layout",
+      "family": "core/guards"
+    },
+    {
+      "id": "core/guards/guards-program-ordinary-if-identifier-compatibility",
+      "name": "guards program: ordinary if identifier compatibility",
+      "family": "core/guards"
+    },
+    {
+      "id": "core/guards/guards-parser-legacy-annotation-in-rhs-before-bar",
+      "name": "guards parser: legacy annotation in RHS before bar",
+      "family": "core/guards"
+    },
+    {
+      "id": "core/guards/guards-parser-legacy-annotation-in-condition-before-equals",
+      "name": "guards parser: legacy annotation in condition before equals",
+      "family": "core/guards"
+    },
+    {
+      "id": "core/guards/guards-parser-diagnostics-keep-original-line-and-column",
+      "name": "guards parser: diagnostics keep original line and column",
+      "family": "core/guards"
+    },
+    {
+      "id": "core/guards/guards-checking-guarded-values-generalize",
+      "name": "guards checking: guarded values generalize",
+      "family": "core/guards"
+    },
+    {
+      "id": "core/guards/guards-checking-separate-whole-function-signature",
+      "name": "guards checking: separate whole-function signature",
+      "family": "core/guards"
+    },
+    {
+      "id": "core/guards/guards-checking-inline-whole-function-signature",
+      "name": "guards checking: inline whole-function signature",
+      "family": "core/guards"
+    },
+    {
+      "id": "core/guards/guards-checking-annotated-parameter",
+      "name": "guards checking: annotated parameter",
+      "family": "core/guards"
+    },
+    {
+      "id": "core/guards/guards-checking-local-guard-sees-outer-binding",
+      "name": "guards checking: local guard sees outer binding",
+      "family": "core/guards"
+    },
+    {
+      "id": "core/guards/guards-checking-pattern-binders-scope-over-guards-and-results",
+      "name": "guards checking: pattern binders scope over guards and results",
+      "family": "core/guards"
+    },
+    {
+      "id": "core/guards/guards-checking-guard-condition-can-contain-an-expression-guard",
+      "name": "guards checking: guard condition can contain an expression guard",
+      "family": "core/guards"
+    },
+    {
+      "id": "core/guards/guards-checking-unselected-branches-preserve-polymorphism",
+      "name": "guards checking: unselected branches preserve polymorphism",
+      "family": "core/guards"
+    },
+    {
+      "id": "core/guards/guards-checking-no-implicit-prelude-required",
+      "name": "guards checking: no implicit prelude required",
+      "family": "core/guards"
+    },
+    {
+      "id": "core/guards/guards-rejection-expression-condition-requires-bool",
+      "name": "guards rejection: expression condition requires Bool",
+      "family": "core/guards"
+    },
+    {
+      "id": "core/guards/guards-rejection-function-condition-requires-bool",
+      "name": "guards rejection: function condition requires Bool",
+      "family": "core/guards"
+    },
+    {
+      "id": "core/guards/guards-rejection-all-result-types-agree",
+      "name": "guards rejection: all result types agree",
+      "family": "core/guards"
+    },
+    {
+      "id": "core/guards/guards-rejection-unselected-condition-is-checked",
+      "name": "guards rejection: unselected condition is checked",
+      "family": "core/guards"
+    },
+    {
+      "id": "core/guards/guards-rejection-pattern-coverage-remains-exhaustive",
+      "name": "guards rejection: pattern coverage remains exhaustive",
+      "family": "core/guards"
+    },
+    {
+      "id": "core/guards/guards-rejection-total-guards-do-not-fall-through-to-another-equation",
+      "name": "guards rejection: total guards do not fall through to another equation",
+      "family": "core/guards"
+    },
+    {
+      "id": "core/guards/guards-rejection-pattern-binder-does-not-enter-sibling-equation",
+      "name": "guards rejection: pattern binder does not enter sibling equation",
+      "family": "core/guards"
+    },
+    {
+      "id": "core/guards/guards-rejection-pattern-binder-does-not-escape-function",
+      "name": "guards rejection: pattern binder does not escape function",
+      "family": "core/guards"
+    },
+    {
+      "id": "core/guards/guards-rejection-branch-binding-does-not-enter-sibling-guard",
+      "name": "guards rejection: branch binding does not enter sibling guard",
+      "family": "core/guards"
+    },
+    {
+      "id": "core/guards/guards-rejection-expression-fallback-required",
+      "name": "guards rejection: expression fallback required",
+      "family": "core/guards"
+    },
+    {
+      "id": "core/guards/guards-rejection-function-fallback-required",
+      "name": "guards rejection: function fallback required",
+      "family": "core/guards"
+    },
+    {
+      "id": "core/guards/guards-rejection-expression-fallback-must-be-last",
+      "name": "guards rejection: expression fallback must be last",
+      "family": "core/guards"
+    },
+    {
+      "id": "core/guards/guards-rejection-function-fallback-must-be-last",
+      "name": "guards rejection: function fallback must be last",
+      "family": "core/guards"
+    },
+    {
+      "id": "core/guards/guards-rejection-duplicate-expression-fallback",
+      "name": "guards rejection: duplicate expression fallback",
+      "family": "core/guards"
+    },
+    {
+      "id": "core/guards/guards-rejection-duplicate-function-fallback",
+      "name": "guards rejection: duplicate function fallback",
+      "family": "core/guards"
+    },
+    {
+      "id": "core/guards/guards-rejection-empty-expression-block",
+      "name": "guards rejection: empty expression block",
+      "family": "core/guards"
+    },
+    {
+      "id": "core/guards/guards-rejection-expression-arm-requires-arrow",
+      "name": "guards rejection: expression arm requires arrow",
+      "family": "core/guards"
+    },
+    {
+      "id": "core/guards/guards-rejection-function-arm-requires-equals",
+      "name": "guards rejection: function arm requires equals",
+      "family": "core/guards"
+    },
+    {
+      "id": "core/guards/guards-rejection-expression-arm-requires-result",
+      "name": "guards rejection: expression arm requires result",
+      "family": "core/guards"
+    },
+    {
+      "id": "core/guards/guards-rejection-comma-guards-are-not-accepted",
+      "name": "guards rejection: comma guards are not accepted",
+      "family": "core/guards"
+    },
+    {
+      "id": "core/guards/guards-rejection-pattern-guards-are-not-accepted",
+      "name": "guards rejection: pattern guards are not accepted",
+      "family": "core/guards"
+    },
+    {
+      "id": "core/guards/guards-rejection-expression-guard-block-needs-braces",
+      "name": "guards rejection: expression guard block needs braces",
+      "family": "core/guards"
+    },
+    {
+      "id": "core/guards/guards-checking-guards-runtime-first-match-and-short-circuit",
+      "name": "guards checking: guards runtime: first match and short circuit",
+      "family": "core/guards"
+    },
+    {
+      "id": "core/guards/guards-checking-guards-runtime-only-selected-io-executes",
+      "name": "guards checking: guards runtime: only selected IO executes",
+      "family": "core/guards"
+    },
+    {
+      "id": "core/guards/guards-checking-guards-runtime-local-and-recursive-bindings",
+      "name": "guards checking: guards runtime: local and recursive bindings",
+      "family": "core/guards"
+    },
+    {
+      "id": "core/guards/guards-checking-guards-runtime-patterns-and-instance-methods",
+      "name": "guards checking: guards runtime: patterns and instance methods",
+      "family": "core/guards"
+    },
+    {
+      "id": "core/guards/guards-checking-guards-runtime-nested-ordinary-and-guarded-conditionals",
+      "name": "guards checking: guards runtime: nested ordinary and guarded conditionals",
+      "family": "core/guards"
+    },
+    {
+      "id": "core/guards/guards-checking-guards-runtime-case-bodies-and-lazy-wildcard",
+      "name": "guards checking: guards runtime: case bodies and lazy wildcard",
+      "family": "core/guards"
+    },
+    {
+      "id": "core/guards/guards-checking-guards-runtime-contextual-otherwise-compatibility",
+      "name": "guards checking: guards runtime: contextual otherwise compatibility",
+      "family": "core/guards"
+    },
+    {
+      "id": "core/guards/guards-checking-guards-runtime-dynamic-selection-and-primitive-hygiene",
+      "name": "guards checking: guards runtime: dynamic selection and primitive hygiene",
+      "family": "core/guards"
+    }
+  ]
+}

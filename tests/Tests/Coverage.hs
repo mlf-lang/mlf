@@ -8,6 +8,7 @@ module Tests.Coverage where {
   import qualified Bootstrap.Std as S;
   import qualified Package.Json as J;
   import qualified Package.OS as O;
+  import qualified Tests.ReportJournal as Journal;
   -- Execution evidence never reads the reviewed inventory. The parent validates
   -- the completed report against that separate file and the child's exit status.
   fields values = J.Object values;
@@ -21,22 +22,20 @@ module Tests.Coverage where {
       path <- getEnv "MLF_TEST_COVERAGE_REPORT";
       if eqString path ""
       then return ()
-      else do {
-             previous <- readFile path;
-             writeFile path (previous ++ (J.render (event suite kind values) ++ "\n"))
-           }
+      else Journal.append "MLF_TEST_COVERAGE_REPORT" path (J.render (event suite kind values) ++ "\n")
     };
   begin suite full =
     do {
       path <- getEnv "MLF_TEST_COVERAGE_REPORT";
       if eqString path ""
       then return ()
-      else writeFile path
+      else Journal.begin "MLF_TEST_COVERAGE_REPORT" path
              (J.render
                 (event suite "start"
                    ((:) (pair "scope" (J.str (if full then "full" else "partial"))) [])) ++
               "\n")
     };
+  flush = Journal.flush "MLF_TEST_COVERAGE_REPORT";
   passed suite identity =
     append suite "case"
       ((:) (pair "id" (J.str identity)) ((:) (pair "status" (J.str "passed")) []));
@@ -54,18 +53,19 @@ module Tests.Coverage where {
       if eqString path ""
       then return ()
       else do {
-             text <- readFile path;
+             text <- Journal.contents "MLF_TEST_COVERAGE_REPORT" path;
              rows <-
                case parse text of {
                  Left error -> O.fatal error;
                  Right rows -> return rows
                };
-             append suite "summary"
+             let { summary = event suite "summary"
                ((:) (pair "complete" (J.Boolean True))
                   ((:) (pair "executions" (J.num (S.length (S.filter (kind "case") rows))))
                      ((:) (pair "aliases" (J.num (S.length (S.filter (kind "alias") rows))))
                         ((:) (pair "metrics" (J.num (S.length (S.filter (kind "metric") rows))))
-                           []))))
+                           [])))) };
+             Journal.publish "MLF_TEST_COVERAGE_REPORT" path (text ++ (J.render summary ++ "\n"))
            }
     };
   -- Count completed callback invocations, not the length of the planned inputs.
@@ -196,6 +196,105 @@ module Tests.Coverage where {
     case value of {
       J.String _ -> True;
       _ -> False
+    };
+  -- Public case descriptors are checked against an independently reviewed
+  -- inventory. Source layout, private binding helpers and unrelated tags are
+  -- deliberately absent from this boundary.
+  registryProjection :: J.Json -> [] String -> Either String ([] J.Json);
+  registryProjection inventory families =
+    do {
+      ensure (projectionObject inventory) "registry contract must be an object";
+      ensure (keys (O.words "schema_version cases") inventory &&
+              J.equal (J.get "schema_version" inventory) (J.num 1))
+        "invalid registry contract schema";
+      entries <- case J.get "cases" inventory of {
+        J.Array values -> Right values;
+        _ -> Left "registry contract cases must be an array"
+      };
+      ensure (S.not (S.null entries) && S.all
+        (\entry -> projectionObject entry && keys (O.words "id name family") entry &&
+          S.all (\key -> case J.get key entry of {
+            J.String value -> stringLength value > 0;
+            _ -> False
+          }) (O.words "id name family")) entries) "invalid registry contract entry";
+      ensure (unique (S.map (J.getText "id" "") entries)) "duplicate registry contract ID";
+      let { known = S.map (J.getText "family" "") entries };
+      ensure (S.not (S.null families) && unique families &&
+              S.all (\family -> S.elem eqString family known) families)
+        "invalid registry family projection";
+      return (S.filter (\entry -> S.elem eqString (J.getText "family" "" entry) families) entries)
+    };
+  registryDescriptors :: [] J.Json -> [] J.Json -> Either String ();
+  registryDescriptors expected actual =
+    do {
+      ensure (S.length actual == S.length expected) "registry descriptor count changed";
+      S.mapM_
+        (\((,) wanted row) -> do {
+          ensure (projectionObject row &&
+                  S.all (\key -> projectionString (J.get key row)) (O.words "id name") &&
+                  strictStrings (J.get "tags" row)) "malformed registry descriptor";
+          ensure (J.equal (J.get "id" row) (J.get "id" wanted) &&
+                  J.equal (J.get "name" row) (J.get "name" wanted) &&
+                  S.eqList eqString
+                    (S.filter (O.starts "family:") (J.getStrings "tags" row))
+                    ((:) ("family:" ++ J.getText "family" "" wanted) []))
+            "registry ID, name, order or family ownership changed"
+        }) (S.zip expected actual)
+    };
+  validateRegistryDiscovery :: J.Json -> [] String -> String -> Either String Int;
+  validateRegistryDiscovery inventory families text =
+    do {
+      expected <- registryProjection inventory families;
+      row <- J.parse text;
+      ensure (projectionObject row &&
+              J.equal (J.get "schema_version" row) (J.num 1) &&
+              J.equal (J.get "event" row) (J.str "inventory") &&
+              J.equal (J.get "scope" row) (J.str "full") &&
+              J.equal (J.get "total" row) (J.num (S.length expected)) &&
+              J.equal (J.get "selected" row) (J.num (S.length expected)))
+        "registry discovery does not describe the complete physical target";
+      actual <- case J.get "cases" row of {
+        J.Array values -> Right values;
+        _ -> Left "registry discovery cases must be an array"
+      };
+      registryDescriptors expected actual;
+      return (S.length expected)
+    };
+  validateRegistryCases :: J.Json -> [] String -> Int -> String -> Either String ();
+  validateRegistryCases inventory families total text =
+    do {
+      expected <- registryProjection inventory families;
+      rows <- parse text;
+      ensure (S.length rows >= 3 && S.all
+        (\row -> projectionObject row && projectionString (J.get "event" row) &&
+          J.equal (J.get "schema_version" row) (J.num 1)) rows)
+        "registry case report is malformed or truncated";
+      let {
+        first = S.head rows;
+        last = S.last rows;
+        actual = S.take (S.length rows - 2) (S.drop 1 rows);
+        count = S.length expected;
+        ids = S.map (J.getText "id" "") expected
+      };
+      ensure (kind "start" first && strictStrings (J.get "ids" first) &&
+              S.eqList eqString (J.getStrings "ids" first) ids &&
+              J.equal (J.get "total" first) (J.num total) &&
+              J.equal (J.get "selected" first) (J.num count))
+        "registry case plan differs from the independent selection";
+      ensure (total >= count &&
+              J.equal (J.get "scope" first) (J.str (if total == count then "full" else "partial")) &&
+              J.equal (J.get "scope" last) (J.get "scope" first))
+        "registry case scope disagrees with the physical inventory";
+      ensure (kind "summary" last && J.equal (J.get "complete" last) (J.Boolean True) &&
+              J.equal (J.get "total" first) (J.get "total" last) &&
+              S.all (\key -> J.equal (J.get key last) (J.num count))
+                (O.words "selected executed passed") &&
+              J.equal (J.get "failed" last) (J.num 0))
+        "registry case summary did not pass the complete selection";
+      ensure (S.all (\row -> kind "case" row &&
+                    J.equal (J.get "status" row) (J.str "passed")) actual)
+        "registry case did not pass";
+      registryDescriptors expected actual
     };
   -- Guard the unchanged full validator's typed getters before delegating the
   -- partial path to it. A malformed row must produce Left rather than panic.

@@ -1,8 +1,6 @@
 {
   "schema_version": 1,
-  "scope": "Reviewed active Haskell-semantics tuple/list contract; not execution evidence. Historical90 ledger is unchanged.",
-  "framework_count": 105,
-  "legacy_pass_count": 305,
+  "scope": "Ordered public tuple/list case IDs, checked against executable discovery and case reports.",
   "framework_ids": [
     "tuple-list/focused/pair-ast",
     "tuple-list/focused/triple-ast",
@@ -109,11 +107,5 @@
     "tuple-list/focused/qualified-custom-pair-rejects-standard-pattern",
     "tuple-list/focused/standard-unit-with-custom-declaration",
     "tuple-list/focused/explicit-custom-unit-remains-available"
-  ],
-  "source_sha256": {
-    "tests/Tests/TupleList.hs": "4d8ceb5ddee0ae9981659402c1c490ff00e0dc50264ba344af0d30ca96c760ae",
-    "tests/MLF/Entry/TupleList.hs": "e817f6037216da8cff7d615e617adcccd58bf687b6e9dacc3155ad8e4a9f6bd8",
-    "tests/Tests/TupleListLegacy.hs": "295f480509cb670133578781ce7daafa265bc28fe37c4a47a4b6e5170bd2b3a7"
-  },
-  "reviewed_case_delta_sha256": "4ff7882b0ee7a372938ee3bf13212ec962b6eaff21cb530b7e50b0241326f2d6"
+  ]
 }

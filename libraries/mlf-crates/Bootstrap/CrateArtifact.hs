@@ -685,6 +685,7 @@ module Bootstrap.CrateArtifact where {
     XAbs _ _ body -> child body;
     XApp a b -> Set.union X.compareName (child a) (child b);
     XTypeAbs _ _ body -> child body;
+    XInstantiationSpine n rows -> join ((:) (one n) (map (\((,,) _ _ val) -> child val) rows));
     XTypeApp body _ -> child body;
     XLet _ rhs body -> Set.union X.compareName (child rhs) (child body);
     XLetRec definitions body -> join ((:) (child body)
@@ -754,10 +755,9 @@ module Bootstrap.CrateArtifact where {
       let {
         modules = Modules.resolvedCrateModules resolution
       };
-      sourceData <- D.canonicalSourceDeclarations []
-        (concatMap (\r -> Modules.renamedDatatypes (Modules.resolvedContents r)) modules);
-      classes <- Classes.canonicalSourceClasses Set.empty sourceData []
-        (concatMap (\r -> Modules.renamedClasses (Modules.resolvedContents r)) modules);
+      (,) sourceData classes <- Classes.canonicalSourceHeaders Set.empty [] []
+        (concatMap (compose Modules.renamedDatatypes Modules.resolvedContents) modules)
+        (concatMap (compose Modules.renamedClasses Modules.resolvedContents) modules);
       let {
         values = concatMap (\r -> Modules.renamedValues (Modules.resolvedContents r)) modules
       };
@@ -1685,27 +1685,30 @@ module Bootstrap.CrateArtifact where {
          (eqString name entry ||
           (startsWith "select_" name || (startsWith "super_" name || startsWith "instance_" name))))
       bindings;
-  -- A closed monotype has no type instantiation or dictionary application at
-  -- the entry use. The linked binding already carries the checked type; keep
-  -- the import-boundary checks, but do not infer fake declarations for it.
+  -- A closed polymorphic entry already abstracts its type and dictionary
+  -- parameters. Re-inferring an occurrence would instantiate those parameters.
   directEntryType dictionaries ty = case ty of {
+    XForall _ _ _ -> Set.null (T.freeVars ty);
+    _ -> directEntryMonotype dictionaries ty
+  };
+  -- Ground evidence still needs to be resolved at the entry use.
+  directEntryMonotype dictionaries ty = case ty of {
     XCon name arguments -> not (M.member compareString name dictionaries) &&
-      all (directEntryType dictionaries) arguments;
-    XArrow argument result -> directEntryType dictionaries argument &&
-      directEntryType dictionaries result;
-    XApply function argument -> directEntryType dictionaries function &&
-      directEntryType dictionaries argument;
+      all (directEntryMonotype dictionaries) arguments;
+    XArrow argument result -> directEntryMonotype dictionaries argument && directEntryMonotype dictionaries result;
+    XApply function argument -> directEntryMonotype dictionaries function && directEntryMonotype dictionaries argument;
     _ -> False
   };
-  -- Preserve the old import adapter's rejection of noncanonical legacy
-  -- schemes (including dead quantifiers). Bounded schemes use inference.
-  directEntryImport ty = case ty of {
+  -- The entry is used at its own checked scheme. Its independent bounded
+  -- quantifiers must keep their order. Other imported selectors still obey
+  -- the legacy adapter, and dead quantifiers still require admission there.
+  directEntryImport isEntry ty = let { valid = directEntryImport isEntry } in case ty of {
     XVar _ -> True;
-    XArrow a b -> directEntryImport a && directEntryImport b;
-    XCon _ arguments -> all directEntryImport arguments;
-    XApply f a -> directEntryImport f && directEntryImport a;
-    XForall variable XBot body -> Set.member T.compareTyVar variable (T.freeVars body) && directEntryImport body;
-    XForall variable (XBotKind _) body -> Set.member T.compareTyVar variable (T.freeVars body) && directEntryImport body;
+    XArrow a b -> valid a && valid b;
+    XCon _ arguments -> all valid arguments;
+    XApply f a -> valid f && valid a;
+    XForall variable bound body -> Set.member T.compareTyVar variable (T.freeVars body) &&
+      (case bound of { XBot -> True; XBotKind _ -> True; _ -> isEntry && valid bound }) && valid body;
     _ -> False
   };
   directEntry signatures available entry = do {
@@ -1774,7 +1777,7 @@ module Bootstrap.CrateArtifact where {
                  signatures
            };
            case M.lookup compareString entry signatures of {
-             Just ty -> if directEntryType dictionaries ty && all (compose directEntryImport snd) (M.toList signatures)
+             Just ty -> if directEntryType dictionaries ty && all (\((,) n t) -> directEntryImport (eqString n entry) t) (M.toList signatures)
                then directEntry signatures available entry
                else inferEntry serial interfaces available entry visibleInstances signatures conventions externals;
              Nothing -> inferEntry serial interfaces available entry visibleInstances signatures conventions externals
@@ -1809,52 +1812,57 @@ module Bootstrap.CrateArtifact where {
         (finish state entry)
     }
   };
-  linkedObjectParts initial prelinked objects root =
-    do {
-      let {
-        interfaces = append prelinked (map objectInterface objects)
-      };
-      uniqueNames "object identity" (map crateId interfaces);
-      ensure (all (compose null crateDependencies) prelinked)
-        "prelinked crate must have no dependencies";
-      let {
-        byName = interfaceMap interfaces
-      };
-      ordered <- dependencyClosure byName [] [] ((:) root []);
-      let { ready = map crateId prelinked };
-      ensure (all (\identity -> elem eqString identity (map crateId ordered)) ready)
-        "prelinked crate is outside the dependency closure";
-      traverseEither (validateDependencies byName) ordered;
-      traverseEither (validateExportBoundary byName) ordered;
-      dataEnv <- validateLayouts ordered;
-      let {
-        layouts =
-          M.fromList compareString
-            (map (\d -> (,) (D.datatypeName d) (datatypePart d))
-               (concatMap crateLoweredData ordered))
-      };
-      let {
-        objectMap =
-          M.fromList compareString (map (\o -> (,) (crateId (objectInterface o)) o) objects)
-      };
-      program <- openProgramFrom ready ordered objectMap root;
-      state <-
-        foldEither
-          (\s i ->
-             case M.lookup compareString (crateId i) objectMap of {
-               Nothing -> Left "missing crate object";
-               Just o -> linkProgramCrate program byName layouts s o
-             })
-          initial
-          (filter (\iface -> not (elem eqString (crateId iface) ready)) ordered);
-      let {
-        rootInterface = M.findWithDefault compareString (panic "missing root crate") root byName
-      };
-      entry <-
-        linkEntry (fragmentSerial state) ordered rootInterface (fragmentBindings state)
-          (crateEntry rootInterface);
-      Right ((,) state entry)
+  linkedObjectParts initial prelinked objects root = do {
+    let { interfaces = append prelinked (map objectInterface objects);
+          byName = interfaceMap interfaces };
+    uniqueNames "object identity" (map crateId interfaces);
+    ensure (all (compose null crateDependencies) prelinked)
+      "prelinked crate must have no dependencies";
+    ordered <- dependencyClosure byName [] [] [root];
+    let { ready = map crateId prelinked };
+    ensure (all (\identity -> elem eqString identity (map crateId ordered)) ready)
+      "prelinked crate is outside the dependency closure";
+    traverseEither (validateDependencies byName) ordered;
+    traverseEither (validateExportBoundary byName) ordered;
+    validateLayouts ordered;
+    let { layouts = M.fromList compareString (map (\d -> (,) (D.datatypeName d) (datatypePart d))
+            (concatMap crateLoweredData ordered));
+          objectMap = M.fromList compareString (map (\o -> (,) (crateId (objectInterface o)) o) objects) };
+    composeObjectParts initial ready root byName ordered layouts objectMap
+  };
+  -- Bind imports only within the checked root's transitive crate closure.
+  -- The actual installed objects own metadata admission, including the
+  -- semantic digest, layout and entry-rendering budget of a marked object.
+  nativeObjectParts initial installed objects root = do {
+    prepared <- envelopePrepareKnownObjects (append installed objects) [root] True;
+    case prepared of { EnvelopeKnownObjects ordered byName objectMap table layouts -> do {
+      let { identities = Set.fromList compareString (map (compose crateId objectInterface) installed);
+            imported = filter (\iface -> Set.member compareString (crateId iface) identities) ordered };
+      charged <- envelopePrechargeEntry root table ordered;
+      seq charged (composeObjectParts (initial imported) (map crateId imported) root byName ordered layouts objectMap)
+    } }
+  };
+  -- Closed spines and external ABI binders share reachable fragment
+  -- selection, capture-free substitution and entry elaboration.
+  composeObjectParts initial ready root byName ordered layouts objectMap = do {
+    program <- openProgramFrom ready ordered objectMap root;
+    state <-
+      foldEither
+        (\s i ->
+           case M.lookup compareString (crateId i) objectMap of {
+             Nothing -> Left "missing crate object";
+             Just o -> linkProgramCrate program byName layouts s o
+           })
+        initial
+        (filter (\iface -> not (elem eqString (crateId iface) ready)) ordered);
+    let {
+      rootInterface = M.findWithDefault compareString (panic "missing root crate") root byName
     };
+    entry <-
+      linkEntry (fragmentSerial state) ordered rootInterface (fragmentBindings state)
+        (crateEntry rootInterface);
+    Right ((,) state entry)
+  };
   finishLinkedState state entry = do {
     body <- foldEither (\body declarations -> Separate.graft declarations body) entry
       (fragmentBodies state);
@@ -1913,18 +1921,30 @@ module Bootstrap.CrateArtifact where {
     };
     _ -> Left "malformed binary crate object roots"
   };
+  data PublishedMetadata = PublishedMetadata ByteArray (Either String CrateInterface);
+  decodeInterfaceBytes bytes = do {
+    input <- Storage.decode 3 bytes;
+    ioReturn (bindEither input (\decoded -> case decoded of {
+      Storage.LegacyText text -> decodeInterface text;
+      Storage.BinaryInput roots -> decodeBinaryInterface roots
+    }))
+  };
   readInterface = readInterfaceProfiled Nothing;
-  readInterfaceProfiled profile path = Host.phaseIO profile "validate_ms" (do {
+  readInterfaceProfiled profile = readInterfaceRetaining profile M.empty;
+  readInterfaceRetaining profile retained path = Host.phaseIO profile "validate_ms" (do {
     raw <- Host.phaseIO profile "read_ms" (Storage.readRaw path);
-    input <- case raw of {
+    interface <- case raw of {
       Left message -> ioReturn (Left message);
-      Right bytes -> Host.phaseIO profile "decode_ms" (Storage.decode 3 bytes)
+      Right bytes -> let { decode = Host.phaseIO profile "decode_ms" (decodeInterfaceBytes bytes) } in
+        case M.lookup compareString path retained of {
+          Nothing -> decode;
+          Just (PublishedMetadata published admitted) -> do {
+            exact <- Storage.sameBytes bytes published;
+            if exact then ioReturn admitted else decode
+          }
+        }
     };
-    ioReturn (mapLeft (\error -> path ++ ": " ++ error)
-      (bindEither input (\decoded -> case decoded of {
-        Storage.LegacyText text -> decodeInterface text;
-        Storage.BinaryInput roots -> decodeBinaryInterface roots
-      })))
+    ioReturn (mapLeft (\error -> path ++ ": " ++ error) interface)
   });
   readObjectV1 path iface = do {
     input <- Storage.read 4 path;
@@ -1939,7 +1959,9 @@ module Bootstrap.CrateArtifact where {
                [] ((,) String CrateInterface) ->
                [] String -> IO (Either String ([] ((,) String CrateInterface)));
   loadGraph = loadGraphProfiled Nothing;
-  loadGraphProfiled profile trail done paths = Host.phaseIO profile "validate_ms" (
+  loadGraphProfiled profile = loadGraphReading profile (readInterfaceProfiled profile);
+  loadGraphRetaining retained = loadGraphReading Nothing (readInterfaceRetaining Nothing retained);
+  loadGraphReading profile reader trail done paths = Host.phaseIO profile "validate_ms" (
     case paths of {
       [] -> ioReturn (Right done);
       (:) requested rest ->
@@ -1955,9 +1977,9 @@ module Bootstrap.CrateArtifact where {
                            ("cyclic crate metadata paths: " ++
                             intercalate " -> " (snoc trail path)))
                  else if any (\p -> eqString path (fst p)) done
-                      then loadGraphProfiled profile trail done rest
+                      then loadGraphReading profile reader trail done rest
                       else do {
-                             read <- readInterfaceProfiled profile path;
+                             read <- reader path;
                              case read of {
                                Left e -> ioReturn (Left e);
                                Right iface ->
@@ -1968,7 +1990,7 @@ module Bootstrap.CrateArtifact where {
                                             crateId iface))
                                  else do {
                                         children <-
-                                          loadGraphProfiled profile (snoc trail path) done
+                                          loadGraphReading profile reader (snoc trail path) done
                                             (map dependencyPath (crateDependencies iface));
                                         case bindEither children
                                                (\xs ->
@@ -1982,7 +2004,7 @@ module Bootstrap.CrateArtifact where {
                                                   }) of {
                                           Left e -> ioReturn (Left e);
                                           Right xs ->
-                                            loadGraphProfiled profile trail (snoc xs ((,) path iface)) rest
+                                            loadGraphReading profile reader trail (snoc xs ((,) path iface)) rest
                                         }
                                       }
                              }
@@ -1993,30 +2015,85 @@ module Bootstrap.CrateArtifact where {
   loadInterfaces = loadInterfacesProfiled Nothing;
   loadInterfacesProfiled profile paths = loadGraphProfiled profile [] [] paths;
   linkCheckedFile = linkCheckedFileProfiled Nothing;
-  linkCheckedFileProfiled profile path =
-    do {
-      loaded <- loadInterfacesProfiled profile ((:) path []);
-      case loaded of {
-        Left e -> ioReturn (Left e);
-        Right interfaces ->
-          do {
-            objects <-
-              mapM (\((,) metadata iface) ->
-                readObjectWithInterfacesProfiled profile (map snd interfaces) (objectPath metadata) iface) interfaces;
-            case sequenceEither objects of {
-              Left message -> ioReturn (Left message);
-              Right os -> case reverse interfaces of {
-                [] -> ioReturn (Left "no root crate metadata");
-                (:) ((,) _ root) _ -> if any envelopeMarked os
-                  then Host.phaseValue profile "link_ms" (Host.phaseEither (\value -> seq value ()))
-                    (linkCheckedObjects os (crateId root))
-                  else linkCheckedObjectsV1Profiled profile finishLinkedState
-                    (FragmentState 0 M.empty [] [] Set.empty) [] os (crateId root)
+  linkCheckedFileProfiled profile = linkCheckedFileUsing profile (\_ _ -> ioReturn Nothing);
+  linkCheckedFileUsing profile admitPrelude path = do {
+    loaded <- loadInterfacesProfiled profile [path];
+    case loaded of {
+      Left message -> ioReturn (Left message);
+      Right interfaces -> linkCheckedClosure profile admitPrelude M.empty interfaces Nothing
+    }
+  };
+
+  -- A file-owned root is already checked in this process; a disk root is the
+  -- last entry in the admitted dependency graph. Both link the same closure.
+  linkCheckedClosure :: Maybe Host.PhaseProfile ->
+    (String -> CrateInterface -> IO (Maybe ([] CrateObject -> String -> IO (Either String Checked.CheckedTerm)))) ->
+    Map String CrateObject -> [] ((,) String CrateInterface) -> Maybe CrateObject ->
+    IO (Either String Checked.CheckedTerm);
+  linkCheckedClosure profile admitPrelude retained interfaces compiledRoot = let {
+    storedInterfaces = map snd interfaces;
+    available = maybe storedInterfaces (\object -> (:) (objectInterface object) storedInterfaces) compiledRoot;
+    loadObject = readClosureObject profile retained available;
+    loadObjects rows = do {
+      results <- mapM loadObject rows;
+      ioReturn (mapEither (\objects -> maybe objects (snoc objects) compiledRoot) (sequenceEither results))
+    };
+    ordinary objects name = if any envelopeMarked objects
+      then Host.phaseValue profile "link_ms" (Host.phaseEither (\value -> seq value ()))
+        (envelopeLinkCheckedObjects objects name)
+      else linkCheckedObjectsV1Profiled profile finishLinkedState
+        (FragmentState 0 M.empty [] [] Set.empty) [] objects name;
+    linkAll name = do {
+      loaded <- loadObjects interfaces;
+      case loaded of { Left message -> ioReturn (Left message); Right objects -> ordinary objects name }
+    };
+    link name = case interfaces of {
+      (:) first@((,) path iface) rest -> if not (eqString (crateId iface) builtinCrateIdentity)
+        then linkAll name else do {
+          admitted <- admitPrelude path iface;
+          case admitted of {
+            Nothing -> linkAll name;
+            Just finish -> do {
+              loaded <- loadObjects rest;
+              case loaded of {
+                Left message -> ioReturn (Left message);
+                Right objects -> if not (any envelopeMarked objects) then finish objects name else do {
+                  -- Envelope limits cover the whole assembled closure, including the Prelude.
+                  builtin <- loadObject first;
+                  case builtin of {
+                    Left message -> ioReturn (Left message);
+                    Right object -> ordinary ((:) object objects) name
+                  }
+                }
               }
             }
           }
+        };
+      [] -> linkAll name
+    }
+  } in case compiledRoot of {
+    Just object -> link (crateId (objectInterface object));
+    Nothing -> case reverse interfaces of {
+      [] -> ioReturn (Left "no root crate metadata");
+      (:) ((,) _ root) _ -> link (crateId root)
+    }
+  };
+  readClosureObject profile retained available ((,) metadata expected) = let {
+    path = objectPath metadata;
+    ordinary = readObjectWithInterfacesProfiled profile available path expected
+  } in case M.lookup compareString metadata retained of {
+    Just object@(OpenCrateObject saved _) -> if not (sameAdmittedInterface expected saved) then ordinary else do {
+      bytes <- Storage.readRaw path;
+      case bytes of {
+        Left _ -> ordinary;
+        Right input -> do {
+          digest <- byteArrayDigest input;
+          if eqString digest (crateObjectFingerprint saved) then ioReturn (Right object) else ordinary
+        }
       }
     };
+    _ -> ordinary
+  };
   linkFile path =
     do {
       linked <- linkCheckedFile path;
@@ -3596,13 +3673,18 @@ module Bootstrap.CrateArtifact where {
     (Map String CrateInterface) (Map String CrateObject)
     (Map String EnvelopeLinkArtifact)
     (Map String ((,) String ((,,,) Int Int Int Int)));
-  envelopePrepareKnownObjects objects roots checkLegacyInterfaces = do {
-    uniqueNames "object identity" (map (\object -> crateId (objectInterface object)) objects);
-    let { interfaces = map objectInterface objects;
+  envelopePrepareKnownObjects = envelopePrepareObjectInputs [];
+  -- Machine-code providers contribute checked interface metadata, never a
+  -- synthetic checked object. Every IR object keeps its own admission ledger.
+  envelopePrepareObjectInputs external objects roots checkLegacyInterfaces = do {
+    let { interfaces = append external (map objectInterface objects);
           byName = interfaceMap interfaces;
           objectMap = M.fromList compareString (map (\object -> (,) (crateId (objectInterface object)) object) objects) };
+    uniqueNames "object identity" (map crateId interfaces);
     ordered <- dependencyClosure byName [] [] roots;
-    initial <- envelopeCollectLinkAdmissions objectMap ordered M.empty;
+    let { actual = if null external then ordered
+            else filter (\iface -> M.member compareString (crateId iface) objectMap) ordered };
+    initial <- envelopeCollectLinkAdmissions objectMap actual M.empty;
     _ <- if checkLegacyInterfaces then traverseEither (\iface ->
       if M.member compareString (crateId iface) initial then Right () else validateInterface iface) ordered
       else Right [];
@@ -3807,22 +3889,37 @@ module Bootstrap.CrateArtifact where {
     (ByteArray -> CrateInterface -> IO (Either String CrateObject)) ->
     String -> CrateInterface -> IO (Either String CrateObject);
   readObjectWithOpenReader = readObjectWithOpenReaderProfiled Nothing;
+  decodeObjectWithOpenReader profile openReader iface bytes = do {
+    open <- Open.packageFamily bytes;
+    recognized <- envelopeHasFamily bytes;
+    if open then openReader bytes iface
+    else if recognized then envelopeDecode crateEnvelopeLimits iface bytes else do {
+      input <- Host.phaseIO profile "decode_ms" (Storage.decode 4 bytes);
+      ioReturn (bindEither input (\decoded -> case decoded of {
+        Storage.LegacyText text -> decodeObject iface text;
+        Storage.BinaryInput graph -> decodeBinaryObject iface graph
+      }))
+    }
+  };
+  -- Hash and decode the same bytes even when the caller pins a fallback at a
+  -- path other than the usual .mlfco adjacent to its interface.
+  readPinnedObjectWithInterfaces interfaces path digest iface = do {
+    raw <- Storage.readRaw path;
+    case raw of {
+      Left message -> ioReturn (Left message);
+      Right bytes -> do {
+        actual <- byteArrayDigest bytes;
+        if not (eqString actual digest) then ioReturn (Left ("checked object SHA-256 mismatch: " ++ path))
+        else decodeObjectWithOpenReader Nothing (\input expected -> decodeOpenObject input expected
+          (openInterfaceDependencies interfaces expected)) iface bytes
+      }
+    }
+  };
   readObjectWithOpenReaderProfiled profile openReader path iface = Host.phaseIO profile "validate_ms" (do {
     raw <- Host.phaseIO profile "read_ms" (Storage.readRaw path);
     result <- case raw of {
       Left message -> ioReturn (Left message);
-      Right bytes -> do {
-        open <- Open.packageFamily bytes;
-        recognized <- envelopeHasFamily bytes;
-        if open then openReader bytes iface
-        else if recognized then envelopeDecode crateEnvelopeLimits iface bytes else do {
-          input <- Host.phaseIO profile "decode_ms" (Storage.decode 4 bytes);
-          ioReturn (bindEither input (\decoded -> case decoded of {
-            Storage.LegacyText text -> decodeObject iface text;
-            Storage.BinaryInput graph -> decodeBinaryObject iface graph
-          }))
-        }
-      }
+      Right bytes -> decodeObjectWithOpenReader profile openReader iface bytes
     };
     ioReturn (mapLeft (\message -> path ++ ": " ++ message) result)
   });
@@ -3947,7 +4044,29 @@ module Bootstrap.CrateArtifact where {
       })
     } }
   };
-  writeOpenObject prefix iface package = do {
+  writeOpenObject = writeOpenObjectUsing (\path iface ->
+    Storage.writeAtomic 3 path [Structure.toStoredCrateInterfaceFields (binaryInterfaceFields iface)]);
+  writeOpenObjectRetaining prefix object = case object of {
+    OpenCrateObject iface package -> writeOpenObjectUsing publishMetadata prefix iface package;
+    _ -> ioReturn (Left "plan metadata requires an open crate object")
+  };
+  publishMetadata path iface = do {
+    encoded <- Storage.encode 3 [Structure.toStoredCrateInterfaceFields (binaryInterfaceFields iface)];
+    case encoded of {
+      Left message -> ioReturn (Left message);
+      Right bytes -> do {
+        written <- Storage.writeRawAtomic path bytes;
+        case written of {
+          Left message -> ioReturn (Left message);
+          Right _ -> do {
+            admitted <- decodeInterfaceBytes bytes;
+            ioReturn (Right (PublishedMetadata bytes admitted))
+          }
+        }
+      }
+    }
+  };
+  writeOpenObjectUsing publish prefix iface package = do {
     actual <- case Open.cachedMetadata (openMetadataFields iface) package of {
       Just digest -> ioReturn (Right digest);
       Nothing -> openMetadata iface
@@ -3961,8 +4080,7 @@ module Bootstrap.CrateArtifact where {
       Left e -> ioReturn (Left e);
       Right _ -> do {
         written <- Storage.writeRawAtomic (prefix ++ ".mlfco") (Open.packageBytes package);
-        case written of { Left e -> ioReturn (Left e); Right _ ->
-          Storage.writeAtomic 3 (prefix ++ ".mlfci") [Structure.toCrateInterfaceFields (binaryInterfaceFields iface)] }
+        case written of { Left e -> ioReturn (Left e); Right _ -> publish (prefix ++ ".mlfci") iface }
       }
     }
   };

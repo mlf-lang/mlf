@@ -1,13 +1,17 @@
 {-# LANGUAGE OverloadedStrings #-}
 module PatriciaOracleControls(boundary) where
 import Prelude
-import Control.Exception(SomeException,try,evaluate)
+import Control.Exception(SomeException,try,evaluate,displayException)
 import Control.Monad(forM_)
+import Data.List(isPrefixOf)
+import qualified Bootstrap.Constraint as Live
 import qualified Bootstrap.Types as T
 import qualified Bootstrap.IntMap as IM
 import qualified Bootstrap.IntSet as IS
 import qualified OracleTypes as R
 import qualified FrozenSolver as FS
+import qualified FrozenConstraint as Frozen
+import qualified SessionGraftFixtures as Fixtures
 import qualified SessionOracle as O
 import qualified C4TransactionOracle as C
 
@@ -20,8 +24,29 @@ badPrefix _=error "bad-prefix fixture requires a branch"
 reject label action=do
  answer<-try action::IO(Either SomeException ())
  case answer of Left _->pure ();Right _->error("oracle accepted "++label)
+
+compactScopeBoundary :: IO ()
+compactScopeBoundary = do
+ let constraints = T.Constraints Fixtures.poly
+       (error "compact scope fixture does not use its skeleton") []
+       [T.Instantiate (T.Edge 2 8)]
+ old@(T.Solver _ _ _ frozenScopes@(T.ScopeIndex _ frozenJumps)) <-
+  O.right "historical scope fixture" (Frozen.solvePrepared constraints)
+ live@(T.Solver actual parents bindings (T.ScopeIndex _ jumps)) <-
+  O.right "live compact scope fixture" (Live.solvePrepared constraints)
+ O.assert "fixture retains strictly fewer live levels" (length jumps < length frozenJumps)
+ C.checkTransactional "valid complete compact scope" old live
+ let overlong = T.Solver actual parents bindings frozenScopes
+ _ <- O.right "historical audit alone accepts the forged live scope" (FS.finish overlong)
+ observed <- try (C.checkTransactional "extra live levels" old overlong) :: IO (Either SomeException ())
+ case observed of
+  Left failure -> O.assert "overlong actual scope rejected by the raw live audit"
+    ("extra live levels raw live index audit: incremental graph index disagrees with the graph" `isPrefixOf` displayException failure)
+  Right () -> error "complete actual scope accepted extra frozen levels"
+
 boundary :: IO ()
 boundary=do
+ compactScopeBoundary
  let g=T.Graph(IM.fromList[(0,T.Node(T.GGen 1)T.Nothing T.Flexible),
              (1,T.Node(T.GArr 2 3)(T.Just 0)T.Flexible),
              (2,T.Node T.GBot(T.Just 1)T.Flexible),(3,T.Node T.GBot(T.Just 1)T.Flexible)])IM.empty 4

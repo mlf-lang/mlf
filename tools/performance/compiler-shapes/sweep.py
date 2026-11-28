@@ -1,15 +1,18 @@
 """Serial family-by-family measurements with a table of complete and failed cells."""
 import csv
 import io
-import statistics
+import json
 import sys
-from decimal import Decimal
 from pathlib import Path
 
 import analyze
 import bench
 import command_runner
+import compiler_reference
+import fit_growth
+import framework_results as framework
 import provenance
+import worker
 
 
 def failure_detail(folder, receipt):
@@ -38,36 +41,22 @@ def failure_detail(folder, receipt):
     return lane, failure.get('error', 'compiler or executable check failed')[:400]
 
 
-def completed_pairs(runs):
+def completed_pairs(runs, with_reference=False):
+    lanes_per_round = 3 if with_reference else 2
+    expected = {'mlf', 'ghc', 'reference'} if with_reference else {'mlf', 'ghc'}
     pairs = {}
     for run in runs:
         if run['complete'] and run['output_correct']:
-            pairs.setdefault(run['position'] // 2, set()).add(run['lane'])
-    return sum(lanes == {'mlf', 'ghc'} for lanes in pairs.values())
+            pairs.setdefault(run['position'] // lanes_per_round, set()).add(run['lane'])
+    return sum(lanes == expected for lanes in pairs.values())
 
 
-def peak_rss_medians(receipt, repeats):
-    """Median sampled peak process-group RSS in bytes for a validated single-cell receipt."""
-    runs = receipt['runs']
-    if (not receipt['complete'] or not receipt['all_cases_passed'] or receipt['failures']
-            or completed_pairs(runs) != repeats):
-        raise ValueError('peak RSS requires a complete paired cohort')
-    peaks = {'mlf': [], 'ghc': []}
-    for run in runs:
-        peak = run['command'].get('sampled_process_tree_peak_rss_bytes')
-        if type(peak) is not int or peak < 0:
-            raise ValueError(f"invalid sampled peak RSS for {run['lane']} at position {run['position']}")
-        peaks[run['lane']].append(Decimal(peak))
-    if any(len(values) != repeats for values in peaks.values()):
-        raise ValueError('peak RSS requires one sample per compiler in each pair')
-    return {lane + '_peak_rss_bytes': statistics.median(values) for lane, values in peaks.items()}
-
-
-def measure(folder, setup, row, args, repeats, reference):
+def measure(folder, setup, row, args, repeats, reference, source_root):
     family, size = row['family'], row['size']
     argv = [sys.executable, '-B', bench.HERE / 'run.py', '--output', folder, '--setup', setup,
             '--cohort', folder.name, '--family', family, '--endpoint', args.endpoint,
-            '--repeats', repeats, '--interleave-pairs']
+            '--repeats', repeats, '--interleave-pairs', '--record-only', '--framework-child']
+    argv += ['--sweep-reference', json.dumps(args.baseline_selection)]
     if size:
         argv += ['--size', size]
     if args.cohort_output_gib is not None:
@@ -79,7 +68,9 @@ def measure(folder, setup, row, args, repeats, reference):
     receipt_path = folder / 'receipt.json'
     receipt = analyze.load(receipt_path) if receipt_path.is_file() else {}
     runs = receipt.get('runs', [])
-    row['completed_pairs'] = completed_pairs(runs)
+    plan_file = folder/'plan.json'
+    has_reference = plan_file.is_file() and bool(analyze.load(plan_file).get('compiler_reference'))
+    row['completed_pairs'] = completed_pairs(runs, has_reference)
     if receipt:
         row['evidence'] += '/receipt.json'
     if status or not receipt.get('all_cases_passed') or not receipt.get('complete') or receipt['failures']:
@@ -87,21 +78,29 @@ def measure(folder, setup, row, args, repeats, reference):
         if status:
             reason = f'recorder exit {status}; {reason}'
         row.update(status='failed', lane=lane, reason=reason)
-        return
-    rows, plan, receipt, _ = analyze.analyze(folder)
+        return []
+    rows, plan, receipt, samples = analyze.analyze(folder)
     if (len(rows) != 1 or (rows[0]['family'], rows[0]['size']) != (family, size)
             or row['completed_pairs'] != repeats or plan['benchmark']['repeats'] != repeats
             or plan['benchmark']['endpoint']['id'] != args.endpoint):
         raise ValueError('analyzed cohort differs from the requested cell')
-    memory = peak_rss_medians(receipt, repeats)
-    check_shared_inputs(bench.ROOT, folder, plan, reference)
+    check_shared_inputs(source_root, folder, plan, reference)
     metrics = rows[0]
     row.update(status='passed', mlf_seconds=metrics['mlf_wall_median'],
-               ghc_seconds=metrics['ghc_wall_median'], mlf_over_ghc=metrics['mlf_over_ghc'], **memory)
+               ghc_seconds=metrics['ghc_wall_median'], mlf_over_ghc=metrics['mlf_over_ghc'],
+               **{field: metrics[field] for field in fit_growth.PEAK_RSS_FIELDS})
+    if has_reference:
+        row.update(reference_commit=plan['compiler_reference']['commit'],
+                   reference_seconds=metrics['reference_wall_median'],
+                   mlf_over_reference=metrics['mlf_over_reference'],
+                   reference_peak_rss_bytes=metrics['reference_peak_rss_bytes'],
+                   mlf_over_reference_peak_rss=metrics['mlf_over_reference_peak_rss'])
+    return samples
 
 
 def check_shared_inputs(root, folder, plan, reference):
     sources = {case['source'] for case in plan['cases']}
+    sources.update(lib['source'] for case in plan['cases'] for lib in worker.dependencies(case))
     inputs = {path: digest for path, digest in plan['inputs'].items() if path not in sources}
     if not inputs:
         raise ValueError('missing shared measurement inputs')
@@ -141,7 +140,7 @@ def prune_products(folder):
     return len(products), sum(sizes)
 
 
-def comparison_table(by_cell, families, sizes, metric, divisor, precision):
+def comparison_table(by_cell, families, sizes, format_cell):
     lines = ['| Family | ' + ' | '.join(map(str, sizes)) + ' |', '| --- |' + ' ---: |' * len(sizes)]
     for family in families:
         cells = []
@@ -150,16 +149,14 @@ def comparison_table(by_cell, families, sizes, metric, divisor, precision):
             if row is None:
                 cells.append('—')
             elif row['status'] == 'passed':
-                mlf = row['mlf_' + metric] / divisor
-                ghc = row['ghc_' + metric] / divisor
-                cells.append(f"[{mlf:.{precision}f} / {ghc:.{precision}f}]({row['evidence']})")
+                cells.append(f"[{format_cell(row)}]({row['evidence']})")
             else:
                 cells.append(row['status'])
         lines.append(f'| `{family}` | ' + ' | '.join(cells) + ' |')
     return lines
 
 
-def save_tables(root, rows, repeats, endpoint):
+def save_tables(root, rows, repeats, endpoint, growth=None, reference_growth=None, selection=None):
     out = io.StringIO(newline='')
     writer = csv.DictWriter(out, fieldnames=list(rows[0]))
     writer.writeheader()
@@ -171,12 +168,20 @@ def save_tables(root, rows, repeats, endpoint):
              f'Each cell shows MLF / GHC for {repeats} paired builds at endpoint `{endpoint}`. '
              'Each compiler builds the same source to a fresh native executable.', '',
              '## Median elapsed time (seconds)', '']
-    lines.extend(comparison_table(by_cell, families, sizes, 'seconds', 1, 3))
+    lines.extend(comparison_table(by_cell, families, sizes,
+                                  lambda row: f"{row['mlf_seconds']:.3f} / {row['ghc_seconds']:.3f}"))
     lines.extend(['', '## Median sampled peak process-group RSS (MiB)', '',
-                  'Each build contributes its largest observed sum of resident bytes across the compiler process group. '
-                  'Sampling approximately every 100 ms can miss short peaks. A build that finishes before the first '
-                  'sample can record zero.', ''])
-    lines.extend(comparison_table(by_cell, families, sizes, 'peak_rss_bytes', 2**20, 2))
+                  fit_growth.PEAK_RSS_NOTE, 'Each cell shows MLF / GHC and the MLF-to-GHC ratio in parentheses.', ''])
+
+    def memory_cell(row):
+        mlf, ghc, ratio = fit_growth.format_peak_rss(row)
+        return f'{mlf} / {ghc} ({ratio})'
+
+    lines.extend(comparison_table(by_cell, families, sizes, memory_cell))
+    if selection:
+        show = [dict(row,mlf_wall_median=row['mlf_seconds'],reference_wall_median=row['reference_seconds'])
+                for row in rows if row['status']=='passed' and row.get('reference_seconds') != '']
+        lines += analyze.baseline_table(show, {'baseline_selection':selection})
     failures = [row for row in rows if row['status'] == 'failed']
     if failures:
         lines.extend(['', '## Failed cells', ''])
@@ -184,8 +189,18 @@ def save_tables(root, rows, repeats, endpoint):
             reason = ' '.join(row['reason'].split())
             lines.append(f"- [{row['family']} at {row['size']}]({row['evidence']}) "
                          f"({row['completed_pairs']}/{repeats} complete pairs). {row['lane']} {reason}".rstrip())
+    files = {'summary.csv': out.getvalue()}
+    if growth is not None:
+        lines += ['', '## Build performance checks', '', *fit_growth.markdown(growth), '',
+                  '[Full-precision check results](growth.json)']
+        result = {'endpoint':endpoint,'growth':growth,'baseline_selection':selection}
+        if reference_growth is not None:
+            result['reference_growth'] = reference_growth
+            lines += ['', '## Growth against the committed compiler', '', *fit_growth.markdown(reference_growth,'reference')]
+        files['growth.json'] = json.dumps(result, indent=2) + '\n'
     lines += ['', '[Full-precision timings, median peak RSS in bytes, and outcomes](summary.csv)', '']
-    for filename, content in [('summary.csv', out.getvalue()), ('summary.md', '\n'.join(lines))]:
+    files['summary.md'] = '\n'.join(lines)
+    for filename, content in files.items():
         path = root / filename
         temporary = root / (filename + '.tmp')
         temporary.write_text(content)
@@ -196,13 +211,18 @@ def run(args):
     matrix, families, sizes, baseline = bench.resolve('default', args.family, args.size)
     bench.measured_endpoint(args.endpoint)
     repeats = args.repeats if args.repeats is not None else matrix['repeats']
-    if repeats < 3 or (args.cohort_output_gib is not None and args.cohort_output_gib <= 0):
-        raise SystemExit('sweep requires at least three repetitions and a positive output budget')
+    if repeats < fit_growth.MIN_PAIRED_REPEATS or (args.cohort_output_gib is not None and args.cohort_output_gib <= 0):
+        raise SystemExit(f'sweep requires at least {fit_growth.MIN_PAIRED_REPEATS} pairs per size and a positive output budget')
     root = args.workdir.resolve()
     cells = ([('baseline', 0)] if baseline else []) + [(f, n) for f in families for n in sizes]
     if not cells or len(set(cells)) != len(cells):
         raise SystemExit('sweep requires distinct family/size cells')
-    if any((root / name).exists() for name in ('summary.csv', 'summary.md', 'cohorts')):
+    cells, ids = framework.select(cells)
+    if framework.active():
+        framework.events.plan(ids)
+    else:
+        ids = []
+    if any((root / name).exists() for name in ('summary.csv', 'summary.md', 'growth.json', 'cohorts')):
         raise SystemExit(f'choose a fresh sweep output directory: {root}')
     # Reserve the output before preparing inputs. Concurrent sweeps cannot both
     # build into the same producer or replace one another's table.
@@ -218,24 +238,38 @@ def run(args):
     except BaseException:
         cohorts.rmdir()
         raise
-    rows = [dict(family=family, size=size, status='pending', completed_pairs=0,
-                 mlf_seconds='', ghc_seconds='', mlf_over_ghc='', mlf_peak_rss_bytes='', ghc_peak_rss_bytes='',
+    source_root = Path(setup_record.get('source', bench.ROOT)).resolve()
+    args.baseline_selection = compiler_reference.select_revision(source_root,
+        [cohorts,setup.parent,setup_record.get('producer',root/'producer'),root/'summary.md',root/'summary.csv',root/'growth.json'])
+    rows = [dict(reference_seconds='',reference_commit='',mlf_over_reference='',reference_peak_rss_bytes=None,
+                 mlf_over_reference_peak_rss=None,family=family, size=size, status='pending', completed_pairs=0,
+                 mlf_seconds='', ghc_seconds='', mlf_over_ghc='', **dict.fromkeys(fit_growth.PEAK_RSS_FIELDS),
                  lane='', reason='',
                  evidence=f'cohorts/{family}-{size}', pruned_files=0, pruned_bytes=0)
             for family, size in cells]
-    reference = {}
+    reference, samples = {}, []
     for row in rows:
+        cell = (row['family'], row['size'])
+        framework.start(ids, cell, endpoint=args.endpoint, repeats=repeats)
         row['status'] = 'running'
-        save_tables(root, rows, repeats, args.endpoint)
+        save_tables(root, rows, repeats, args.endpoint, selection=args.baseline_selection)
         folder = root / row['evidence']
         try:
-            measure(folder, setup, row, args, repeats, reference)
+            samples.extend(measure(folder, setup, row, args, repeats, reference, source_root))
         except (OSError, ValueError, KeyError, RuntimeError) as exc:
             row.update(status='failed', reason=f'{type(exc).__name__}: {exc}')
-        save_tables(root, rows, repeats, args.endpoint)
+        save_tables(root, rows, repeats, args.endpoint, selection=args.baseline_selection)
         if args.prune_build_products and row['status'] == 'passed':
             row['pruned_files'], row['pruned_bytes'] = prune_products(folder)
-            save_tables(root, rows, repeats, args.endpoint)
+            save_tables(root, rows, repeats, args.endpoint, selection=args.baseline_selection)
+        framework.result(ids, cell, 'pass' if row['status'] == 'passed' else 'fail',
+                         completed_pairs=row['completed_pairs'], lane=row['lane'], reason=row['reason'],
+                         receipt=str(root / row['evidence']))
+    cases = [dict(row, case=f"{row['family']}-{row['size']}") for row in rows]
+    growth = fit_growth.family_reports(cases, samples, repeats)
+    reference_growth = (fit_growth.family_reports(cases,samples,repeats,'reference')
+                        if any(s['lane']=='reference' for s in samples) or (not samples and args.baseline_selection['commit']) else None)
+    save_tables(root, rows, repeats, args.endpoint, growth, reference_growth, args.baseline_selection)
     print(root / 'summary.md', flush=True)
     if any(row['status'] != 'passed' for row in rows):
         raise SystemExit(1)

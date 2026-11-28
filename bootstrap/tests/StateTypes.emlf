@@ -19,11 +19,13 @@ verify result = do
   else if L.not (X.equalErased (X.erase parsed) (X.erase (C.compiledTerm result))) then Left "xMLF roundtrip changed erasure"
   else Right (C.sourceType result)
 report : (,) String String -> IO ()
-report ((,) name source) = putStrLn (name ++ "\t" ++ (case C.compile "<fixture>" source of
-  Left err -> "REJECT\t" ++ C.prettyPhase (C.phase err)
-  Right result -> case verify result of
-    Left err -> "FAILED\t" ++ err
-    Right ty -> "ACCEPT\t" ++ ty))
+report ((,) name source) = do
+  compilation <- C.compile "<fixture>" source
+  putStrLn (name ++ "\t" ++ (case compilation of
+    Left err -> "REJECT\t" ++ C.prettyPhase (C.phase err)
+    Right result -> case verify result of
+      Left err -> "FAILED\t" ++ err
+      Right ty -> "ACCEPT\t" ++ ty))
 targetFixtures : [] ((,) String String)
 targetFixtures = L.map (\((,,) label _ source) -> (,) label source) Cases.stateTargetCases
 reportTarget : (,) String String -> IO ()

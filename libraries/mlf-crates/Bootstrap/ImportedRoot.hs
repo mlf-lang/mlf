@@ -3,16 +3,18 @@
              KindSignatures, FlexibleContexts, FlexibleInstances,
              MultiParamTypeClasses, OverloadedStrings #-}
 module Bootstrap.ImportedRoot
-  (Compilation, finishCompilation, finishSelected, checkedWrapper, inferredType, sourceType,
+  (Compilation, fromCheckedWrapper, finishCompilation, finishSelected, fileImports, finishFileImports, finishFileImportsIn, checkedWrapper, inferredType, sourceType,
    remove, finishLinked, materializeImports, materializeLinked, usedImportSignatures) where {
   import MLF.Primitive;
   import Bootstrap.Types;
   import Bootstrap.Std;
   import qualified Bootstrap.Map as M;
   import qualified Bootstrap.IntMap as IM;
+  import qualified Bootstrap.IndexVec as V;
   import qualified Bootstrap.Set as S;
   import qualified Bootstrap.IntSet as IS;
   import qualified Bootstrap.Data as D;
+  import qualified Bootstrap.OpenFragment as Open;
   import qualified Bootstrap.Surface as Surface;
   import qualified Bootstrap.Constraint as C;
   import qualified Bootstrap.Graph as G;
@@ -21,6 +23,8 @@ module Bootstrap.ImportedRoot
   import qualified Bootstrap.Classes as Classes;
   import qualified Bootstrap.CompilerCore as Core;
   import qualified Bootstrap.ImportParameters as Parameters;
+  import qualified Bootstrap.Dependency as Dependency;
+  import qualified Bootstrap.Kind as K;
   import qualified Bootstrap.Separate as Separate;
   import qualified Bootstrap.X.Syntax as X;
   import qualified Bootstrap.X.Type as T;
@@ -32,6 +36,22 @@ module Bootstrap.ImportedRoot
   checkedWrapper (Compilation checked _ _) = checked;
   inferredType (Compilation _ ty _) = ty;
   sourceType (Compilation _ _ rendered) = rendered;
+  -- A grouped crate already carries checked declaration bodies. Its user
+  -- type is the codomain after exactly the authenticated external binders.
+  fromCheckedWrapper :: Map String XType -> Checked.CheckedTerm -> Either String Compilation;
+  fromCheckedWrapper signatures checked = do {
+    let { expression = case Checked.term checked of { XWithData _ body -> body; body -> body };
+          consume ty row = case ty of {
+            XArrow argument answer -> do {
+              ensure (T.alphaEq argument (snd row)) "checked crate import arrow type mismatch";
+              Right answer
+            };
+            _ -> Left "checked crate import arrow missing"
+          } };
+    _ <- takeParameters (M.toList signatures) expression;
+    answer <- foldEither consume (Checked.typeOf checked) (M.toList signatures);
+    Right (Compilation checked answer (Classes.prettyQualified M.empty answer))
+  };
   -- The composition constructor accepts actual checked terms only. Requested
   -- imports select a verified prefix; they never supply a claimed result type.
   finishLinked linked signatures compiled = do {
@@ -48,6 +68,7 @@ module Bootstrap.ImportedRoot
     join = S.unions X.compareName
   } in case source of {
     XVarTerm name -> S.singleton name;
+    XInstantiationSpine n rows -> join ((:) (S.singleton n) (map (\((,,) _ _ val) -> child val) rows));
     XAbs _ _ body -> child body;
     XApp a b -> join [child a, child b];
     XTypeAbs _ _ body -> child body;
@@ -110,61 +131,142 @@ module Bootstrap.ImportedRoot
       };
     _ -> Left "direct import parameter is not an authenticated placeholder"
   };
-  declareImported datatypes definitions = do {
-    -- Keep build/buildRecursive's outer scope and declaration geometry. The
-    -- sole omitted work is building and proving the synthetic panic RHSs.
+  data ImportedDeclaration = ImportedGraph String XName Int | ImportedEvidence String XName XType;
+  -- Only prenex bottom-bound schemes with a compound body and all binders
+  -- present in the canonical traversal order have this direct embedding.
+  evidenceTemplate datatypes first scheme = let {
+    nominalRoot body = case body of { XCon _ _ -> True; XArrow _ _ -> True; _ -> False };
+    -- Unknown raw type symbols use occurrence arity as a fallback. Only the
+    -- authenticated schema can supply one invariant kind for all occurrences.
+    kindOf name = case datatypes of { DataEnv _ _ kinds -> M.lookup compareString name kinds };
+    visit names body = case body of {
+      XVar v -> do { w <- IM.lookup (T.tyVarId v) names;
+        Just ((,,,) (XVar w) 0 [] [T.tyVarId v]) };
+      XArrow a b -> do {
+        (,,,) left n ks u <- visit names a; (,,,) right m js v <- visit names b;
+        Just ((,,,) (XArrow left right) (1+n+m) (append ks js) (append u v))
+      };
+      XApply f a -> do {
+        (,,,) x n ks u <- visit names f; (,,,) y m js v <- visit names a;
+        case x of { XCon _ _ -> Nothing;
+          _ -> Just ((,,,) (XApply x y) (1+n+m) (append ks js) (append u v)) }
+      };
+      XCon key xs -> do {
+        kind <- kindOf key;
+        rows <- mapM (visit names) xs;
+        Just ((,,,) (XCon key (map (\((,,,) x _ _ _) -> x) rows))
+          (1+length xs+sum (map (\((,,,) _ n _ _) -> n) rows))
+          (append (if K.eqKind kind Star then [] else [(,) key kind]) (concatMap (\((,,,) _ _ ks _) -> ks) rows))
+          (concatMap (\((,,,) _ _ _ vs) -> vs) rows))
+      };
+      _ -> Nothing
+    };
+    prefix ordinal names order bound t = case t of {
+      XForall v b body -> let {
+        id = T.tyVarId v; w = XTyVar (advanceIdentity first ordinal);
+        next = prefix (ordinal+1) (IM.insert id w names) ((:) id order) ((:) ((,) w b) bound) body
+      } in if IM.member id names then Nothing else case b of {
+        XBot -> next; XBotKind k -> if K.eqKind k Star then Nothing else next; _ -> Nothing };
+      _ -> if not (nominalRoot t) then Nothing else do {
+        (,,,) body n kinds seen <- visit names t;
+        if not (eqList eqInt (reverse order) (nubBy eqInt seen)) then Nothing else
+          Just ((,,) (foldl (\ty ((,) v b) -> XForall v b ty) body bound) (ordinal+n) kinds)
+      }
+    }
+  } in prefix 0 IM.empty [] [] scheme;
+  declareImported admitted datatypes definitions = do {
     gen <- C.newNode (GGen (-1)) Nothing Flexible;
     root <- C.newNode GBot (Just gen) Flexible;
     C.setNode gen (Node (GGen root) Nothing Flexible);
-    before <- C.getGraph;
-    declarations <- mapM (C.declareRecursive datatypes gen) definitions;
-    after <- C.getGraph;
-    return ((,,,) gen root declarations
-      (IM.size (G.nodes after) - IM.size (G.nodes before)))
+    let { allocate d@((,,) key mode _) = let {
+      ordinary = do {
+        (,,,) n binder source _ <- C.declareRecursive datatypes gen d;
+        return ((,) (ImportedGraph n binder source) [])
+      }
+    } in case (,) (M.lookup compareString key admitted) mode of {
+      (,) (Just checked) (CheckRecursive (SAnnotation [] written)) ->
+        if not (C.sameType written (Separate.sourceSchemeIn M.empty False checked)) then ordinary else do {
+          graph <- C.getGraph;
+          let { first = advanceIdentity (G.nextId graph) 2 };
+          case evidenceTemplate datatypes first checked of {
+            Nothing -> ordinary;
+            Just ((,,) rebuilt width kinds) -> do {
+              name <- C.freshName key;
+              C.setGraph (G.mkGraph (G.nodes graph) (G.links graph) (advanceIdentity first width));
+              return ((,) (ImportedEvidence key name rebuilt) kinds)
+            }
+          }
+        };
+      _ -> ordinary
+    } };
+    rows <- mapM allocate definitions;
+    return ((,,,) gen root (map fst rows) (concatMap snd rows))
   };
-  buildImported datatypes ids definitions inner = do {
-    declared <- declareImported datatypes definitions;
-    let { gen = case declared of { (,,,) value _ _ _ -> value };
-          root = case declared of { (,,,) _ value _ _ -> value };
-          declarations = case declared of { (,,,) _ _ value _ -> value };
-          allocated = case declared of { (,,,) _ _ _ value -> value } };
-    let { bindings = map (\((,,,) name target source _) -> (,) name (Poly target source)) declarations;
+  evidenceOnly slots signatures inner = let {
+    declared refs = IS.fromList (map V.toInt (Dependency.occurrenceGlobalIds (\_ -> refs) inner));
+    allReads = Dependency.valueOccurrences True False inner;
+    values = Dependency.valueOccurrences False False inner;
+    candidates = IS.difference (declared allReads) (declared values);
+    names = S.fromList compareString (mapMaybe (\ref -> case ref of {
+      LexicalRef name -> Just name; DeclRef _ _ -> Nothing
+    }) values)
+  } in M.fromList compareString (mapMaybe (\((,) slot p@((,) name _)) ->
+    if IS.member (V.toInt slot) candidates && not (S.member compareString name names)
+    then Just p else Nothing) (zip slots signatures));
+  buildImported admitted datatypes ids definitions inner = do {
+    (,,,) gen root imports kinds <- declareImported admitted datatypes definitions;
+    let { graphBinding imported = case imported of {
+      ImportedGraph key name source -> Just ((,) key (Poly name source)); _ -> Nothing };
+      evidenceBinding imported = case imported of {
+        ImportedEvidence _ name ty -> Just ((,) name ty); _ -> Nothing };
+      indexed slots project = M.fromList C.compareRefSlot (mapMaybe (\((,) i row) ->
+        mapOptional ((,) i) (project row)) (zip slots imports));
       scope = case ids of {
-        Nothing -> C.BindingEnv (M.fromList compareString bindings) M.empty;
-        Just slots -> C.BindingEnv M.empty (M.fromList C.compareRefSlot (zip slots (map snd bindings)))
-      } };
-    continuation <- C.buildIn datatypes M.empty (Just gen) scope (C.desugar inner);
+        Nothing -> C.BindingEnv (M.fromList compareString (mapMaybe graphBinding imports)) M.empty;
+        Just slots -> C.BindingEnv M.empty (indexed slots (\row -> mapOptional snd (graphBinding row)))
+      };
+      evidence = case ids of { Nothing -> M.empty; Just slots -> indexed slots evidenceBinding }
+    };
+    continuation <- C.buildInWithEvidence evidence datatypes M.empty (Just gen) scope (C.desugar inner);
     proof <- C.edge (C.generalization continuation) root;
-    return ((,,) (Typed gen (FRecursive [] continuation proof)) declarations allocated)
+    return ((,,) (Typed gen (FRecursive [] continuation proof)) imports kinds)
   };
-  generate selected program = let { signatures = Parameters.namedEntries selected } in case program of {
+  generate selected = generateWith C.SeparateEnvironments True
+    (Parameters.entries selected) (Parameters.namedEntries selected);
+  generateWith = generateIn Nothing;
+  generateIn = generateUsing False;
+  generateUsing compact known memo validateInput slots signatures program = let {
+    validate graph = if validateInput then G.validateGraph graph else Right ()
+  } in case program of {
     SClassProgram _ _ _ _ -> Left "class declarations must be translated before constraint generation";
     SProgram declarations expression -> do {
       -- Keep validation before inspection, including every unused user RHS.
-      datatypes <- D.validateDeclarations declarations;
+      datatypes <- case known of {
+        Nothing -> D.validateDeclarations declarations;
+        Just _ -> mapEither Open.dataEnvironment (Open.environmentUsing known declarations)
+      };
       lowered <- Surface.lowerExpression expression;
       C.validateAnnotations datatypes lowered;
       if null signatures then do {
-        result <- C.runGenerate (C.build datatypes M.empty Nothing M.empty (C.desugar lowered))
-          (C.Generation G.emptyGraph [] []);
+        result <- C.startGeneration memo (C.build datatypes M.empty Nothing M.empty (C.desugar lowered));
         case result of { (,) typed (C.Generation graph equalities steps) -> do {
-          G.validateGraph graph;
-          Right ((,,) (Constraints graph typed (reverse equalities) (reverse steps)) [] 0)
+          validate graph;
+          Right ((,,) (Constraints graph typed (reverse equalities) (reverse steps)) [] [])
         } }
       } else case Parameters.prefix lowered of {
         Just ((,,) ids parameters inner) -> do {
-          ensure (case ids of { Nothing -> True; Just actual -> Parameters.matchesPrefix actual (Parameters.entries selected) })
+          ensure (case ids of { Nothing -> True; Just actual -> Parameters.matchesPrefix actual slots })
             "direct import declaration inventory mismatch";
           ensure (eqList eqString (map (\((,,) name _ _) -> name) parameters) (map fst signatures))
             "direct import parameter inventory mismatch";
           traverseEither (\((,) _ ty) -> ensure (S.null (T.freeVars ty))
             "direct import contract is not closed") signatures;
           definitions <- traverseEither parameter parameters;
-          result <- C.runGenerate (buildImported datatypes ids definitions inner)
-            (C.Generation G.emptyGraph [] []);
+          let { admitted = case (,) compact ids of { (,) True (Just actual) -> evidenceOnly actual signatures inner; _ -> M.empty } };
+          result <- C.startGeneration memo (buildImported admitted datatypes ids definitions inner);
           case result of {
             (,) ((,,) typed imports allocated) (C.Generation graph equalities steps) -> do {
-              G.validateGraph graph;
+              validate graph;
               Right ((,,) (Constraints graph typed (reverse equalities) (reverse steps)) imports allocated)
             }
           }
@@ -176,42 +278,85 @@ module Bootstrap.ImportedRoot
   finishCompilation :: Map String XType -> (,) SProgram (Map String String) ->
     Either CompileError Compilation;
   finishCompilation signatures = finishSelected (Parameters.namedImports signatures);
-  finishSelected selected ((,) program names) = let { signatures = Parameters.namedEntries selected } in case program of {
+  finishSelected selected = finishUsing (generate selected) (Parameters.namedEntries selected);
+  verifyImportedParameter types ((,) imported ((,) stable expected)) = let {
+    verify key name actual = do {
+      ensure (eqString key stable) "direct import contract disappeared";
+      ensure (T.alphaEq actual expected) ("direct import declaration changed its contract: " ++ key);
+      Right ((,) name expected)
+    }
+  } in case imported of {
+    ImportedGraph key name source -> verify key name (E.schemeTypeIn types source);
+    ImportedEvidence key name actual -> verify key name actual
+  };
+  finishUsing = finishUsingChecked Checked.check;
+  finishUsingChecked = finishUsingSolver C.solvePrepared;
+  finishUsingSolver solveConstraints check generateInputs signatures ((,) program names) = case program of {
     SClassProgram _ _ _ _ -> Left (CompileError Inference "class translation did not produce a core program");
     SProgram declarations _ -> do {
-      generated <- Core.atPhase Inference (generate selected program);
+      generated <- Core.atPhase Inference (generateInputs program);
       let { constraints = case generated of { (,,) value _ _ -> value };
             imports = case generated of { (,,) _ value _ -> value };
-            allocated = case generated of { (,,) _ _ value -> value } };
-      solved <- Core.atPhase Inference (C.solvePrepared constraints);
-      let { graph = Solver.solverGraph solved; types = E.prepareTypes graph };
+            kinds = case generated of { (,,) _ _ value -> value } };
+      solved <- Core.atPhase Inference (solveConstraints constraints);
+      let { graph = Solver.solverGraph solved; types = E.prepareValidatedSolvedTypes solved };
       -- Check each declaration, including unused parameters, against the exact
       -- authenticated target contract after solving. Poly is intentionally the
       -- same binding form as buildRecursive, not declared-field provenance.
       parameters <- Core.atPhase Verification (do {
         ensure (length imports == length signatures) "direct import contract disappeared";
-        traverseEither (\((,) ((,,,) key name source _) ((,) stable expected)) -> do {
-          ensure (eqString key stable) "direct import contract disappeared";
-          ensure (T.alphaEq (E.schemeTypeIn types source) expected)
-            ("direct import declaration changed its contract: " ++ key);
-          Right ((,) name expected)
-        }) (zip imports signatures)
+        traverseEither (verifyImportedParameter types) (zip imports signatures)
       });
-      evidence <- Core.atPhase Resolution (E.resolveEvidenceIn types (C.skeleton constraints));
-      body <- Core.atPhase Elaboration (E.elaboratePreparedIn types solved evidence (C.skeleton constraints));
-      let { userType = E.schemeTypeIn types (C.generalization (C.skeleton constraints));
-            wrapped = foldr (\((,) name ty) rest -> XAbs name ty rest) body parameters;
-            term = if null declarations then wrapped else XWithData declarations wrapped;
-            expected = foldr (\((,) _ ty) rest -> XArrow ty rest) userType parameters;
-            erased = foldr (\((,) name _) rest -> XEAbs name rest)
-              (C.eraseSourceWith evidence (C.skeleton constraints)) parameters };
-      checked <- Core.atPhase Verification (Checked.check term);
-      Core.atPhase Verification (ensure (T.alphaEq (Checked.typeOf checked) expected)
-        "direct import elaboration changed the inferred type");
-      Core.atPhase Verification (ensure (X.equalErased (X.erase term) erased)
-        "direct import elaboration changed source erasure");
+      let { datatypes = if null kinds then E.graphDatatypes graph else
+        D.withKinds (append kinds (mapMaybe E.nodeConstructorKind (IM.elems (G.nodes graph)))) };
+      (,) checked userType <- Core.finishCheckedRoot types datatypes constraints solved declarations parameters check
+        "direct import elaboration changed the inferred type" "direct import elaboration changed source erasure";
       Right (Compilation checked userType (Classes.prettyQualified names userType))
     }
+  };
+
+  -- The file-unit caller has the consumer-local slots along with each independent
+  -- certificate. Only the exact lowering-owned group is eligible.
+  fileImports rows ((,) program _) = case program of {
+    SProgram _ expression -> case Parameters.prefix expression of {
+      Just ((,,) (Just ids) definitions _) -> let {
+        ordered = sortBy (\((,,) _ a _) ((,,) _ b _) -> compareString a b) rows;
+        signatures = map (\((,,) _ name ty) -> (,) name ty) ordered;
+        slots = map (\((,,) i _ ty) -> (,) i ty) ordered
+      } in do {
+        ensure (not (null rows) && Parameters.matchesPrefix ids slots &&
+          eqList eqString (map (\((,,) n _ _) -> n) definitions) (map fst signatures))
+          "file import prefix inventory mismatch";
+        traverseEither parameter definitions;
+        Right ((,) slots signatures)
+      };
+      _ -> Left "file import prefix is not indexed"
+    };
+    _ -> Left "file import prefix needs a class-lowered program"
+  };
+  finishFileImports = finishFileImportsIn Nothing;
+  -- Graph allocation order can occur in a later type or evidence error. Replay
+  -- the entire checked file wrapper on rejection, through its original order.
+  finishFileImportsIn known inputs lowered = let {
+    run compact memo = finishFileImportsUsing compact known memo inputs lowered;
+    batches = C.BatchedEnvironments IM.empty;
+    original = case run False batches of {
+      Right result -> Right result; Left _ -> run False (C.SharedEnvironments IM.empty)
+    }
+  } in case known of {
+    Nothing -> original;
+    Just _ -> case run True batches of { Right result -> Right result; Left _ -> original }
+  };
+  finishFileImportsUsing compact known memo ((,) slots signatures) lowered = do {
+    let { check = case known of { Nothing -> Checked.check; Just env -> Open.checkClosedIn env } };
+    result <- mapLeft Core.prettyError
+      (finishUsingSolver C.solveFileConstraints check (generateUsing compact known memo False slots signatures) signatures lowered);
+    let { parts = case Checked.term (checkedWrapper result) of {
+      XWithData ds body -> (,) ds body; body -> (,) [] body
+    } };
+    (,) parameters inner <- takeParameters signatures (snd parts);
+    implementation <- removeEmptyGroup inner;
+    Right ((,,) (fst parts) (map (\((,,) _ name ty) -> (,) name ty) parameters) implementation)
   };
 
   -- Strip exactly the authenticated prefix. splitParameters would also consume

@@ -2,7 +2,7 @@
 
 `runtime/mlf_system.h` uses a private `EVFILT_PROC / NOTE_EXIT` kqueue to wake the existing `waitpid(WNOHANG)` loop on macOS. `waitpid` remains the only status and reaping authority. The queue is used only with default `SIGCHLD` disposition and without `SA_NOCLDWAIT`; no signal handler changes are made. Registration, descriptor setup, and wait failures fall back to the existing bounded polling path. Timeout checks, command parsing, exit codes and process-group cleanup retain their existing order. The native and GHC host runtimes share this header.
 
-These controls reuse the independently pinned `../fixtures/Probe.c` and `Tree.c`; the frozen Linux fixture inventory is not modified. The runner authenticates both ordinary GHC 9.14.1 `-O2` producers, recompiles their host objects byte-for-byte, and requires that removing exactly the three Darwin preprocessor arms recovers the baseline header verbatim. All other producer inputs must match. Use an unmodified baseline checkout and producer, plus a separately built candidate checkout and producer.
+These controls reuse the independent `../fixtures/Probe.c` and `Tree.c` fixtures. The runner authenticates both ordinary GHC 9.14.1 `-O2` producers, recompiles their host objects byte-for-byte, and records the actual control inputs for this run. Each producer must match its own source checkout. The two source trees can evolve independently: current qualification uses the observable transport, failure and cleanup checks below, with no historical header reconstruction or source-hash allowlist.
 
 ```sh
 python3 -B tools/performance/process-readiness/darwin/run_controls.py \
@@ -22,7 +22,7 @@ The suite checks:
 - Four supervised/unsupervised timeout descendant-cleanup cases, covering both versions.
 - Ten ordinary Clang `-O2` compact native-value ABI cases for success, nonzero exit, explicit 124, signal death and timeout.
 
-The syscall controls are independent, finite examples, not a proof for every OS interleaving. The GHC eligibility executable is an instrumented diagnostic; it is never a performance sample. Linux behavior is guarded by exact source projection and the existing Linux controls, rather than by claiming that macOS executed Linux syscalls.
+The syscall controls are independent, finite examples, not a proof for every OS interleaving. The GHC eligibility executable is an instrumented diagnostic; it is never a performance sample. The separate Linux controls qualify Linux behavior; a Darwin run makes no claim about executing Linux syscalls.
 
 For performance, run the ordinary executable on fresh target query directories. Keep complete checked outputs and compare their raw bytes with a frozen independently qualified reference; a matching digest alone is insufficient. Keep qualification, microbenchmarks, screening and confirmation data separate. No GC configuration, Clang optimization flag or target inference-cache reuse is part of this change.
 

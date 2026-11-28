@@ -231,7 +231,8 @@ module Bootstrap.Parser where {
       Just n -> n
     };
   standaloneProgram :: SourceModule -> Either String SProgram;
-  standaloneProgram (SourceModule _ _ _ _ datatypes classes instances values body _) =
+  standaloneProgram = standaloneProgramWith (\expression -> expression);
+  standaloneProgramWith wrapEntry (SourceModule _ _ _ _ datatypes classes instances values body _) =
     let {
       entry =
         case body of {
@@ -245,7 +246,7 @@ module Bootstrap.Parser where {
     case entry of {
       Left e -> Left e;
       Right e ->
-        case Surface.bindValues values e of {
+        case Surface.bindValues values (wrapEntry e) of {
           Left error -> Left error;
           Right expression ->
             case Surface.closeSourceInstances values instances of {
@@ -431,7 +432,7 @@ module Bootstrap.Parser where {
           let {
             names = concatMap Surface.patternVariables args
           } in
-          if (length names == length (nubBy eqString names))
+          if (length names == Set.size (Set.fromList compareString names))
           then pPure result
           else pFail "duplicate function parameter"
       }
@@ -970,7 +971,7 @@ module Bootstrap.Parser where {
       let {
         names = concatMap Surface.patternVariables args
       };
-      if (length names == length (nubBy eqString names))
+      if (length names == Set.size (Set.fromList compareString names))
       then pPure (Surface.function ((:) ((,) args body) []))
       else pFail "duplicate pattern variable"
     };
@@ -1039,7 +1040,24 @@ module Bootstrap.Parser where {
   patternAtom :: Parser SPattern;
   patternAtom = sourceOrMetadata sharedPatternAtom legacyPatternAtom;
   sharedPatternAtom :: Parser SPattern;
-  sharedPatternAtom =
+  sharedPatternAtom = Parser (\state -> let {
+    ordinary = pRun generalSharedPatternAtom state
+  } in case state of {
+    ParseState file ((:) (Token name _ _ _ _) rest) end SharedHaskellV1 owner pkg -> let {
+      accept variable = PSuccess (SDefaultPattern variable)
+        (ParseState file rest end SharedHaskellV1 owner pkg) True;
+      first = if stringLength name == 0 then 0 else stringCodeAt name 0;
+      asPattern = case rest of {
+        (:) (Token next _ _ _ _) _ -> eqString next "@";
+        [] -> False
+      }
+    } in if eqString name "_" then accept Nothing
+      else if first >= 97 && first <= 122 && sharedIdentifier name &&
+              not (Set.member compareString name sharedReservedSet || asPattern)
+      then accept (Just name) else ordinary;
+    _ -> ordinary
+  });
+  generalSharedPatternAtom =
     pChoice (pTry (do {
       name <- lowerIdentifier;
       pToken "@";
@@ -1776,6 +1794,7 @@ module Bootstrap.Parser where {
         mapM_ validateSharedExpression ((:) action ((:) continuation ((:) bind ((:) failure []))))
       };
       SVar _ -> Right ();
+      SBindDictionaries _ _ -> Left "dictionary binders are reserved for class translation";
       SLam name annotation body ->
         do {
           validateSharedBinding name;
@@ -1952,10 +1971,11 @@ module Bootstrap.Parser where {
   operatorName :: Parser String;
   operatorName = pSatisfy (\name -> Set.member compareString name sharedOperatorSet) "supported value operator";
   operatorReference :: Parser String;
-  operatorReference = do {
+  operatorReference = operatorReferenceWith qualifiedName operatorName;
+  operatorReferenceWith build suffix = do {
     prefixes <- pMany (pTry (pBefore upperIdentifier (pSymbolPrefix ".")));
-    name <- operatorName;
-    pPure (foldr (\prefix suffix -> prefix ++ ("." ++ suffix)) name prefixes)
+    item <- suffix;
+    pPure (build prefixes item)
   };
   bindingName :: Parser String;
   bindingName = pChoice lowerIdentifier (pParens operatorName);
@@ -1972,14 +1992,27 @@ module Bootstrap.Parser where {
     if elem eqString (referenceLeaf name) ((:) "==" ((:) "/=" []))
     then name else "$MLF.Infix." ++ name;
   sharedSourceName name = if elem eqString name ((:) "True" ((:) "False" [])) then "$MLF.Source." ++ name else name;
-  sharedOperatorParser choices = do {
-    located <- pWithSpan (sharedInfix choices);
-    case located of {
-      (,) location operator -> pPure (\a b ->
-        SApp (SApp (SCallSite (referenceLeaf operator) location
-                    (SVar (sourceOperatorName operator))) a) b)
+  -- A successful infix ends at the operator token, including the suffix
+  -- left when a qualifier consumes the dot of a combined token such as ".+".
+  sharedOperatorParser choices = pTry (do {
+    original <- pState;
+    first <- referenceToken;
+    located <- operatorReferenceWith (\prefixes ((,) final name) ->
+      (,) final (qualifiedName prefixes name)) (do {
+        final <- referenceToken;
+        name <- operatorName;
+        pPure ((,) final name)
+      });
+    case located of { (,) final operator -> let { leaf = referenceLeaf operator } in
+      if elem eqString leaf choices then case original of {
+        ParseState file _ _ _ sourceModule sourcePackage -> let {
+          location = SourceSpan sourcePackage sourceModule file (tokenLine first) (tokenColumn first)
+            (tokenEndLine final) (tokenEndColumn final)
+        } in pPure (\a b -> SApp (SApp (SCallSite leaf location
+          (SVar (sourceOperatorName operator))) a) b)
+      } else pFail "operator at another precedence"
     }
-  };
+  });
   sharedApplyExpr :: Parser SExpr;
   sharedApplyExpr = pChainr sharedBindExpr (sharedOperatorParser ["$"]);
   sharedBindExpr :: Parser SExpr;

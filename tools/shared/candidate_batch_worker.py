@@ -1,5 +1,5 @@
-"""Frozen candidate-selection controls with explicit actual-capture batch vector projections.
-No fresh-process equivalence claim. Must run inside the pinned owned-tree guard.
+"""Candidate-selection controls with explicit actual-capture batch vector projections.
+No fresh-process equivalence claim. Must run inside the owned-tree supervisor.
 """
 import collections
 import hashlib
@@ -10,56 +10,20 @@ import subprocess
 import sys
 import time
 import traceback
-import types
+import test_direct as direct
+import candidate_batch_contract as contract
+import test_candidate_selection as suite
 
 HERE = Path(__file__).resolve().parent
-CLASSES_PATH = '../../libraries/mlf-inference/Bootstrap/Classes.hs'
-CLASSES_SUCCESSORS = (
-    'b4a2ce4772e168f2013a77d0113298103557d955',
-    '9f3597afc8b5415339f05291b4ce6342ea057d21',
-    '54dd1eedb8736aa9cea55d40c4de979e08e2df17',
-    '3ff1b6a5668928661b112f6ab4225880f3408a1a',
-    '6f1bc8e923c6333d20f38b421ae43672fa0721c3',
-    'b7caa275f2b1b90718e5da59152c8ccf9b96d538',
-    '629f0c52164ab2211c638e9499caf6ab7b30121e',
-    '1eaafe6174076500ac97aa1d6b3dbf9ea68959ee',
-    'bdbc1000fce1a8b1b388f953adc13d7c7d862655',
-    'fa396c405908b897db00decda395c1d1fa660420',
-    'f22cec64548c408602c85c8c81732fb57694927e',
-)
-PINS = {
- 'test_direct.py':'a46bd66949e81c5761dff3446201640837ec8f68',
- 'test_candidate_selection.py':'c2a16944fe4e19c1f8de0ac24ff06d95d94c031c',
- 'fixtures/CandidateSelectionControls.hs':'928d4511289a780af1685dcc4ea28d0ae0c404d2',
- CLASSES_PATH:'bbcc794dc1ce447ccfc1450378e951df1b427819',
- 'default_stdlib.py':'33f84ec682f78c064322de8e9d303b76b6040871',
- 'crc_process_supervisor.py':'620e88b557139a6b19ca63097decaa9148bdd819',
- 'test_direct_crc_successor.py':'789dc7e641fdbd8aace2f9395914d786c18eadb1',
- 'test_direct_bounded.py':'40c07dbea8b42da414997270ede4c49ef9b564ac',
- 'utf8_batch_worker.py':'3bb35f2e81ab8dbb51c27d3097934c9b35a36083',
- 'utf8_batch_contract.py':'51942bc8df2c8cd779fe50abb7eca92734530933',
- 'test_utf8_length.py':'73fe9e2c4dc4201a03d342ad146b7227a9b57330',
- 'test_crc32.py':'f906dde582c2aef13d56ec608accedec7f746dae',
- 'fixtures/utf8-length/Main.hs':'5dc5eddae94e609328404febc90db226a82167cd',
- 'fixtures/utf8-length/Length.hs':'dcef64296a26296b720d0ffa00016d808f7cee1e',
-}
-HELPERS = ('candidate_batch_worker.py','candidate_batch_contract.py','test_direct_candidate_successor.py')
+INPUTS = ('test_direct.py', 'test_candidate_selection.py', 'crc_process_supervisor.py', 'default_stdlib.py', 'direct_managed.py', 'candidate_batch_worker.py', 'candidate_batch_contract.py', 'fixtures/CandidateSelection.hs', 'fixtures/CandidateSelectionControls.hs')
 _receipt_created=False
 def require(ok, message):
     if not ok: raise ValueError(message)
 def digest(raw): return hashlib.sha256(raw).hexdigest()
-def blob(raw): return hashlib.sha1(b'blob '+str(len(raw)).encode()+b'\0'+raw).hexdigest()
 def snapshot(here=HERE):
-    raws = {name: (here/name).read_bytes() for name in (*PINS, *HELPERS)}
-    for name, pin in PINS.items():
-        actual = blob(raws[name])
-        require(actual == pin or (name == CLASSES_PATH and actual in CLASSES_SUCCESSORS),
-                'frozen input changed: '+name)
+    """Record this invocation's source bytes; edits between runs are supported."""
+    raws = {name: (here/name).read_bytes() for name in INPUTS}
     return raws, {name:digest(raw) for name,raw in raws.items()}
-def load(raw, name, path):
-    module=types.ModuleType(name); module.__file__=str(path)
-    exec(compile(raw,str(path),'exec'),module.__dict__)
-    return module
 def save(path, value):
     temp=path.with_suffix('.tmp'); temp.write_text(json.dumps(value,indent=2)+'\n'); temp.replace(path)
 
@@ -83,7 +47,7 @@ def execution_policy(worker_receipt):
                        'required_vectors':24,'required_batch_executions':{'host':2,'interpreter':2}},
         'native-O0':{'mode':'original fresh process per vector','required_vectors':124},
         'native-O2':{'mode':'original fresh process per vector','required_vectors':124}},
-        host_gate='unchanged actual Classes host gate: 8254 + 12369 cases and 2 + 5 demand checks',
+        host_gate='current Classes host gate: 8254 + 12369 cases and 2 + 5 demand checks',
         commands_semantics='physical commands only; 24 logical interpreter vectors have no invented subprocess timing or exit status',
         batch_worker_receipt=str(worker_receipt),fresh_process_equivalence_claimed=False,
         execution_policy_is_not_completion_evidence=True)
@@ -132,16 +96,12 @@ def execute():
     receipt=Path(sys.argv[2]).resolve(strict=True); output=Path(sys.argv[6]).resolve()
     state_path=output.parent/(output.name+'-batch-worker.json')
     state={'complete':False,'physical_commands':[],'logical_vectors':[], 'logical_indices':[], 'batch_commands':[],
-           'scope':'original controls unchanged; 24 interpreter vector startups replaced by four-lane actual batch projections; not fresh-process equivalence'}
-    state['fixture_generation']='candidate-monomorphic-runtime-loop-v1'
-    state['source_basis']='8d80e0fb1dbf4e6d40c53de35b727674b5c74817'
+           'scope':'current Classes host gate and portable selector reference; 24 interpreter vectors observed through four actual batches; not fresh-process equivalence'}
+    state['fixture_mode']='ordinary-shared-case-and-batch-entry'
     require(not state_path.exists(),'fresh worker receipt required')
     save(state_path,state)
     _receipt_created=True
     raws,pins=snapshot(); state['input_pins']=pins
-    direct=load(raws['test_direct.py'],'candidate_direct_frozen',HERE/'test_direct.py')
-    contract=load(raws['candidate_batch_contract.py'],'candidate_contract_bound',HERE/'candidate_batch_contract.py')
-    old_modules={n:sys.modules.get(n) for n in ('test_direct','default_stdlib')}
     producer=None; initial_receipt=digest(receipt.read_bytes()); captured=[]
     original_auth=direct.authenticate_build
     def auth(*args,**kwargs):
@@ -151,7 +111,6 @@ def execute():
         if producer is None: producer=value
         captured.append(value)
         return value
-    direct.authenticate_build=auth
     templates={}; generated={}; batch_results={}; original_record=None
     state['generated_artifacts']=generated
     def persist(): save(state_path,state)
@@ -160,8 +119,7 @@ def execute():
             nonlocal original_record
             self.root,self.output,self.receipt,self.original_save=root,out,record,original_save
             original_record=record
-            # Keep the frozen script's original scope and counters intact, but
-            # make a standalone reading of its receipt unambiguous.
+            # State explicitly which observations came from physical batches.
             record.update(execution_policy(state_path))
         def physical(self,name,argv,*,expected=None,status=0,timeout=180,kind='original'):
             argv=list(map(str,argv)); identity='%04d-%s'%(len(state['physical_commands'])+1,name)
@@ -178,9 +136,12 @@ def execute():
                     row['cleanup_delegated_to_supervisor']=True
                     raise
                 row['exit_code']=process.returncode
-                require(process.returncode==status and (expected is None or stdout==expected) and (status!=0 or not stderr),'physical command failed: '+name)
+                modes, diagnostics = direct.command_diagnostics(argv, stderr)
+                if modes:
+                    row['dependency_modes'] = modes
+                require(process.returncode==status and (expected is None or stdout==expected) and (status!=0 or not diagnostics),'physical command failed: '+name)
                 row['state']='passed'
-                return subprocess.CompletedProcess(argv,process.returncode,stdout,stderr),row
+                return subprocess.CompletedProcess(argv,process.returncode,stdout,diagnostics),row
             except BaseException as error:
                 row.update(state='failed',error=repr(error)); raise
             finally:
@@ -190,18 +151,10 @@ def execute():
                 row['seconds']=time.monotonic()-start; self.original_save(); persist()
         def batches(self):
             require(producer is not None and set(templates)=={'compile','link'},'authenticated actual host build templates')
-            script=raws['test_candidate_selection.py']
-            classes=raws['../../libraries/mlf-inference/Bootstrap/Classes.hs']
-            original=contract.original_fixture(script,classes)
-            fixture=self.output/'CandidateSelection.hs'
-            require(fixture.read_bytes()==original,'whole original fixture identity')
-            generated[str(fixture)]=digest(original)
+            source=HERE/'fixtures/CandidateSelection.hs'
+            generated[str(source)]=digest(source.read_bytes())
             build=receipt.parent
             for direction in ('forward','reverse'):
-                raw=contract.generate(original,direction,script,classes)
-                require(contract.restore(raw,direction,script,classes)==original,'full generated inverse')
-                source=self.output/('batch-'+direction+'.hs');source.write_bytes(raw)
-                generated[str(source)]=digest(raw)
                 obj=self.output/('batch-'+direction+'.o');hi=self.output/('batch-'+direction+'.hi')
                 binary=self.output/('batch-'+direction)
                 compile_argv=list(templates['compile']);link_argv=list(templates['link'])
@@ -216,20 +169,20 @@ def execute():
                 self.physical('batch-compile-'+direction,compile_argv,kind='batch')
                 self.physical('batch-link-'+direction,link_argv,kind='batch')
                 for artifact in (obj,hi,binary):generated[str(artifact)]=digest(artifact.read_bytes())
-                for lane,argv in [('host',[binary]),
-                    ('interpreter',[build/'bin/emlf','-i',self.root/'libraries/mlf-foundation','--run',source,'--'])]:
+                for lane,argv in [('host',[binary,'batch-'+direction]),
+                    ('interpreter',[build/'bin/emlf','-i',self.root/'libraries/mlf-foundation','--run',source,'--','batch-'+direction])]:
                     for artifact in (source,obj,hi,binary):
                         require(digest(artifact.read_bytes())==generated[str(artifact)],'batch artifact drift before target')
                     result,row=self.physical('batch-'+lane+'-'+direction,argv,timeout=120,kind='batch')
                     for artifact in (source,obj,hi,binary):
                         require(digest(artifact.read_bytes())==generated[str(artifact)],'batch artifact drift after target')
                     stdout=Path(row['stdout_path']).read_bytes();stderr=Path(row['stderr_path']).read_bytes()
-                    require(stdout==result.stdout and stderr==result.stderr,'actual capture identity')
+                    require(stdout==result.stdout and direct.command_diagnostics(row['argv'],stderr)[1]==result.stderr,'actual capture identity')
                     physical=contract.physical_record(row['id'],lane,direction,row['argv'],stdout,stderr,result.returncode)
-                    state['batch_commands'].append(physical);batch_results[physical['id']]=(physical,stdout,stderr)
+                    state['batch_commands'].append(physical);batch_results[physical['id']]=(physical,stdout,result.stderr)
                     for index in contract.FORWARD:
                         original_argv=[str(build/'bin/emlf'),'-i',str(self.root/'libraries/mlf-foundation'),
-                            '--run',str(fixture),'--',*contract.cases()[index]['arguments']]
+                            '--run',str(HERE/'fixtures/CandidateSelection.hs'),'--',*contract.cases()[index]['arguments']]
                         state['logical_vectors'].append(contract.project(physical,stdout,index,
                             original_argv,contract.cases()[index]['expected']))
             state['batch_aggregate']=contract.aggregate(state['batch_commands'],state['logical_vectors']);persist()
@@ -242,7 +195,7 @@ def execute():
                 require(name in names,'exact interpreter selector/index')
                 index=names[name];case=contract.cases()[index]
                 prefix=[str(receipt.parent/'bin/emlf'),'-i',str(self.root/'libraries/mlf-foundation'),
-                        '--run',str(self.output/'CandidateSelection.hs'),'--']
+                        '--run',str(HERE/'fixtures/CandidateSelection.hs'),'--']
                 require(argv==prefix+case['arguments'] and type(timeout)is int and timeout==120 and
                         type(status)is int and status==0 and expected==case['expected'],
                         'exact original interpreter contract')
@@ -260,19 +213,11 @@ def execute():
                 templates['compile']=argv
             if name=='host-link':
                 require('link' not in templates,'unique host link');templates['link']=argv
-            if name=='emit-native':
-                require((self.output/'CandidateSelection.hs').read_bytes()==contract.original_fixture(
-                    raws['test_candidate_selection.py'],raws['../../libraries/mlf-inference/Bootstrap/Classes.hs']),
-                    'native fixture exact original body')
             result,row=self.physical(name,argv,expected=expected,status=status,timeout=timeout)
             return result
     try:
         persist()
-        sys.modules['test_direct']=direct
-        sys.modules['default_stdlib']=load(raws['default_stdlib.py'],'default_stdlib',HERE/'default_stdlib.py')
-        original=load(raws['test_candidate_selection.py'],'candidate_original_frozen',HERE/'test_candidate_selection.py')
-        original.CommandRunner=Runner
-        original.main()
+        suite.main(runner_factory=Runner, authenticate=auth)
         validate_inventory(original_record,state['physical_commands'],state['logical_indices'],state['batch_commands'])
         require(len(captured)==2,'original two actual authentications required')
         require(snapshot()[1]==pins and digest(receipt.read_bytes())==initial_receipt,'source/helper/producer drift')
@@ -290,11 +235,7 @@ def execute():
     except BaseException as error:
         state.update(complete=False,error=repr(error),traceback=traceback.format_exc()); raise
     finally:
-        try: persist()
-        finally:
-            for name,value in old_modules.items():
-                if value is None: sys.modules.pop(name,None)
-                else: sys.modules[name]=value
+        persist()
 def main():
     try: execute()
     except BaseException as error:

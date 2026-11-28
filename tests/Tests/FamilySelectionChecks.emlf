@@ -1,9 +1,11 @@
 module Tests.FamilySelectionChecks where
+import Prelude hiding (Monad, return, bind)
+import MLF.Primitive (Monad, return, bind)
 import Bootstrap.Types
 import qualified Bootstrap.Std as S
 import qualified Package.Json as J
 import qualified Package.OS as O
-import qualified Tests.Basic as H
+import qualified Test.Assert as A
 import qualified Tests.Selection as F
 import qualified Tests.Coverage as C
 
@@ -21,17 +23,17 @@ coverageEmpty = "{\"schema_version\":1,\"suite\":\"probe\",\"event\":\"start\",\
 render rows = S.intercalate "\n" (S.map J.render rows) ++ "\n"
 change index action rows = S.map (\((,) position row) -> if position == index then action row else row) (S.zip (S.range 0 (S.length rows - 1)) rows)
 without index rows = S.map S.snd (S.filter (\((,) position _) -> position /= index) (S.zip (S.range 0 (S.length rows - 1)) rows))
-rejected : forall a. Either String a -> IO ()
-rejected result = case result of { Left _ -> return (); Right _ -> H.fail "damaged family selection or projected coverage was accepted" }
+rejected : forall a. Either String a -> A.Test ()
+rejected result = case result of { Left _ -> return (); Right _ -> A.fail "damaged family selection or projected coverage was accepted" }
 plan available args full identities = do
- (,) actualFull actual <- H.right (F.choose available args)
- H.assert (H.eq actualFull full && S.eqList eqString actual identities) "family plan changed selection, order or scope"
+ (,) actualFull actual <- A.right (\message -> message) (F.choose available args)
+ A.assert ((actualFull && full || S.not actualFull && S.not full) && S.eqList eqString actual identities) "family plan changed selection, order or scope"
 
-main : IO ()
-main = do
+checks : A.Test ()
+checks = do
  let identities = O.words "probe/first probe/second"
  let first = (:) "probe/first" []
- H.assert (F.listing ((:) "--list-families" []) && S.not (F.listing []) && S.not (F.listing (O.words "--list-families extra"))) "family discovery accepts execution arguments"
+ A.assert (F.listing ((:) "--list-families" []) && S.not (F.listing []) && S.not (F.listing (O.words "--list-families extra"))) "family discovery accepts execution arguments"
  plan identities [] true identities
  plan identities (O.words "--families probe/second probe/first") false identities
  plan identities (O.words "--families probe/second") false ((:) "probe/second" [])
@@ -44,11 +46,11 @@ main = do
  rejected (F.choose identities ((:) "--families" ((:) "" [])))
  rejected (F.choose identities (O.words "--list-families"))
  rejected (F.choose identities (O.words "--unknown probe/first"))
- full <- H.right (F.parse familyFull)
- partial <- H.right (F.parse familyPartial)
- checked <- H.right (F.validate "probe" true identities familyFull)
- H.assert (J.equal (J.get "families" checked) (J.num 2) && S.eqList eqString (J.getStrings "ids" checked) identities) "family result lost completed identities"
- H.right (F.validate "probe" false first familyPartial)
+ full <- A.right (\message -> message) (F.parse familyFull)
+ partial <- A.right (\message -> message) (F.parse familyPartial)
+ checked <- A.right (\message -> message) (F.validate "probe" true identities familyFull)
+ A.assert (J.equal (J.get "families" checked) (J.num 2) && S.eqList eqString (J.getStrings "ids" checked) identities) "family result lost completed identities"
+ A.right (\message -> message) (F.validate "probe" false first familyPartial)
  rejected (F.validate "probe" true first familyPartial)
  rejected (F.validate "probe" false identities familyFull)
  rejected (F.validate "probe" true first familyFull)
@@ -81,25 +83,25 @@ main = do
  rejected (F.validate "probe" true identities (render (change 0 (J.set "scope" J.Null) full)))
  rejected (F.validate "probe" true identities (render (change 0 (J.set "selected" J.Null) full)))
 
- inventory <- H.right (J.parse inventoryText)
- projection <- H.right (J.parse projectionText)
- coverage <- H.right (C.parse coveragePartial)
- fullCoverage <- H.right (C.parse coverageFull)
- accepted <- H.right (C.validateProjection inventory "probe" projection coveragePartial)
- H.assert (J.equal (J.get "executions" accepted) (J.num 1) && J.equal (J.get "aliases" accepted) (J.num 1) && J.equal (J.get "oracle-executed" (J.get "metrics" accepted)) (J.num 3)) "projection lost actual aliases or counted inputs"
+ inventory <- A.right (\message -> message) (J.parse inventoryText)
+ projection <- A.right (\message -> message) (J.parse projectionText)
+ coverage <- A.right (\message -> message) (C.parse coveragePartial)
+ fullCoverage <- A.right (\message -> message) (C.parse coverageFull)
+ accepted <- A.right (\message -> message) (C.validateProjection inventory "probe" projection coveragePartial)
+ A.assert (J.equal (J.get "executions" accepted) (J.num 1) && J.equal (J.get "aliases" accepted) (J.num 1) && J.equal (J.get "oracle-executed" (J.get "metrics" accepted)) (J.num 3)) "projection lost actual aliases or counted inputs"
  rejected (C.validate inventory "probe" coveragePartial)
  rejected (C.validateProjection inventory "probe" projection (render (change 0 (J.set "scope" (J.str "full")) coverage)))
  -- Explicitly selecting every family is still partial qualification.
  let all = J.get "probe" (J.get "suites" inventory)
  let allPartial = render (change 0 (J.set "scope" (J.str "partial")) fullCoverage)
- H.right (C.validateProjection inventory "probe" all allPartial)
+ A.right (\message -> message) (C.validateProjection inventory "probe" all allPartial)
  rejected (C.validate inventory "probe" allPartial)
  -- A metric-only family is legitimate; an empty evidence projection is not.
- metricOnly <- H.right (J.parse "{\"executions\":[],\"aliases\":{},\"metrics\":{\"oracle-executed\":3}}")
- H.right (C.validateProjection inventory "probe" metricOnly coverageMetric)
- empty <- H.right (J.parse "{\"executions\":[],\"aliases\":{},\"metrics\":{}}")
+ metricOnly <- A.right (\message -> message) (J.parse "{\"executions\":[],\"aliases\":{},\"metrics\":{\"oracle-executed\":3}}")
+ A.right (\message -> message) (C.validateProjection inventory "probe" metricOnly coverageMetric)
+ empty <- A.right (\message -> message) (J.parse "{\"executions\":[],\"aliases\":{},\"metrics\":{}}")
  rejected (C.validateProjection inventory "probe" empty coverageEmpty)
- unknown <- H.right (J.parse "{\"executions\":[\"unknown\"],\"aliases\":{},\"metrics\":{}}")
+ unknown <- A.right (\message -> message) (J.parse "{\"executions\":[\"unknown\"],\"aliases\":{},\"metrics\":{}}")
  rejected (C.validateProjection inventory "probe" unknown coverageUnknown)
  rejected (C.validateProjection inventory "probe" (J.set "executions" (J.stringArray (O.words "first first")) projection) coveragePartial)
  rejected (C.validateProjection inventory "probe" (J.set "executions" (J.stringArray ((:) "second" [])) projection) coveragePartial)
@@ -131,4 +133,4 @@ main = do
  rejected (C.validateProjection inventory "probe" projection (render (change 0 (J.set "scope" J.Null) coverage)))
  rejected (C.validateProjection inventory "probe" projection (render (change 2 (J.set "canonical" J.Null) coverage)))
  rejected (C.validateProjection inventory "probe" projection (render (change 3 (J.set "name" J.Null) coverage)))
- putStrLn "Family selection and projected coverage contracts passed"
+ A.liftIO (putStrLn "Family selection and projected coverage contracts passed")

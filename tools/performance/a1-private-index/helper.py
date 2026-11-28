@@ -136,13 +136,20 @@ def memory_available():
 def process_group(group):
     rows = []
     if sys.platform == 'darwin':
-        output = subprocess.check_output(['/bin/ps', '-axo', 'pid=,ppid=,pgid=,sess=,state=,rss='], text=True)
+        output = subprocess.check_output(['/bin/ps', '-axo', 'pid=,pgid=,state=,rss='], text=True)
         for line in output.splitlines():
             parts = line.split()
-            require(len(parts) == 6, 'invalid ps process row')
-            pid, ppid, pgid, session = map(int, parts[:4])
-            if pgid == group or session == group:
-                rows.append({'pid': pid, 'state': parts[4], 'rss': int(parts[5]) * 1024})
+            require(len(parts) == 4, 'invalid ps process row')
+            pid, pgid = map(int, parts[:2])
+            if pgid != group:
+                # Darwin ps reports a kernel pointer in sess, often as zero.
+                # getsid also finds workers that created their own process group.
+                try:
+                    if os.getsid(pid) != group:
+                        continue
+                except (ProcessLookupError, PermissionError):
+                    continue
+            rows.append({'pid': pid, 'state': parts[2], 'rss': int(parts[3]) * 1024})
         return rows
     for entry in Path('/proc').iterdir():
         if not entry.name.isdigit():
@@ -177,17 +184,57 @@ def live_group_members(group, members, *, settle_exit=False):
     return live
 
 
+def kill_darwin_session(session, members):
+    group_denial, member_denial = None, None
+    # Popen creates a session whose leader also leads the original group.
+    # If that leader is gone, clean up by verified session membership instead.
+    try:
+        leader_enrolled = os.getsid(session) == session
+    except ProcessLookupError:
+        leader_enrolled = False
+    except PermissionError as error:
+        leader_enrolled, member_denial = False, error
+    if leader_enrolled:
+        try:
+            os.killpg(session, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+        except PermissionError as error:
+            group_denial = error
+
+    # A successful killpg (or a vanished PGID) says nothing about other groups
+    # in the same session. Revalidate every PID rather than signaling a stale
+    # ps row, and attempt all enrolled workers before reporting any denial.
+    live = live_group_members(session, members, settle_exit=True)
+    for row in live:
+        pid = row['pid']
+        try:
+            if os.getsid(pid) == session:
+                os.kill(pid, signal.SIGKILL)
+        except ProcessLookupError:
+            continue
+        except PermissionError as error:
+            if member_denial is None:
+                member_denial = error
+    # Darwin can report EPERM as its last members exit. Only a fresh empty
+    # (or zombie-only) live inventory permits ignoring that group denial.
+    if group_denial is not None and live:
+        raise group_denial
+    if member_denial is not None:
+        raise member_denial
+
+
 def kill_group(group, *, members=None):
-    """Stop this group. Darwin can report EPERM as its last members exit."""
+    """Stop this group and, on Darwin, the rest of its enrolled session."""
     members = process_group if members is None else members
+    if sys.platform == 'darwin':
+        return kill_darwin_session(group, members)
     try:
         os.killpg(group, signal.SIGKILL)
     except ProcessLookupError:
         return
     except PermissionError:
         live = live_group_members(group, members, settle_exit=True)
-        if sys.platform == 'darwin' and not live:
-            return
         # A real denial is a supervision failure, even if individual signals are
         # permitted. Stop the remaining members where possible before reporting it.
         for row in live:
@@ -237,7 +284,7 @@ class Runner:
     def __init__(self, work, limits):
         self.work, self.limits = Path(work), limits
 
-    def run(self, argv, cwd, output, expected_exit=0, timed=False):
+    def run(self, argv, cwd, output, expected_exit=0, timed=False, *, env_overrides=None):
         output = Path(output)
         require(not output.exists(), 'fresh command output required: ' + str(output))
         output.mkdir(parents=True)
@@ -245,9 +292,14 @@ class Runner:
         limit = self.limits
         require(memory_available() >= limit['host_available_floor_bytes'], 'host memory floor before launch')
         require(__import__('shutil').disk_usage(self.work).free >= limit['disk_free_floor_bytes'], 'disk floor before launch')
+        child_env = env()
+        reported_env = {key: child_env[key] for key in (
+            'GHC_ENVIRONMENT', 'GHCRTS', 'LC_ALL', 'OMP_NUM_THREADS', 'OPENBLAS_NUM_THREADS', 'MAKEFLAGS')}
+        if env_overrides:
+            child_env.update(env_overrides)
+            reported_env.update(env_overrides)
         record = {'complete': False, 'argv': argv, 'cwd': str(Path(cwd).resolve()),
-                  'timed_target_leg': timed, 'limits': limit, 'environment': {
-                      key: env()[key] for key in ['GHC_ENVIRONMENT','GHCRTS','LC_ALL','OMP_NUM_THREADS','OPENBLAS_NUM_THREADS','MAKEFLAGS']},
+                  'timed_target_leg': timed, 'limits': limit, 'environment': reported_env,
                   'boundary': 'Popen launch through exact-child wait4 completion; setup/copy/auth/postchecks excluded',
                   'started_utc': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())}
         receipt = output / 'command.json'
@@ -263,7 +315,7 @@ class Runner:
                 resource.setrlimit(resource.RLIMIT_AS, (maximum, maximum))
         with (output / 'stdout').open('wb') as stdout, (output / 'stderr').open('wb') as stderr:
             begin = time.perf_counter_ns()
-            process = subprocess.Popen(argv, cwd=cwd, env=env(), stdin=subprocess.DEVNULL,
+            process = subprocess.Popen(argv, cwd=cwd, env=child_env, stdin=subprocess.DEVNULL,
                                        stdout=stdout, stderr=stderr, start_new_session=True, preexec_fn=limits)
             def wait():
                 try:

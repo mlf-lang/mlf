@@ -5,13 +5,9 @@ in PR #25. Source integration is **not performance acceptance**: the original
 cloud screen failed its 5% threshold, and no universal >=5% or <=3x result is
 claimed. The unchanged public crate/Solver route remains a control/reference.
 
-The final integrated checkout is checked separately by
-`tools/performance/crate-optimizations/run_controls.py` and
-`tools/performance/a1-private-index/check_integrated.py`, using its own complete
-authenticated O2 producer. CI runs both finite gates without changing the
-existing O0/O2 coverage, budgets or opt-in async-bootstrap policy. The historical
-benchmark runner instead selects the fixed candidate `5a89143`; it does **not**
-validate the current HEAD or measure its performance.
+Current graph, private-export and builtin checks run against an authenticated
+producer through the [Patricia integration runner](../../../tools/performance/patricia/README.md).
+The historical benchmark measured the fixed candidate `5a89143`.
 
 ## What changed
 
@@ -27,7 +23,7 @@ The complete implementation, registrations and genuine regenerated locks are
 included. The compiler has 123 registered shared modules. The benchmark is the
 same separately frozen historical **14-module target**, not today's 15-module
 crate. See [admission obligations](ADMISSION-PROOF.md) and
-[finite control scope](../../../tools/performance/a1-private-index/CONTROL-SCOPE.md).
+[finite control scope](https://github.com/mlf-lang/mlf/blob/0704d216b8cf6d887d3737efa30a2eae3c152f0a/tools/performance/a1-private-index/CONTROL-SCOPE.md).
 
 ## Historical cloud measurements (2026-10-28)
 
@@ -88,11 +84,10 @@ original campaign with a run of this newly packaged wrapper.
 
 ## Local reproduction
 
-Use [runner instructions](../../../tools/performance/a1-private-index/README.md)
-and [the local-agent prompt](LOCAL-AGENT-PROMPT.md). All frozen input and literal semantic
-control sources are in Git; no private cloud path, binary or query-cache body is
-required. Rebuild and compare all three implementations on the **same local host**.
-Cross-host wall seconds are not an improvement comparison.
+Follow the [archived runner instructions](https://github.com/mlf-lang/mlf/blob/0704d216b8cf6d887d3737efa30a2eae3c152f0a/tools/performance/a1-private-index/README.md)
+or the [original local-agent prompt](https://github.com/mlf-lang/mlf/blob/0704d216b8cf6d887d3737efa30a2eae3c152f0a/docs/performance/a1-private-index/LOCAL-AGENT-PROMPT.md)
+from commit `0704d216b8cf6d887d3737efa30a2eae3c152f0a`. Use its frozen inputs and
+compare all three implementations on the same host.
 
 The runner supports an experimental native Apple Silicon macOS route in addition
 to Linux. It uses the same platform-only builder adaptation for both producers.

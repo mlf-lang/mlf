@@ -73,12 +73,17 @@ static MLF_NOINLINE MlfValue *os_listDirectory(MlfValue *name) {
     if (!valid_utf8((unsigned char *)text,size)) { free(text); fail("IO error: invalid UTF-8 input"); }
     MlfValue *result = mlf_string(text,size); free(text); return result;
 }
-static MlfValue *os_acquireFileLock(MlfValue *name) {
-    int fd = open(file_path(name),O_RDWR|O_CREAT|O_CLOEXEC,0600);
+static intptr_t os_file_lock(const char *path) {
+    int fd = open(path,O_RDWR|O_CREAT|O_CLOEXEC,0600);
     struct flock lock = {0}; lock.l_type = F_WRLCK; lock.l_whence = SEEK_SET;
-    if (fd < 0) fail("IO error: acquireFileLock failed");
-    while (fcntl(fd,F_SETLKW,&lock) < 0) if (errno != EINTR) { close(fd); fail("IO error: acquireFileLock failed"); }
-    return small(fd);
+    if (fd < 0) return -1;
+    while (fcntl(fd,F_SETLKW,&lock) < 0) if (errno != EINTR) { close(fd); return -1; }
+    return fd;
+}
+static MlfValue *os_acquireFileLock(MlfValue *name) {
+    intptr_t handle = os_file_lock(file_path(name));
+    if (handle < 0) fail("IO error: acquireFileLock failed");
+    return small(handle);
 }
 static MlfValue *os_releaseFileLock(MlfValue *handle) {
     int fd = (int)bounded_integer(handle,INT_MAX,"invalid file lock");

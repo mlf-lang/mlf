@@ -6,6 +6,13 @@ if [ "$#" -ne 3 ]; then
   exit 2
 fi
 root=$(cd -- "$(dirname -- "$0")/../.." && pwd)
+if [ "${MLF_TEST_SUITE:-}" = candidate-smoke-packages ]; then
+  . "$root/tools/testing/native-events.sh"
+else
+  mlf_case_start() { :; }
+  mlf_case_result() { :; }
+  mlf_case_cleanup() { :; }
+fi
 mkdir -p -- "$3"
 output=$(cd -- "$3" && pwd)
 # A failed rerun must never leave the preceding successful receipt in place.
@@ -76,11 +83,17 @@ run_stage() {
   done
 }
 
+trap 'mlf_case_cleanup "$?"' EXIT
+mlf_case_start candidate-smoke-packages/initial
 run_stage initial $'Hello, local packages!\n'
 jq -e 'all(.builds[]; .cached == false)' "$output/initial.build-report.json" >/dev/null
+mlf_case_result pass 0
+mlf_case_start candidate-smoke-packages/cached
 run_stage cached $'Hello, local packages!\n'
 jq -e 'all(.builds[]; .cached == true)' "$output/cached.build-report.json" >/dev/null
 
+mlf_case_result pass 0
+mlf_case_start candidate-smoke-packages/changed
 source="$app/message/Message.emlf"
 test "$(grep -Fxc 'render (Message text) = text' "$source")" -eq 1
 sed 's/^render (Message text) = text$/render (Message text) = text ++ " updated"/' \
@@ -102,6 +115,8 @@ jq -e '
       "crate local-packages-example/0.1.0/target-test-hello", "crate message/0.1.0/library"] and
     all($rows[]; .cached == false))
 ' "$output/changed.build-report.json" >/dev/null
+
+mlf_case_result pass 0
 
 test "$(sha256 "$compiler")" = "$compiler_sha256"
 test "$(sha256 "$manager")" = "$manager_sha256"

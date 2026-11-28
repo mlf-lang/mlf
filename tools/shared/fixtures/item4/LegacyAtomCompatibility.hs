@@ -27,7 +27,9 @@ ast label source expected = if E.eqExpr (parse source) expected
   then putStrLn ("PASS AST " ++ label) else error ("AST mismatch: " ++ label)
 closed label source expected = do
   ast label source expected
-  case (C.compile "LegacyAtoms.emlf" (B.literal source), C.compileExpr expected) of
+  textual <- C.compile "LegacyAtoms.emlf" (B.literal source)
+  authored <- C.compileExpr expected
+  case (textual, authored) of
     (T.Right a, T.Right b) | X.alphaEq (C.inferredType a) (C.inferredType b)
       H.&& X.equalErased (X.erase (C.compiledTerm a)) (X.erase (C.compiledTerm b)) -> putStrLn ("PASS type/erasure " ++ label)
     (T.Left e, _) -> error (B.unpack (C.prettyError e))

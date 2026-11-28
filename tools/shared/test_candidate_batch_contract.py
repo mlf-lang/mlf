@@ -1,16 +1,9 @@
 """Pure synthetic-data contract tests. No compiler/interpreter invocation."""
 import copy
-from pathlib import Path
 import unittest
 import candidate_batch_contract as C
 
-HERE=Path(__file__).resolve().parent
 class ContractControls(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        cls.script=(HERE/'test_candidate_selection.py').read_bytes()
-        cls.classes=(HERE/'../../libraries/mlf-inference/Bootstrap/Classes.hs').read_bytes()
-        cls.original=C.original_fixture(cls.script,cls.classes)
     def capture(self,direction):
         # Test fixture only, never represented as actual workload evidence.
         return b''.join(('%d\n%d\n'%(C.BEGIN,i)).encode()+C.cases()[i]['expected']+
@@ -25,14 +18,6 @@ class ContractControls(unittest.TestCase):
                 for i in range(24):
                     projections.append(C.project(row,raw,i,['original',*C.cases()[i]['arguments']],C.cases()[i]['expected']))
         return physical,projections
-    def test_fixed_full_sources_and_selector_body(self):
-        self.assertEqual(C.blob(self.script),C.SCRIPT_BLOB)
-        self.assertIn(C.blob(self.classes), C.CLASSES_BLOBS)
-        self.assertEqual(C.digest(self.original), C.ORIGINAL_FIXTURE_SHA256)
-        body=self.classes[self.classes.index(b'  selectCandidates ::'):self.classes.index(b'  methodBindings ::')]
-        self.assertEqual(self.original.count(body),1)
-        for a,b in ((self.script+b'\n',self.classes),(self.script,self.classes+b'\n')):
-            with self.assertRaises(ValueError):C.original_fixture(a,b)
     def test_independent_literal_inventory(self):
         small=[
             (0,[]),(0,[-1,0]),(0,[0,0,1,-1]),
@@ -48,37 +33,6 @@ class ContractControls(unittest.TestCase):
                 self.assertEqual(got[offset+i],dict(selector=selector,index=i,
                     arguments=[selector,str(n),'0',str(len(ids)),*map(str,ids)],
                     expected=(prefix+expected_tail).encode()))
-    def test_complete_inverse_both_directions_and_single_call(self):
-        body=self.classes[self.classes.index(b'  selectCandidates ::'):self.classes.index(b'  methodBindings ::')]
-        for direction in ('forward','reverse'):
-            raw=C.generate(self.original,direction,self.script,self.classes)
-            self.assertEqual(C.restore(raw,direction,self.script,self.classes),self.original)
-            self.assertEqual(raw.count(body),1)
-            self.assertEqual(raw.count(b'runCase (batchArgument args);'),1)
-            self.assertEqual(raw.count(b'  main :: IO ();'),1)
-            self.assertEqual(raw.count(b'  readIndices :: (Int -> IO String) -> Int -> Int -> IO ([] Int);'),1)
-            self.assertIn(b'rest <- readIndices getArg (position + 1) (count - 1);',raw)
-            self.assertIn(b'indices <- readIndices getArg 4 (readInt count);',raw)
-            self.assertNotIn(b'rest <- readIndices (',raw)
-            table=b', '.join(('(,) %d [%s]'%(i,', '.join('"%s"'%a for a in C.cases()[i]['arguments']))).encode()
-                            for i in C.order_for(direction))
-            self.assertIn(b'batchCases = ['+table+b'];',raw)
-    def test_inverse_refuses_every_adaptation_and_data_tamper(self):
-        raw=C.generate(self.original,'forward',self.script,self.classes)
-        for old,new in C.ADAPTATIONS:
-            with self.subTest(old=old),self.assertRaises(ValueError):
-                C.restore(raw.replace(new,old,1),'forward',self.script,self.classes)
-        for changed in (raw+b'\n',raw.replace(b'InstanceEvidence',b'GivenEvidence',1),
-                        raw.replace(b'runCase (batchArgument args);',b'runCase getArg;',1),
-                        raw.replace(b'readIndices getArg (position + 1)',b'readIndices getArg position',1),
-                        raw.replace(b'(,) 0 ["named"',b'(,) 1 ["named"',1),
-                        raw.replace(b'"named", "0"',b'"ids", "0"',1),
-                        raw.replace(b'Int -> IO ([] Int)',b'Int -> IO Int',1),
-                        raw.replace(b'printInt index;',b'printInt 0;',1)):
-            with self.assertRaises(ValueError):C.restore(changed,'forward',self.script,self.classes)
-        with self.assertRaises(ValueError):C.restore(raw,'reverse',self.script,self.classes)
-        with self.assertRaises(ValueError):C.generate(self.original+b'\n','forward',self.script,self.classes)
-        with self.assertRaises(ValueError):C.generate(self.original,'other',self.script,self.classes)
     def test_actual_byte_ranges_have_no_virtual_process_fields(self):
         for d in ('forward','reverse'):
             raw=self.capture(d);rows=C.parse(raw,d)

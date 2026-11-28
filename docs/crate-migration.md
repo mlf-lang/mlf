@@ -3,9 +3,9 @@
 Status: accepted on 2026-10-20. The crate implementation, all six native test
 groups, fresh self-host fixed point and isolated performance acceptance are
 complete for the R11 source and tool configuration. The
-[validation record](crate-validation.json) binds actual command exits, source
+[validation record](https://github.com/mlf-lang/mlf/blob/0704d216b8cf6d887d3737efa30a2eae3c152f0a/docs/crate-validation.json) binds actual command exits, source
 hashes, native tools, profiles, test coverage, baseline preservation and measured
-results. The [native-only cleanup record](native-only-validation.json) remains
+results. The [native-only cleanup record](https://github.com/mlf-lang/mlf/blob/0704d216b8cf6d887d3737efa30a2eae3c152f0a/docs/native-only-validation.json) remains
 evidence for the earlier tree.
 
 ## Evidence and semantic boundary

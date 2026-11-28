@@ -1,9 +1,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Main where
--- Fresh nominal types may close their constructor-site census. This fixture
--- combines a strict saturated site with a bare constructor passed to opaque
--- installed polymorphic code, which creates a lazy poison field. Escaping must
--- invalidate the earlier strict-field observation, including after optimization.
+-- A constructor passed through a separately compiled polymorphic function
+-- keeps the boxed crate ABI. Ignored fields stay unforced, while demanding
+-- the field must expose poison even beside an ordinary saturated construction.
 import Prelude
 import Control.Monad (forM_)
 import System.Environment (getArgs)
@@ -16,7 +15,14 @@ right (T.Left x)=error(P.textToChars x)
 identity=P.textFromChars(replicate 64 'a')
 unit=T.XConstructor "()" []
 main=do
- [directory]<-getArgs
+ args<-getArgs
+ case args of
+  [directory] -> emit directory Nothing
+  [directory, label] | label `elem` ["private-identity", "private-escape-ignore", "private-escape-demand"] ->
+   emit directory (Just label)
+  _ -> fail "expected output directory and optional private-constructor label"
+
+emit directory selection = do
  let a=T.XTyVar 0; at=T.XVar a; double=T.XCon "Double" []
      idTy=T.XForall a T.XBot (T.XArrow at at)
      makeTy=T.XForall a T.XBot (T.XArrow (T.XArrow double at) at)
@@ -36,8 +42,10 @@ main=do
      output n=T.XApp(T.XPrimitive T.PPrintInt[])(T.XIntTerm n)
      observed=T.XApp(T.XApp(T.XPrimitive T.PEqDouble[])(T.XVarTerm field))(T.XDoubleTerm 4)
      demanded=T.XApp(T.XApp(T.XApp(T.XPrimitive T.PIfThenElse[ioUnit])observed)(output 1))(output 0)
- writeFile(directory++"/private-library.ll")(concatMap P.textToChars(right(N.emitLibrary layout linked)))
- forM_[("private-identity","ident",idTy,False),("private-escape-ignore","maker",makeTy,True),("private-escape-demand","maker",makeTy,False)] $ \(label,key,ty,ignored)->do
+ writeFile(directory++"/private-library.ll")
+   (concatMap P.textToChars(right(N.emitCrateLibrary layout(right(N.libraryTerm layout linked)))))
+ let candidates=[("private-identity","ident",idTy,False),("private-escape-ignore","maker",makeTy,True),("private-escape-demand","maker",makeTy,False)]
+ forM_ (filter (\(label,_,_,_) -> maybe True (== label) selection) candidates) $ \(label,key,ty,ignored)->do
   let selected=T.XName 20 key
       instantiate=T.XTypeApp(T.XVarTerm selected)(T.XThen (T.XInner (T.XBottom privateTy)) T.XElim)
       value=if key=="ident" then T.XApp instantiate(T.XApp(T.XConstructor "PrivateBoxValue"[])(T.XDoubleTerm 4)) else T.XApp instantiate(T.XConstructor "PrivateBoxValue"[])
@@ -47,5 +55,7 @@ main=do
       body=if key=="ident" then T.XAbs selected ty answer else
         T.XAbs selected ty(T.XAbs identityName idTy(T.XCase seed ioUnit[T.XAlternative(T.XConstructorPattern "PrivateBoxValue"[T.Nothing])answer]))
       selectedKeys=if key=="ident" then [key] else [key,"ident"]
-  writeFile(directory++"/"++label++".ll")(concatMap P.textToChars(right(N.emitRoot layout selectedKeys(right(C.check(T.XWithData[private]body))))))
+  writeFile(directory++"/"++label++".ll")
+    (concatMap P.textToChars(right(N.emitCrateProgram [(layout,key) | key <- selectedKeys]
+      (right(C.check(T.XWithData[private]body))))))
  putStrLn "PASS private constructor boundary emission"

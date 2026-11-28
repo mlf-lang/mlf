@@ -90,7 +90,7 @@ def main():
         if count != 1:
             raise ValueError('codec module boundary changed')
         candidate.write_text(renamed)
-        first = text[text.index('  packedBits bytes'):text.index('  packedRefs bytes')]
+        first = text[text.index('  packedBits ::'):text.index('  packedRefs ::')]
         last = text[text.index('  packedFinish bytes'):text.index('  encodeTables ::')]
         if first.count('  packedByte bytes') != 1 or first.count('  packedVar bytes') != 1:
             raise ValueError('packed writer extraction boundary changed')

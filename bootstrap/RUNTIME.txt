@@ -121,9 +121,11 @@ collector allocations. Memoized thunks and popped continuation slots clear
 obsolete references. Native stack support preserves suspended evaluations and
 recursive binding holes. GC_DEBUG and MLF_ALLOCATION_AUDIT remain supported.
 
-All LLVM command spellings emit compact-GC; -gc spellings are aliases. Old
-standard-layout LLVM and objects fail to link against this runtime's ABI guard
-and must be regenerated. There is no standard allocator/collector fallback.
+All LLVM command spellings emit compact-GC; -gc spellings are aliases.
+Standalone entries, native libraries and their callers require the same
+mlf_require_runtime_v5_abi link symbol. Rebuild LLVM, native objects and
+installed native libraries produced with earlier guards. The code generation
+cache includes the exact guard in its input and optimized-program keys.
 The shared backend matrix compares interpreter and compact native execution;
 port executes 25 checked compiler probes through LLVM. Stress coverage retains
 suspended applications, cyclic data, GMP integers, arrays and tables across
@@ -134,10 +136,8 @@ long pure allocation intervals and checks results with independent references.
 This private monomorphic transport calls the dynamic subprocess supervisor in
 this process. It is not runProcess, a shell, or a task-value lookup. The public
 API is the separate mlf-async library's Async.Process module. Primitive numbers
-0..81 remain unchanged. New compiler entries require the additional compact
-runtime symbol mlf_require_process_supervisor_v1_abi; released-seed entries keep
-the old compact guard and can link to the new runtime. There is no fallback
-that silently runs a whole static runner for one dynamic operation.
+0..81 retain their assigned numbers. The native runtime guard above covers
+this primitive. The frozen bootstrap bridge uses its own runtime.
 
 Request fields are NUL-terminated UTF-8 strings, headed by MLF-PROCESS-1 and an
 operation. The complete request is limited to 1 MiB and 4096 fields. Replies
@@ -242,5 +242,5 @@ Closed scopes are removed rather than retained as tombstones; unforgeable,
 monotonic issued identities distinguish stale handles without a historical map.
 Only clock/pause metadata crosses the bootstrap host bridge. Results and resume
 closures stay in the traced typed store. Native objects are scanned BDWGC roots.
-New codegen entries require mlf_require_async_completion_v2_abi, and the cache
-key includes completion-v2; old native object IDs are not silently reused.
+The native runtime guard covers the completion primitives and their object
+layouts.

@@ -210,7 +210,7 @@ compile had a 60-second bound; executable probes had a 5-second bound. Native
 oracles included the unchanged `runtime/mlf_runtime.c` directly and linked the
 already installed BDWGC/GMP dependencies, without compiling the language
 implementation. The original reviewed source identities were recorded by receipt
-`20261023T210203Z` (the original `tests/shared-host/evidence/latest` checkpoint).
+`20261023T210203Z` (the [original checkpoint](https://github.com/mlf-lang/mlf/blob/0704d216b8cf6d887d3737efa30a2eae3c152f0a/tests/shared-host/evidence/before-independent-review/receipt.json)).
 The original five hashes were:
 
 - Base.hs: `71be4d20a9d73fb040b9b6e9e1e9914e3c4c26a84bbb818e793dc90d86e0ff08`
@@ -220,8 +220,8 @@ The original five hashes were:
 - host.c: `bfcf4b400902afaa89e0d6cbe0de5901a4e1e89c6100d203e50c3099ba7fc694`
 
 The complete original checkpoint is preserved in
-`tests/shared-host/evidence/before-independent-review/`. The fresh passing
-post-fix receipt is `tests/shared-host/evidence/latest/receipt.json`, timestamp
+[the pre-fix archive](https://github.com/mlf-lang/mlf/tree/0704d216b8cf6d887d3737efa30a2eae3c152f0a/tests/shared-host/evidence/before-independent-review). The passing
+[post-fix receipt](https://github.com/mlf-lang/mlf/blob/0704d216b8cf6d887d3737efa30a2eae3c152f0a/tests/shared-host/evidence/latest/receipt.json) has timestamp
 `20261023T211159Z`; every source listed by that receipt matched the checkout at
 the independent final verification. Its principal final hashes are:
 

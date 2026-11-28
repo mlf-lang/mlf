@@ -1,5 +1,7 @@
-module Tests.CrateQueries (crateQueryTests) where
+module Tests.CrateQueries (crateQueryTests, canonicalKeyLabel, canonicalKeyAssertions) where
 
+import Prelude hiding (Monad, return, bind)
+import MLF.Primitive (Monad, return, bind)
 import Bootstrap.Types
 import Bootstrap.Std
 import qualified Bootstrap.Map as M
@@ -16,6 +18,7 @@ import qualified Bootstrap.X.Syntax as X
 import qualified Bootstrap.X.Checked as Checked
 import qualified Package.OS as OS
 import qualified Tests.Helpers as H
+import qualified Test.Assert as A
 
 scratch name = do
   root <- canonicalPath "."
@@ -164,34 +167,45 @@ classCandidates = do
   (,) _ _ <- query "ClassCache" directory (Inference.loweredData before) (Inference.loweredValues before)
   (,) _ report <- query "ClassCache" directory (Inference.loweredData after) (Inference.loweredValues after)
   counts 2 2 report
-canonicalKeys = do
+canonicalKeyLabel : String
+canonicalKeyLabel = "query encodings preserve semantics and normalize lexical names"
+
+canonicalKeys : IO ()
+canonicalKeys = A.orExit canonicalKeyAssertions
+
+canonicalKeyAssertions : A.Test ()
+canonicalKeyAssertions = do
   let first = (,,) "evidence" Nothing (SLam "givenDictionary1" Nothing (SWanted "Dict_C" ((:) ((,) GivenEvidence "givenDictionary1") [])))
   let renamed = (,,) "evidence" Nothing (SLam "givenDictionary99" Nothing (SWanted "Dict_C" ((:) ((,) GivenEvidence "givenDictionary99") [])))
-  H.assert (eqString (Query.queryKey "Alpha" "compiler" ((:) first []) [] []) (Query.queryKey "Alpha" "compiler" ((:) renamed []) [] [])) "given evidence names leaked into query identity"
-  H.assert (not (eqString (Query.encodeType (SForall Flexible "a" SBottom (STVar "a"))) (Query.encodeType (SForall Rigid "a" SBottom (STVar "a"))))) "query encoding lost the quantifier flag"
-  H.assert (eqString (Query.encodeBinding ((,) "x" (XCon "List" ((:) (XCon "Int" []) [])))) (Query.encodeBinding ((,) "x" (XApply (XCon "List" []) (XCon "Int" []))))) "equivalent type applications invalidate semantic query inputs"
+  A.assert (eqString (Query.queryKey "Alpha" "compiler" ((:) first []) [] []) (Query.queryKey "Alpha" "compiler" ((:) renamed []) [] [])) "given evidence names leaked into query identity"
+  A.assert (not (eqString (Query.encodeType (SForall Flexible "a" SBottom (STVar "a"))) (Query.encodeType (SForall Rigid "a" SBottom (STVar "a"))))) "query encoding lost the quantifier flag"
+  A.assert (eqString (Query.encodeBinding ((,) "x" (XCon "List" ((:) (XCon "Int" []) [])))) (Query.encodeBinding ((,) "x" (XApply (XCon "List" []) (XCon "Int" []))))) "equivalent type applications invalidate semantic query inputs"
   let checked = (,,) "f" (CheckRecursive (SAnnotation [] (SCon "Int" []))) (SVar "f")
   let inferred = (,,) "f" InferRecursive (SVar "f")
-  H.assert (eqString (Query.encodeRecursive checked) "9:recursive1:f39:10:annotation0:21:11:constructor3:Int0:13:8:variable1:f") "signed recursive query encoding changed"
-  H.assert (not (eqString (Query.encodeRecursive checked) (Query.encodeRecursive inferred))) "query encoding conflated inferred and checked recursion"
-  H.assert (not (H.eq (SLetRec ((:) checked []) (SVar "f")) (SLetRec ((:) inferred []) (SVar "f")))) "source equality conflated inferred and checked recursion"
-  H.assert (not (H.eq (SDo ((:) (SDoLetRec ((:) checked [])) []) (SVar "f")) (SDo ((:) (SDoLetRec ((:) inferred [])) []) (SVar "f")))) "statement equality conflated inferred and checked recursion"
+  A.assert (eqString (Query.encodeRecursive checked) "9:recursive1:f39:10:annotation0:21:11:constructor3:Int0:13:8:variable1:f") "signed recursive query encoding changed"
+  A.assert (not (eqString (Query.encodeRecursive checked) (Query.encodeRecursive inferred))) "query encoding conflated inferred and checked recursion"
+  A.assert (not (H.eq (SLetRec ((:) checked []) (SVar "f")) (SLetRec ((:) inferred []) (SVar "f")))) "source equality conflated inferred and checked recursion"
+  A.assert (not (H.eq (SDo ((:) (SDoLetRec ((:) checked [])) []) (SVar "f")) (SDo ((:) (SDoLetRec ((:) inferred [])) []) (SVar "f")))) "statement equality conflated inferred and checked recursion"
   let firstRecursive = (,,) "entry" Nothing (SLetRec ((:) inferred []) (SVar "f"))
   let renamedRecursive = (,,) "entry" Nothing (SLetRec ((:) ((,,) "renamed" InferRecursive (SVar "renamed")) []) (SVar "renamed"))
-  H.assert (eqString (Query.queryKey "AlphaRecursive" "compiler" ((:) firstRecursive []) [] []) (Query.queryKey "AlphaRecursive" "compiler" ((:) renamedRecursive []) [] [])) "unsigned recursive binder names leaked into query identity"
-  H.assert (not (eqString (Query.queryKey "AlphaRecursive" "compiler-before" ((:) firstRecursive []) [] []) (Query.queryKey "AlphaRecursive" "compiler-after" ((:) firstRecursive []) [] []))) "compiler identity change reused a recursive query key"
+  A.assert (eqString (Query.queryKey "AlphaRecursive" "compiler" ((:) firstRecursive []) [] []) (Query.queryKey "AlphaRecursive" "compiler" ((:) renamedRecursive []) [] [])) "unsigned recursive binder names leaked into query identity"
+  A.assert (not (eqString (Query.queryKey "AlphaRecursive" "compiler-before" ((:) firstRecursive []) [] []) (Query.queryKey "AlphaRecursive" "compiler-after" ((:) firstRecursive []) [] []))) "compiler identity change reused a recursive query key"
   let checkedRecursive = (,,) "entry" Nothing (SLetRec ((:) checked []) (SVar "f"))
-  H.assert (not (eqString (Query.queryKey "AlphaRecursive" "compiler" ((:) firstRecursive []) [] []) (Query.queryKey "AlphaRecursive" "compiler" ((:) checkedRecursive []) [] []))) "canonical query identity erased recursive checking mode"
+  A.assert (not (eqString (Query.queryKey "AlphaRecursive" "compiler" ((:) firstRecursive []) [] []) (Query.queryKey "AlphaRecursive" "compiler" ((:) checkedRecursive []) [] []))) "canonical query identity erased recursive checking mode"
   let signedRecursive = \name variable -> (,,) "entry" Nothing (SLetRec ((:) ((,,) name (CheckRecursive (SAnnotation [] (SForall Flexible variable SBottom (SArrow (STVar variable) (STVar variable))))) (SLam "value" (Just (SAnnotation [] (STVar variable))) (SApp (SVar name) (SVar "value")))) []) (SVar name))
-  H.assert (eqString (Query.queryKey "SignedAlphaRecursive" "compiler" ((:) (signedRecursive "f" "a") []) [] []) (Query.queryKey "SignedAlphaRecursive" "compiler" ((:) (signedRecursive "renamed" "other") []) [] [])) "signed recursive scoped type names leaked into query identity"
+  A.assert (eqString (Query.queryKey "SignedAlphaRecursive" "compiler" ((:) (signedRecursive "f" "a") []) [] []) (Query.queryKey "SignedAlphaRecursive" "compiler" ((:) (signedRecursive "renamed" "other") []) [] [])) "signed recursive scoped type names leaked into query identity"
 cacheBoundary = do
   object <- H.right (Inference.compileLoweredGroup "CacheBoundary" [] [] ((:) ((,,) "identity" Nothing (SLam "x" Nothing (SVar "x"))) []))
   let original = Separate.objectInterface object
   let forged = Separate.UnitInterface "CacheBoundary" [] [] [] [] [] ((:) ((,) "identity" (XCon "Int" [])) []) (Separate.unitObjectFingerprint original)
   proof <- H.right (Separate.objectChecked object)
   H.reject (Query.validateCached "CacheBoundary" [] [] ((:) "identity" []) (Separate.CheckedUnitObject forged proof))
-  let encoded = Query.encodeCached "key" (Separate.UnitObject forged (Separate.objectTerm object))
-  H.assert (case Query.decodeCached "key" "CacheBoundary" [] [] ((:) "identity" []) encoded of {Left _ -> true; Right _ -> false}) "cache trusted interface schemes without independently checking the body"
+  dir <- scratch "forged-lowered"
+  let path = dir ++ "/forged.mlfq"
+  written <- Query.writeLoweredCache path "key" (Separate.UnitObject forged (Separate.objectTerm object))
+  _ <- H.right written
+  decoded <- Query.readLoweredCache "key" "CacheBoundary" [] [] ((:) "identity" []) path
+  H.assert (case decoded of {Left _ -> true; Right _ -> false}) "cache trusted interface schemes without independently checking the body"
 
 crateQueryTests : [] ((,) String (IO ()))
 crateQueryTests = (:) ((,) "declaration SCC order and inventory permutation" orderedSCC)
@@ -206,5 +220,5 @@ crateQueryTests = (:) ((,) "declaration SCC order and inventory permutation" ord
   ((:) ((,) "changed schemes invalidate actual consumers" cacheScheme)
   ((:) ((,) "datatype closure invalidates relevant changes only" cacheTypes)
   ((:) ((,) "instance candidate visibility participates in query keys" classCandidates)
-  ((:) ((,) "query encodings preserve semantics and normalize lexical names" canonicalKeys)
+  ((:) ((,) canonicalKeyLabel canonicalKeys)
   ((:) ((,) "cache schemes are checked against stored implementations" cacheBoundary) [])))))))))))))

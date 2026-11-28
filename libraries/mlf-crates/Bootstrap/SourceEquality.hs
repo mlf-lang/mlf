@@ -151,6 +151,8 @@ module Bootstrap.SourceEquality where {
     b = case right of {
       SGivenScope names body -> L.expandWantedScopes names body;
       SWantedScope dictionary env -> SWantedRefs dictionary (wantedScopeRefs [] env);
+      SBindDictionaries names body -> L.dictionaryAbstraction names body;
+      SApplyDictionaries f names -> L.dictionaryApplication f names;
       _ -> right
     }
   } in
@@ -181,11 +183,13 @@ module Bootstrap.SourceEquality where {
           SLam y0 y1 y2 -> (eqString x0 y0 && (L.eqMaybe eqSAnnotation x1 y1 && same x2 y2));
           _ -> False
         };
+      SBindDictionaries names body -> same (L.dictionaryAbstraction names body) b;
       SApp x0 x1 ->
         case b of {
           SApp y0 y1 -> (same x0 y0 && same x1 y1);
           _ -> False
         };
+      SApplyDictionaries f names -> same (L.dictionaryApplication f names) b;
       SLet x0 x1 x2 ->
         case b of {
           SLet y0 y1 y2 -> (eqString x0 y0 && (same x1 y1 && same x2 y2));

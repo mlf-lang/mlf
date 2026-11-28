@@ -1,6 +1,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Main where
 import Control.Monad (unless, forM_)
+import System.Environment (getArgs)
+import System.Exit (exitSuccess)
 import qualified Bootstrap.Types as T
 import qualified Bootstrap.Data as D
 import qualified Bootstrap.Runtime as R
@@ -71,7 +73,15 @@ rawSemantics label initial value body expectedError = do
 
 main :: IO ()
 main = do
- let two args = pair (f args) (f args)
+ args <- getArgs
+ selected <- case args of
+  [] -> pure Nothing
+  ["--exact", label] -> pure (Just label)
+  _ -> fail "usage: common-calls-audit [--exact LABEL]"
+ let runCase label action = case selected of
+      Nothing -> action
+      Just target -> if target == label then action >> exitSuccess else pure ()
+     two args = pair (f args) (f args)
  forM_
   [ ("identical-outer-vector",True,rhs,two [v 10])
   , ("different-identity-same-hint",False,rhs,pair (f [v 10]) (f [v 11]))
@@ -92,18 +102,19 @@ main = do
   , ("exact-two-parameter-vector",True,rhs2,two [v 10,v 11])
   , ("reversed-parameter-vector",False,rhs2,pair (f [v 10,v 11]) (f [v 11,v 10]))
   , ("self-argument-refused",False,rhs,two [v 0])
-  ] $ \(label,wanted,value,body) -> check label wanted value body
- let expected = T.XELet (n 0) (app (T.XEPrimitive T.PConcatString) [v 10,v 90]) (pair (v 0) (v 0))
- case fst (O.runFresh (O.specializeSharedValue (n 0) (O.indexUses rhs) (O.indexUses (two [v 10]))) 1000) of
-  T.Just actual -> unless (X.equalErased (O.useTerm actual) expected) (fail "exact lazy contraction changed")
-  T.Nothing -> fail "exact lazy contraction missing"
- putStrLn "PASS exact-lazy-contraction"
+  ] $ \(label,wanted,value,body) -> runCase label (check label wanted value body)
+ runCase "exact-lazy-contraction" $ do
+  let expected = T.XELet (n 0) (app (T.XEPrimitive T.PConcatString) [v 10,v 90]) (pair (v 0) (v 0))
+  case fst (O.runFresh (O.specializeSharedValue (n 0) (O.indexUses rhs) (O.indexUses (two [v 10]))) 1000) of
+   T.Just actual -> unless (X.equalErased (O.useTerm actual) expected) (fail "exact lazy contraction changed")
+   T.Nothing -> fail "exact lazy contraction missing"
+  putStrLn "PASS exact-lazy-contraction"
  let plusOne = T.XEAbs (n 1) (primitive T.PAddInt [v 1,T.XEInt 1])
      repeated = primitive T.PAddInt [f [v 10],f [v 10]]
- rawSemantics "raw-unused-bottom-laziness"
+ runCase "raw-unused-bottom-laziness" $ rawSemantics "raw-unused-bottom-laziness"
    (primitive T.PPanic [T.XEString "unused argument"]) plusOne
    (primitive T.PIfThenElse [T.XEBool False,ret repeated,ret (T.XEInt 0)]) Nothing
- rawSemantics "raw-earlier-failure-order"
+ runCase "raw-earlier-failure-order" $ rawSemantics "raw-earlier-failure-order"
    (primitive T.PPanic [T.XEString "late argument"]) plusOne
    (bind (primitive T.PPanic [T.XEString "first failure"]) 20 (ret repeated)) (Just "first failure")
  let allocate = T.XEAbs (n 1) (primitive T.PNewIntArray [T.XEInt 1,v 1])
@@ -111,5 +122,6 @@ main = do
        (bind (f [v 10]) 21
          (bind (primitive T.PWriteIntArray [v 20,T.XEInt 0,T.XEInt 42]) 22
            (primitive T.PReadIntArray [v 21,T.XEInt 0])))
- rawSemantics "raw-fresh-arrays-each-execution" (T.XEInt 0) allocate twoArrays Nothing
+ runCase "raw-fresh-arrays-each-execution" $ rawSemantics "raw-fresh-arrays-each-execution" (T.XEInt 0) allocate twoArrays Nothing
+ unless (selected == Nothing) (fail "unknown common-call case")
  putStrLn "Independent common-call audit: 23 checks passed"

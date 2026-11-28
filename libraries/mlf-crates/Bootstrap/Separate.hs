@@ -14,6 +14,7 @@ module Bootstrap.Separate where {
   import qualified Bootstrap.IndexVec as V;
   import qualified Bootstrap.IntSet as IS;
   import qualified Bootstrap.Module as Modules;
+  import qualified Bootstrap.NameEncoding as NameEncoding;
   import qualified Bootstrap.Classes as Classes;
   import qualified Bootstrap.Parser as Parser;
   import qualified Bootstrap.Primitive as Primitive;
@@ -77,28 +78,7 @@ module Bootstrap.Separate where {
   } in concatStringList (fields start);
   encodedChunks text i = if i >= stringLength text then []
     else (:) (showInt (stringCodeAt text i)) ((:) "_" (encodedChunks text (i + 1)));
-  -- Versioned, injective identifier components. The result has only ASCII
-  -- letters/digits; underscore separates whole components. z introduces a
-  -- lowercase scalar hex escape terminated by z; a literal z is doubled.
-  compactNameCode code =
-    (code >= 48 && code <= 57) || (code >= 65 && code <= 90) ||
-    (code >= 97 && code < 122);
-  compactNameHex code = if code < 16 then stringFromCode
-    (if code < 10 then 48 + code else 87 + code)
-    else compactNameHex (unsignedShiftRInt code 4) ++ compactNameHex (andInt code 15);
-  compactNameChunks text start position =
-    if position == stringLength text then [stringSlice text start (position - start)]
-    -- Produce a list cell after a bounded ASCII run. Native O0 evaluation
-    -- need not tail-call the scan; never traverse an arbitrary name before
-    -- giving the consuming concat loop its next finite fragment.
-    else if position - start == 256 then
-      (:) (stringSlice text start 256) (compactNameChunks text position position)
-    else let { code = stringCodeAt text position } in
-      if compactNameCode code then compactNameChunks text start (position + 1)
-      else (:) (stringSlice text start (position - start))
-        ((:) (if code == 122 then "zz" else if code == 58 then "z3az" else "z" ++ compactNameHex code ++ "z")
-          (compactNameChunks text (position + 1) (position + 1)));
-  compactName text = concatStringList (compactNameChunks text 0 0);
+  compactName text = NameEncoding.compactName text;
   queryGroupName crateId members = "Query_" ++ encoded crateId ++ "z_" ++ encoded (head members);
   -- Open-fragment owners are wire text, not generated source identifiers.
   -- Frame the full canonical ownership set once instead of escaping its
@@ -183,7 +163,11 @@ module Bootstrap.Separate where {
                freshPure ((,) n new)
              })
           names;
-      freshPure (M.union compareString (M.fromList compareString pairs) env)
+      -- Infix markers and prefix uses must name the same lexical binder
+      -- after freshening, so resolution can enforce the canonical operator.
+      let { markers = map (\((,) n fresh) -> (,) ("$MLF.Infix." ++ n) ("$MLF.Infix." ++ fresh))
+              (filter (\pair -> Set.member compareString (fst pair) Lexer.sharedValueOperatorSet) pairs) };
+      freshPure (M.union compareString (M.fromList compareString (append pairs markers)) env)
     };
   hygieneRef env ref = case ref of {
     LexicalRef n -> LexicalRef (hygieneName env n);
@@ -236,11 +220,13 @@ module Bootstrap.Separate where {
     }
   } in fromMaybe expression (changed expression);
   hygieneApplication env term = hygieneApplicationWith hygieneIn env term;
-  hygieneApplicationWith walk env term = let { child = hygieneApplicationWith walk env } in case term of {
-    SApp f a -> do { x <- child f; y <- child a; freshPure (SApp x y) };
-    SCallSite n span e -> do { b <- child e; freshPure (SCallSite n span b) };
-    _ -> walk env term
-  };
+  hygieneApplicationWith walk env term = let {
+    child expression = case expression of {
+      SApp f a -> do { x <- child f; y <- child a; freshPure (SApp x y) };
+      SCallSite n span e -> do { b <- child e; freshPure (SCallSite n span b) };
+      _ -> walk env expression
+    }
+  } in child term;
   hygieneIn :: Map String String -> SExpr -> Fresh SExpr;
   hygieneIn env expression = hygieneWith renamePlain env expression;
   hygieneWith rename env expression = let { walk = hygieneWith rename } in case expression of {
@@ -270,9 +256,16 @@ module Bootstrap.Separate where {
           body <- walk scope b;
           freshPure (SLam (hygieneName scope n) a body)
         };
+      SBindDictionaries names body -> do {
+        scope <- hygieneBind env names;
+        inner <- walk scope body;
+        freshPure (SBindDictionaries (map (hygieneName scope) names) inner)
+      };
       SApp _ _ -> if plainHygiene expression
         then freshPure (if M.null env then expression else rename env expression)
         else hygieneApplicationWith walk env expression;
+      SApplyDictionaries f names -> freshPure
+        (SApplyDictionaries (hygieneRef env f) (map (hygieneName env) names));
       SLet n a b ->
         do {
           scope <- hygieneBind env ((:) n []);
@@ -439,20 +432,39 @@ module Bootstrap.Separate where {
           y <- normalTypeIn env b;
           freshPure (XApply x y)
         };
-      XForall a bound b ->
-        do {
-          bound2 <- normalTypeIn env bound;
+      XForall a XBot body@(XForall r tail (XArrow (XVar input) (XVar output))) ->
+        if T.equalTyVar a input && T.equalTyVar r output && not (T.equalTyVar a r) then do {
           i <- freshInteger;
-          body <- normalTypeIn (M.insert T.compareTyVar a (XTyVar i) env) b;
-          freshPure (XForall (XTyVar i) bound2 body)
-        };
+          let { variable = XTyVar i };
+          bound <- normalTypeIn (M.insert T.compareTyVar a variable env) tail;
+          j <- freshInteger;
+          let { result = XTyVar j };
+          freshPure (XForall variable XBot (XForall result bound (XArrow (XVar variable) (XVar result))))
+        } else normalForall env a XBot body;
+      XForall a bound b -> normalForall env a bound b;
       _ -> freshPure ty
     };
-  normalType ty =
-    case runFresh [] (normalTypeIn M.empty ty) of {
+  normalForall env a bound body = do {
+    bound2 <- normalTypeIn env bound;
+    i <- freshInteger;
+    let { v = XTyVar i };
+    result <- normalTypeIn (M.insert T.compareTyVar a v env) body;
+    freshPure (XForall v bound2 result)
+  };
+  normalType ty = case T.projectionTypeLayout ty of {
+    Just ((,) width selected) -> let {
+      -- Match normalTypeIn's allocation order. The argument binder comes
+      -- before its suffix and the result binder comes after that suffix.
+      argument index = let { a = XTyVar index; next = index + 1 } in
+        if next == width then XForall a XBot (XArrow (XVar a) (XVar (XTyVar selected)))
+        else let { r = XTyVar (2 * (width - 1) - index) } in
+          XForall a XBot (XForall r (argument next) (XArrow (XVar a) (XVar r)))
+    } in argument 0;
+    Nothing -> case runFresh [] (normalTypeIn M.empty ty) of {
       Right t -> t;
       Left e -> panic e
     };
+  };
   cleanSource source = cleanSourceWith hygiene source;
   cleanParsedSource = cleanParsedReserving True;
   cleanParsedReserving possible = cleanSourceWith (\e ->
@@ -652,10 +664,25 @@ module Bootstrap.Separate where {
     } in seq nextA (seq nextB (canonicalFingerprintState rest nextA nextB));
     _ -> fingerprintStateChars chars a b
   };
+  canonicalFingerprintText text index size a b =
+    if index == 0 && size > 1024 && size == stringLength text && size /= stringUtf8Length text
+    then fingerprintBlocks text 0 size a b else canonicalFingerprintBlock text index size a b;
+  -- A few Unicode scalars in an otherwise ASCII artifact should only require
+  -- streaming their own block. Each block continues both polynomial states.
+  fingerprintBlocks text index size a b =
+    if index == size then (,) a b else let {
+      count = if size - index < 1024 then size - index else 1024;
+      block = stringSlice text index count;
+      states = if stringUtf8Length block == count
+        then canonicalFingerprintBlock block 0 count a b
+        else canonicalFingerprintState (textToChars block) a b
+    } in case states of {
+      (,) nextA nextB -> seq nextA (seq nextB (fingerprintBlocks text (index + count) size nextA nextB))
+    };
   -- ASCII fields are common in artifacts. Read four scalars directly without
   -- allocating a character-list cell for each byte. On the first non-ASCII
   -- block, stream just the remaining suffix so Unicode stays a linear scan.
-  canonicalFingerprintText text index size a b =
+  canonicalFingerprintBlock text index size a b =
     if size - index < 4 then canonicalFingerprintState
       (textToChars (stringSlice text index (size - index))) a b
     else let {
@@ -664,7 +691,7 @@ module Bootstrap.Separate where {
     } in if x0 < 128 && x1 < 128 && x2 < 128 && x3 < 128 then let {
       nextA = (a * 1172642095 + x0 * 780718649 + x1 * 8261507 + x2 * 65599 + x3) % 2147483647;
       nextB = (b * 294499921 + x0 * 2248091 + x1 * 17161 + x2 * 131 + x3) % 2147483629
-    } in seq nextA (seq nextB (canonicalFingerprintText text (index + 4) size nextA nextB))
+    } in seq nextA (seq nextB (canonicalFingerprintBlock text (index + 4) size nextA nextB))
     else canonicalFingerprintState (textToChars (stringSlice text index (size - index))) a b;
   fingerprint text = case canonicalFingerprintText text 0 (stringLength text) 0 1 of {
     (,) a b -> showInt a ++ "-" ++ showInt b
@@ -786,12 +813,12 @@ module Bootstrap.Separate where {
   -- Entries remain lazy. A name lookup is not an identity proof: lowering may
   -- change a layout, so reuse requires equality of the actual full declaration.
   data DatatypeEncoding =
-    DatatypeEncoding DataDecl String Int ((,,,) Int Int Int Int);
+    DatatypeEncoding DataDecl String ((,,,) Int Int Int Int);
   data DatatypeEncodings = DatatypeEncodings (Map String ([] DatatypeEncoding));
   datatypeEncoding :: DataDecl -> DatatypeEncoding;
   datatypeEncoding declaration =
     let { text = D.prettyDeclaration declaration ++ "\n" } in
-    DatatypeEncoding declaration text (stringLength text) (fingerprintPart text);
+    DatatypeEncoding declaration text (fingerprintPart text);
   prepareDatatypeEncodings :: [] DataDecl -> DatatypeEncodings;
   prepareDatatypeEncodings declarations =
     DatatypeEncodings (M.fromListWith compareString append
@@ -800,7 +827,7 @@ module Bootstrap.Separate where {
   findDatatypeEncoding declaration entries = case entries of {
     [] -> datatypeEncoding declaration;
     (:) entry rest -> case entry of {
-      DatatypeEncoding original _ _ _ ->
+      DatatypeEncoding original _ _ ->
         if SourceEquality.eqDataDecl declaration original then entry
         else findDatatypeEncoding declaration rest
     }
@@ -809,26 +836,15 @@ module Bootstrap.Separate where {
   lookupDatatypeEncoding (DatatypeEncodings entries) declaration =
     findDatatypeEncoding declaration
       (M.findWithDefault compareString [] (D.datatypeName declaration) entries);
-  datatypeEncodingText :: DatatypeEncoding -> String;
-  datatypeEncodingText (DatatypeEncoding _ text _ _) = text;
-  datatypeEncodingLength :: DatatypeEncoding -> Int;
-  datatypeEncodingLength (DatatypeEncoding _ _ count _) = count;
   appendDatatypeEncoding :: (,) Int Int -> DatatypeEncoding -> (,) Int Int;
   -- Internal callers reach canonical residues. Other signed Int64 seeds need
   -- the original recurrence: a negative seed can cross zero, and a large
   -- positive seed can wrap before the first remainder. Composing the summary
   -- is exact only when both seeds are already within their residue ranges.
-  appendDatatypeEncoding state (DatatypeEncoding _ text _ part) = case state of {
+  appendDatatypeEncoding state (DatatypeEncoding _ text part) = case state of {
     (,) a b -> if (a < 0 || a >= 2147483647 || b < 0 || b >= 2147483629)
       then fingerprintStateFrom text 0 a b
       else fingerprintAppend state part
-  };
-  prettyTermWithDatatypes :: DatatypeEncodings -> XTerm -> String;
-  prettyTermWithDatatypes pool term = case term of {
-    XWithData declarations body ->
-      concatMapString (\d -> datatypeEncodingText (lookupDatatypeEncoding pool d)) declarations
-        ++ Pretty.prettyTerm body;
-    _ -> Pretty.prettyTerm term
   };
   fingerprintTermWithDatatypes :: DatatypeEncodings -> XTerm -> String;
   fingerprintTermWithDatatypes pool term = case term of {
@@ -839,37 +855,6 @@ module Bootstrap.Separate where {
         (Pretty.prettyTerm body);
     _ -> fingerprint (Pretty.prettyTerm term)
   };
-  -- The interface checksum is NOT the payload checksum. Compose the exact
-  -- scalar-length-framed seven fields, sharing only actual datatype text parts.
-  -- Header and payload declarations are looked up separately by encodeUnit.
-  encodeInterfaceWithDatatypes :: DatatypeEncodings -> UnitInterface -> (,) String String;
-  encodeInterfaceWithDatatypes pool iface =
-    let { encodings = map (lookupDatatypeEncoding pool) (unitData iface) } in
-    let { suffix = unlines (append (map prettyClass (unitClasses iface))
-          (map (\p -> prettyInstance (snd p)) (unitInstances iface))) } in
-    let { metadata = concatMapString datatypeEncodingText encodings ++ suffix } in
-    let { metadataLength = foldlStrict (\n entry -> n + datatypeEncodingLength entry)
-          (stringLength suffix) encodings } in
-    let { before = (:) "MLFI-4" ((:) (unitName iface)
-          ((:) (pack (map pairEncoding (unitDependencies iface)))
-            ((:) (pack (map entityEncoding (unitExports iface))) []))) } in
-    let { after = (:) (pack (map fst (unitInstances iface)))
-          ((:) (pack (map (\((,) n t) -> pairEncoding ((,) n (Pretty.prettyType (normalType t))))
-            (unitBindings iface))) []) } in
-    let { fields = append before ((:) metadata after) } in
-    let { state = foldlStrict appendDatatypeEncoding
-          (fingerprintStateFrom (pack before ++ showInt metadataLength ++ ":") 0 0 1)
-          encodings } in
-    (,) (pack (snoc fields (unitObjectFingerprint iface)))
-      (fingerprintAfter state (suffix ++ pack after));
-  encodeUnitWithDatatypes :: DatatypeEncodings -> UnitObject -> (,) String String;
-  encodeUnitWithDatatypes pool object =
-    let { iface = objectInterface object } in
-    let { interfaceEncoding = encodeInterfaceWithDatatypes pool iface } in
-    (,) (fst interfaceEncoding)
-      (pack ((:) "MLFO-1" ((:) (unitName iface)
-        ((:) (snd interfaceEncoding)
-          ((:) (prettyTermWithDatatypes pool (objectTerm object)) [])))));
   entityEncoding (Modules.Entity owner name role) =
     let {
       result :: (String, String);
@@ -1218,13 +1203,6 @@ module Bootstrap.Separate where {
       header = withInterfaceData (objectInterface object) [] (fingerprint body)
     } in
     pack ((:) "MLFF-2" ((:) (encodeInterface header) ((:) body [])));
-  decodeContextualObject :: [] DataDecl -> [] DataDecl -> String -> Either String UnitObject;
-  decodeContextualObject headerData bodyData input =
-    decodeContextualObjectAfter
-      (fingerprintStateFrom (unlines (map D.prettyDeclaration bodyData)) 0 0 1)
-      headerData
-      bodyData
-      input;
   decodeContextualObjectAfter :: (,) Int Int ->
                                  [] DataDecl ->
                                  [] DataDecl -> String -> Either String UnitObject;
@@ -1389,6 +1367,9 @@ module Bootstrap.Separate where {
       XTypeAbs a bound b ->
         XTypeAbs (variable a) (mapType variable bound) (walk b);
       XTypeApp a p -> XTypeApp (walk a) (proof p);
+      XProjection rows selected -> X.mapProjection name variable rows selected;
+      XInstantiationSpine head rows -> XInstantiationSpine (name head)
+        (map (\((,,) spelling eliminate operand) -> (,,) spelling eliminate (walk operand)) rows);
       XLet n a b -> XLet (name n) (walk a) (walk b);
       XLetRec bs b ->
         XLetRec
@@ -1444,6 +1425,9 @@ module Bootstrap.Separate where {
       XTypeAbs (XTyVar a) bound b ->
         foldTermIdentities add b (foldTypeIdentities add bound (add a seen));
       XTypeApp a p -> foldComputationIdentities add p (foldTermIdentities add a seen);
+      XProjection rows selected -> X.foldProjectionIdentities add rows selected seen;
+      XInstantiationSpine n rows -> foldl (\ids ((,,) _ _ operand) -> foldTermIdentities add operand ids)
+        (add (X.nameId n) seen) rows;
       XLet n a b -> foldTermIdentities add b (foldTermIdentities add a (add (X.nameId n) seen));
       XLetRec bs b ->
         foldTermIdentities add b

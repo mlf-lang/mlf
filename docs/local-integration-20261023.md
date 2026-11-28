@@ -1,5 +1,8 @@
 # 本地四 PR 整合记录（2026-10-23）
 
+> 历史记录（2026-10-23）：下文保留当时的结论和命令。已从当前树移除的清单、迁移审计和证据可在 Git 提交 `496dcae024cae1a93096d9bdb9d6b93e57359dc0` 中查阅。
+> 当前维护入口见[历史基础设施退役说明](testing-history-retirement.md)和[测试指南](../tests/README.md)。
+
 代码快照：**`8a3e69b165765931c3ff762379a78db9659b2cd8`**，tree `ba0ae958b466ca08ffee79a83dadbd8b7d2156fa`。此提交冻结后，测试接入规划及清单以单独文档提交追加；不会改写这份代码快照。
 
 ## 位置与授权边界
@@ -46,7 +49,7 @@ GitHub 只读元数据显示四个 PR 都开放且为 draft，base 名均为 `ma
 
 第二个独立实现从 manifest 重建而非遍历既有锁，复核 **11 个 manifest、37 条依赖边、80 个源文件** 的完整集合、哈希、顺序及序列化字节；冻结代码上再次通过。锁 SHA-256：`2b45bb8ce32058d971a93ae92526c42ab647b46500f6f8c73ec4b02d5e8ba9bd`。
 
-这证明当前纯本地根包图的 snapshot 一致性，不冒充 MLF parser、target import semantic validation、原生 locked plan 或完整 native/test 输入认证。根锁本来不涵盖所有独立 test manifests、fixtures 与 C 文件；详见[锁审计](integration-evidence-20261023/lock-audit.md)和[完整审计 JSON](integration-evidence-20261023/independent-lock-audit.json)。
+这证明当前纯本地根包图的 snapshot 一致性，不冒充 MLF parser、target import semantic validation、原生 locked plan 或完整 native/test 输入认证。根锁本来不涵盖所有独立 test manifests、fixtures 与 C 文件；详见[锁审计](https://github.com/mlf-lang/mlf/blob/0704d216b8cf6d887d3737efa30a2eae3c152f0a/docs/integration-evidence-20261023/lock-audit.md)和[完整审计 JSON](https://github.com/mlf-lang/mlf/blob/0704d216b8cf6d887d3737efa30a2eae3c152f0a/docs/integration-evidence-20261023/independent-lock-audit.json)。
 
 ## 实际轻量检查
 
@@ -58,7 +61,7 @@ GitHub 只读元数据显示四个 PR 都开放且为 draft，base 名均为 `ma
 - 四 PR exact-head 祖先检查、原仓库 HEAD/status 保持检查通过。
 - 稀疏排除的 `tools/profile/results/` **2,588 个 tracked 路径及 Git object ID** 与 main 完全一致，没有删除提交。
 
-完整明细见[轻量检查记录](integration-evidence-20261023/lightweight-checks.json)。YAML 能解析不等价 actionlint；本机没有 actionlint，未下载/安装。
+完整明细见[轻量检查记录](https://github.com/mlf-lang/mlf/blob/0704d216b8cf6d887d3737efa30a2eae3c152f0a/docs/integration-evidence-20261023/lightweight-checks.json)。YAML 能解析不等价 actionlint；本机没有 actionlint，未下载/安装。
 
 ## 未执行与剩余风险
 
@@ -68,6 +71,6 @@ GitHub 只读元数据显示四个 PR 都开放且为 draft，base 名均为 `ma
 
 ## 测试统一接入规划
 
-详见[主计划](test-framework-integration-plan-20261023.md)、[完整机器清单](testing-migration-inventory-20261023.json)、[全仓资产表](testing-inventory-20261023.tsv)和[外部逐入口表](testing-external-entrypoints-20261023.tsv)。目标是所有测试由框架实际管理发现/选择/执行/判定/清理/报告，而不是永远保留粗粒度 wrapper。各 adapter 保留独立 oracle、负例阶段、native/平台语义、fresh self-host、SDK 与性能采样要求；真实发布副作用仍独立。
+详见[主计划](test-framework-integration-plan-20261023.md)、[完整机器清单](https://github.com/mlf-lang/mlf/blob/496dcae024cae1a93096d9bdb9d6b93e57359dc0/docs/testing-migration-inventory-20261023.json)、[全仓资产表](https://github.com/mlf-lang/mlf/blob/496dcae024cae1a93096d9bdb9d6b93e57359dc0/docs/testing-inventory-20261023.tsv)和[外部逐入口表](https://github.com/mlf-lang/mlf/blob/496dcae024cae1a93096d9bdb9d6b93e57359dc0/docs/testing-external-entrypoints-20261023.tsv)。目标是所有测试由框架实际管理发现/选择/执行/判定/清理/报告，而不是永远保留粗粒度 wrapper。各 adapter 保留独立 oracle、负例阶段、native/平台语义、fresh self-host、SDK 与性能采样要求；真实发布副作用仍独立。
 
-输入范围、machine handoff 和完整 merge-base 记录分别见 [code-handoff.json](integration-evidence-20261023/code-handoff.json) 与 [dependencies.json](integration-evidence-20261023/dependencies.json)。
+输入范围、machine handoff 和完整 merge-base 记录分别见 [code-handoff.json](https://github.com/mlf-lang/mlf/blob/0704d216b8cf6d887d3737efa30a2eae3c152f0a/docs/integration-evidence-20261023/code-handoff.json) 与 [dependencies.json](https://github.com/mlf-lang/mlf/blob/0704d216b8cf6d887d3737efa30a2eae3c152f0a/docs/integration-evidence-20261023/dependencies.json)。

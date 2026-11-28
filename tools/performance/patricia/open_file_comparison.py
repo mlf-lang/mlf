@@ -10,22 +10,17 @@ production-boundary control, not independent codec or checker evidence.
 from pathlib import Path
 import hashlib
 
-# The C4 oracle predates the additional DeclId array/ST primitives. Keep its
-# entire reader/schema triple byte-for-byte: this finite corpus uses the old
-# primitive domain. Actual artifacts still pass the current native reader,
-# linker and audit before this independent comparison.
-from frozen_file_oracles import load_oracles, dependency_oracle, dependency_v12_oracle
+# Independent reader/schema fixtures retain the original primitive domain for
+# own artifacts. Dependencies opt into the explicit current declaration domain.
+# Actual artifacts also pass the native reader, linker and audit.
+from frozen_file_oracles import load_oracles
 
 ORACLE_PINS = {
     'artifact_binary_reference.py': 'de312e3415eba178b649d30b6fa2b113fc864455de16603a5902af034d036422',
-    'artifact_binary_typed.py': 'b703af43e334733c9ccb49f2a4e5a63a615f6bd065c8c464bdd3841ed54e369d',
+    'artifact_binary_typed.py': 'cde4555f92c652411e32e942e06e7d83d0787d1f28a5396ec2a1b3b802e5a90b',
     'artifact_structure_contract.json': '20f1df71bc2fc1ebe01247dc986b01029b3e8e0c4a89f7dcc8cc517f756cf5a1',
 }
 ORACLE_DIRECTORY, _reference, _typed = load_oracles(ORACLE_PINS)
-DEPENDENCY_ORACLE_PATH, _dependency_typed = dependency_oracle(
-    ORACLE_DIRECTORY, _reference, ORACLE_PINS['artifact_binary_typed.py'])
-CURRENT_DEPENDENCY_ORACLE_PATH, _current_dependency_typed = dependency_v12_oracle(
-    ORACLE_DIRECTORY, _reference, ORACLE_PINS['artifact_binary_typed.py'], DEPENDENCY_ORACLE_PATH)
 Invalid, read_document, tree_document = (_reference.Invalid, _reference.read_document,
                                         _reference.tree_document)
 fields, items, text = _typed.value_node, _typed.list_values, _typed.text
@@ -61,30 +56,6 @@ def decoded(raw, schema, family=None):
     require(tree_document(values, schema) == raw, 'canonical whole binary bytes')
     return values[0]
 
-def dependency_decoded(raw):
-    """Validate whole dependency bytes, including the two added primitive exports."""
-    doc = read_document(raw, 3)
-    require(len(doc.roots) == 1, 'exactly one dependency interface root')
-    _dependency_typed.validate_type(doc, doc.roots[0], 'CrateInterfaceFields')
-    values = doc.values()
-    require(tree_document(values, 3) == raw, 'canonical whole dependency bytes')
-    # Module.builtinEntities declares primitive entities in Prelude, including
-    # exports reexported through MLF.Primitive. Do not treat 132/133 as generic
-    # newly accepted integers or permit an arbitrary renamed primitive export.
-    added = {132: ('Prelude', 'freezeSTArray'), 133: ('Prelude', 'stToIO')}
-    for module, entities in (fields(row, 2, 2) for row in items(fields(values[0], 242, 13)[3])):
-        text(module)
-        for entity in items(entities):
-            owner, spelling, role = fields(entity, 189, 3)
-            if role[1] == 186:
-                primitive, = fields(role, 186, 1)
-                code, = fields(primitive, 32, 1)
-                if code[1] in added:
-                    require((text(owner), text(spelling)) == added[code[1]],
-                            'exact added dependency primitive identity')
-    return values[0]
-
-
 # Fixed append-only identities: 132/133 from ABI134-v9, 134..136 from
 # ABI137-v12 (d8325d9 over 63fbd13). This is not a dynamic registry maximum.
 CURRENT_DEPENDENCY_PRIMITIVES = {
@@ -96,13 +67,13 @@ CURRENT_DEPENDENCY_PRIMITIVES = {
 def current_dependency_decoded(raw):
     """Whole canonical dependency bytes plus exact bidirectional v12 identities.
 
-    The old dependency_decoded still uses 0..133 and its historical controls.
-    Own artifacts and linked terms retain the original 0..131 reader.
+    Own artifacts and linked terms retain the original 0..131 domain.
+    This entry point alone allows the explicitly named 132..136 declarations.
     """
     require(isinstance(raw, bytes), 'comparison input must be original bytes')
     doc = read_document(raw, 3)
     require(len(doc.roots) == 1, 'exactly one dependency interface root')
-    _current_dependency_typed.validate_type(doc, doc.roots[0], 'CrateInterfaceFields')
+    _typed.validate_type(doc, doc.roots[0], 'CrateInterfaceFields', primitive_max=136)
     values = doc.values()
     require(tree_document(values, 3) == raw, 'canonical whole dependency bytes')
     reverse = {identity: code for code, identity in CURRENT_DEPENDENCY_PRIMITIVES.items()}

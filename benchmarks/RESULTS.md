@@ -36,7 +36,7 @@ Compiler SHA-256: `0bc6f35450ec7bf03df75a1dbebedea3d5de5ed692aabb69e97ed2dbb3648
 All nine workloads pass the **5x C compilation / 2x C runtime** limits with
 seven samples per compiler and workload. The runner, package manager, compiler
 and test suites are native MLF; this run uses no GHC, Cabal or Python.
-The [raw report](../tools/bench/results/2026-10-16-native-macos-arm64.json)
+The [raw report](https://github.com/mlf-lang/mlf/blob/0704d216b8cf6d887d3737efa30a2eae3c152f0a/tools/bench/results/2026-10-16-native-macos-arm64.json)
 contains 189 fresh compilation samples and 189 timed runtime samples across
 C, the original native MLF compiler and the final native MLF compiler.
 Haskell and Rust were not remeasured.
@@ -100,10 +100,10 @@ The measured command was:
 cabal bench compiler-bench -j1 --benchmark-options='--emlf dist-newstyle/compile-margin/bootstrap/emlf-stage3 --runs 7 --max-compile-ratio 5 --max-runtime-ratio 2 --output dist-newstyle/compile-margin/stage3-benchmarks.json'
 ```
 
-The [raw benchmark report](results/2026-10-14-stage3-normalization-macos-arm64.json)
+The [raw benchmark report](https://github.com/mlf-lang/mlf/blob/0704d216b8cf6d887d3737efa30a2eae3c152f0a/benchmarks/results/2026-10-14-stage3-normalization-macos-arm64.json)
 contains **252 fresh compilation samples and 252 runtime samples**, independent
 correctness checks, commands, hashes, CPU time, peak RSS and executable sizes.
-The [validation archive](results/2026-10-14-stage3-normalization-validation.json)
+The [validation archive](https://github.com/mlf-lang/mlf/blob/0704d216b8cf6d887d3737efa30a2eae3c152f0a/benchmarks/results/2026-10-14-stage3-normalization-validation.json)
 binds those measurements to the same compiler used for the bootstrap and both
 native backend matrices. Dates here use Asia/Shanghai; raw timestamps use UTC.
 
@@ -149,7 +149,7 @@ Geometric mean of runtime ratios: **1.124x**.
 
 ## Controlled comparison and validation
 
-A separate [15-run alternating comparison](results/2026-10-14-stage3-normalization-comparison.json)
+A separate [15-run alternating comparison](https://github.com/mlf-lang/mlf/blob/0704d216b8cf6d887d3737efa30a2eae3c152f0a/benchmarks/results/2026-10-14-stage3-normalization-comparison.json)
 compares the previous and rebuilt stage 3 compilers. Each invocation starts a
 fresh process and includes source checking and captured xMLF output; it excludes
 LLVM generation and native linking. Both compilers emit byte-identical xMLF,
@@ -212,10 +212,10 @@ python3 scripts/release.py install --release dist-newstyle/release-2026-10-14 --
 
 Its benchmark step is `cabal bench compiler-bench -j1`, selecting the exact
 stage 3 binary, five samples, default inputs and both per-workload limits. The
-[raw report](results/2026-10-14-stage3-release-macos-arm64.json) contains all
+[raw report](https://github.com/mlf-lang/mlf/blob/0704d216b8cf6d887d3737efa30a2eae3c152f0a/benchmarks/results/2026-10-14-stage3-release-macos-arm64.json) contains all
 180 fresh compilation samples and 180 runtime samples, correctness checks,
 commands, source/tool/library hashes, CPU time, RSS and executable sizes.
-The [release validation archive](results/2026-10-14-release-validation.json)
+The [release validation archive](https://github.com/mlf-lang/mlf/blob/0704d216b8cf6d887d3737efa30a2eae3c152f0a/benchmarks/results/2026-10-14-release-validation.json)
 binds the compiler, packaged files, correctness evidence and installation checks.
 The date above uses Asia/Shanghai; the report records UTC timestamps on October 13.
 
@@ -325,9 +325,9 @@ cabal bench compiler-bench -j1 --benchmark-options='--emlf dist-newstyle/bootstr
 cabal bench compiler-bench -j1 --benchmark-options='--emlf dist-newstyle/bootstrap-force-complete/emlf-stage3 --runs 5 --max-compile-ratio 5 --max-runtime-ratio 2 --output benchmarks/results/2026-10-13-stage3-force-macos-arm64.json'
 ```
 
-Each report ([stage 2](results/2026-10-13-stage2-force-macos-arm64.json),
-[stage 1](results/2026-10-13-stage1-force-macos-arm64.json),
-[stage 3](results/2026-10-13-stage3-force-macos-arm64.json)) contains **180 fresh
+Each report ([stage 2](https://github.com/mlf-lang/mlf/blob/0704d216b8cf6d887d3737efa30a2eae3c152f0a/benchmarks/results/2026-10-13-stage2-force-macos-arm64.json),
+[stage 1](https://github.com/mlf-lang/mlf/blob/0704d216b8cf6d887d3737efa30a2eae3c152f0a/benchmarks/results/2026-10-13-stage1-force-macos-arm64.json),
+[stage 3](https://github.com/mlf-lang/mlf/blob/0704d216b8cf6d887d3737efa30a2eae3c152f0a/benchmarks/results/2026-10-13-stage3-force-macos-arm64.json)) contains **180 fresh
 compilation samples and 180 runtime samples**, independent correctness checks,
 exact commands, source/library/tool hashes, CPU time, peak RSS and executable
 sizes. All input hashes remained unchanged, and each run passed all **18
@@ -429,7 +429,7 @@ include directories and adds the complete prescribed module corpus to native
 parity. The module CLI matrix now uses the selected native compiler and fails
 if that selection is missing or does not match the coverage log.
 
-The [first stage 2 run](results/2026-10-13-stage2-modules-macos-arm64.json)
+The [first stage 2 run](https://github.com/mlf-lang/mlf/blob/0704d216b8cf6d887d3737efa30a2eae3c152f0a/benchmarks/results/2026-10-13-stage2-modules-macos-arm64.json)
 missed n-body compilation at **5.016x C**; that failed report is retained. The
 compiler now exposes the compact runtime's non-evaluating WHNF test to LLVM,
 avoiding external calls for ready values and one completed indirection.
@@ -443,7 +443,7 @@ Earlier general improvements include shared type translation results, dense
 ST graph traversals, bounded higher-order specialization, checked small-integer
 arithmetic with GMP fallback, and compact constructors with inline fields.
 All **36 workload source hashes** match the
-[previous native report](results/2026-10-13-stage1-final-macos-arm64.json).
+[previous native report](https://github.com/mlf-lang/mlf/blob/0704d216b8cf6d887d3737efa30a2eae3c152f0a/benchmarks/results/2026-10-13-stage1-final-macos-arm64.json).
 Algorithms, inputs, compiler flags and per-workload limits are unchanged.
 
 The native compiler uses a **512 MiB initial GC heap** and free-space divisor 1.
@@ -455,7 +455,7 @@ settings and heap caps are honored, and workload binaries use the ordinary pool.
 
 ## Bootstrap and correctness validation
 
-The [validation archive](results/2026-10-13-bootstrap-force-validation.json)
+The [validation archive](https://github.com/mlf-lang/mlf/blob/0704d216b8cf6d887d3737efa30a2eae3c152f0a/benchmarks/results/2026-10-13-bootstrap-force-validation.json)
 binds all three measured compiler hashes to a fresh three-stage bootstrap and records:
 
 - Byte-identical stage 2/3 LLVM and **7,083 parity cases run through stage 2**:
@@ -477,7 +477,7 @@ binds all three measured compiler hashes to a fresh three-stage bootstrap and re
 All three stages were freshly compiled. The stage 2/3 LLVM SHA-256 is
 `47b0f9bd6051b096fb2d163f94d031d669a7de06e2de599f4d18d0089c7d0f78`.
 Build and validation commands are in [bootstrap/README.md](../bootstrap/README.md).
-The earlier [stage 1 archive](results/2026-10-13-stage1-validation.json) remains
+The earlier [stage 1 archive](https://github.com/mlf-lang/mlf/blob/0704d216b8cf6d887d3737efa30a2eae3c152f0a/benchmarks/results/2026-10-13-stage1-validation.json) remains
 historical evidence; its native module CLI checks still used the Haskell seed.
 
 ## Comparison scope

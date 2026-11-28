@@ -2,7 +2,7 @@
 
 All six native test groups passed on the immutable source snapshot. The actual
 serial, locked root test command exited 0. Changes are uncommitted and unpublished.
-The [machine record](test-matrix-cleanup.json) binds the 3207-file source inventory,
+The [machine record](https://github.com/mlf-lang/mlf/blob/0704d216b8cf6d887d3737efa30a2eae3c152f0a/docs/test-matrix-cleanup.json) binds the 3207-file source inventory,
 actual compiler/manager identities, completed group reports and selection review.
 The compiler is byte-identical to the preceding accepted R6 compiler;
 the manager was rebuilt from the changed orchestration sources.
@@ -54,7 +54,7 @@ retain 18/29 checks. Parity retains 7086 rows / 7075 primary compilations and 16
 runtime executions. Self-host used a genuinely fresh next stage and reproduced
 LLVM and native bytes. Backend and parity interpreter coverage were retained.
 
-The [individual execution timings](test-matrix-cleanup-execution-times.json)
+The [individual execution timings](https://github.com/mlf-lang/mlf/blob/0704d216b8cf6d887d3737efa30a2eae3c152f0a/docs/test-matrix-cleanup-execution-times.json)
 contain 2350 checked backend paths and 2314 measured child executions. The 36
 LLVM target-rejection paths have diagnostics and null execution timers; removed
 port interpreter paths have no fabricated zero timers or execution records.

@@ -109,6 +109,14 @@ main = do
   verify "difference" (O.difference x y) (C.difference a b)
   assertEqual "equality" (x==y) (C.eqIntMap (==) a b)
  let lazyMap=C.fromList [(minBound,error "left payload"),(0,error "middle payload"),(maxBound,error "right payload")] :: T.IntMap String
+ -- Ranking only needs keys. Selecting a value must leave every other payload lazy,
+ -- including neighbors across the sign bit and the low six bitmap bits.
+ let demandKeys = [minBound,-65,-64,-1,0,63,64,maxBound]
+ forM_ (zip [0..] demandKeys) $ \(i,wanted) -> do
+  let tree = C.fromList [(k,if k == wanted then k else error "unselected payload")
+                        | k <- reverse demandKeys]
+  assertEqual "rank ignores neighboring payloads" (Just i) (unwrap (C.lookupIndex wanted tree))
+  assertEqual "select demands only its own payload" (Just (wanted,wanted)) (unwrap (C.elemAt i tree))
  assertEqual "stored values lazy" 3 (C.size lazyMap)
  assertEqual "keysSet ignores values" [minBound,0,maxBound] (S.toList(C.keysSet lazyMap))
  assertEqual "lazy map results" 3 (C.size(C.map (error "unused map action") lazyMap))

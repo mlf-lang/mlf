@@ -2,30 +2,12 @@
 
 The compiler and package manager come from a fresh public GHC `-O2` installation of commit `726cd256aa90d3e8cf596842fbb29515c1bc5249`. The capture program reads the independent v1 reader from that checkout. The Foundation input consists of the 14 `Bootstrap/*.hs` blobs at `c5928b5be73cd78d194405e734aa012415570e1a`.
 
-From the migration worktree, choose new absolute paths for `BASE_TREE`, `INSTALL` and `OUT`. Create the installation and capture the three Foundation states as follows.
-
-```sh
-CAPTURE="$PWD/tools/performance/declid-migration/capture-baseline.py"
-git worktree add --detach "$BASE_TREE" 726cd256aa90d3e8cf596842fbb29515c1bc5249
-mkdir -p "$OUT"
-(cd "$BASE_TREE" && python3 -B tools/shared/build.py --build-dir "$INSTALL")
-python3 -B "$CAPTURE" "$BASE_TREE" "$INSTALL" "$OUT/foundation"
-```
+The [original capture instructions](https://github.com/mlf-lang/mlf/blob/0704d216b8cf6d887d3737efa30a2eae3c152f0a/benchmarks/results/2026-11-05-declid/baseline/README.md) and
+[capture program](https://github.com/mlf-lang/mlf/blob/0704d216b8cf6d887d3737efa30a2eae3c152f0a/tools/performance/declid-migration/capture-baseline.py)
+record the commands that produced the three Foundation states and built the
+compiler crate from a fresh cache with the selected native toolchain.
 
 `foundation/summary.json` records the actual programs, installation receipt hash, locked package plan, corpus hashes, products, graph accounting and receipt reconstruction. Each state retains `unit.mlfci`, `unit.mlfco`, `unit.queries`, `generation.mlfqg` and `rows.json`. The rows include every full stable key, result digest, ordered read key and version, and optional payload location. The Foundation spec and stored crate interfaces contain absolute paths. For byte comparisons between compilers, use the same spec paths. Executable hashes also identify a particular installed prefix.
-
-Run the compiler-crate build from a fresh cache in the fixed source checkout. Use the native toolchain selected for both arms of the comparison.
-
-```sh
-cd "$BASE_TREE"
-source tools/release/native-environment.sh
-bash tools/release/ensure-build-runner.sh "$OUT/runner" "$(command -v clang)"
-export MLF_BUILD_RUNNER="$OUT/runner/mlf-build-runner"
-"$INSTALL/bin/mlfpkg" --offline --manifest libraries/mlf-crates/mlf-package.json \
-  --build-dir "$OUT/mlf-crates-build" --cache-dir "$OUT/mlf-crates-cache" \
-  --compiler "$INSTALL/bin/emlf" --runtime "$PWD/runtime/mlf_runtime.c" \
-  --jobs 1 --timeout 21600 build > "$OUT/mlf-crates.log" 2>&1
-```
 
 ## Fixed-run products
 

@@ -13,6 +13,7 @@ import qualified Bootstrap.Primitive as Prim
 import qualified Bootstrap.Data as D
 import qualified Bootstrap.Module as M
 import qualified Bootstrap.SourceEquality as E
+import qualified Bootstrap.IntMap as IntMap
 import qualified Bootstrap.Map as Map
 import qualified Bootstrap.CrateQuery as Q
 import qualified Bootstrap.CrateArtifact as A
@@ -66,7 +67,7 @@ tuple64 = B.literal ("(" ++ replicate 63 ',' ++ ")")
 fullChars = T.CharString (list [0,65,55296,57343,1114111])
 terminal (T.Function _ result) = terminal result
 terminal result = result
-checks =
+checks compiledSource =
   [ ("source definition boundary changes query encoding", not (same
       (Q.encodeExpression (T.SSourceDefinition (T.SVar "f"))) (Q.encodeExpression (T.SVar "f"))))
   , ("source definition equality retains boundary and body", E.eqSExpr
@@ -110,18 +111,16 @@ checks =
       (list [(,) "wide" (T.XCon tuple64 (list (replicate 64 int)))])))
   , ("tuple64 complete builtin family affects cache identity",
       let ds = toList D.builtinDeclarations
-          wide (T.DataDecl name _ _) = same name tuple64
+          wide d = same (D.datatypeName d) tuple64
           valid (T.DataDecl _ params ctors) = length (toList params) == 64 && case toList ctors of
             [T.ConstructorDecl name fields] -> same name tuple64 && length (toList fields) == 64
             _ -> False
+          valid _ = False
       in case filter wide ds of
         [d] -> valid d && case U.unpack (key []) of
           T.Right fields ->
             let changed = U.pack (list (init (toList fields) ++ [Q.list Q.encodeDatatype (list (filter (not . wide) ds))]))
-                object = U.UnitObject (U.UnitInterface "Empty" [] [] [] [] [] [] "unused")
-                  (T.XConstructor "()" [])
-            in not (same (key []) changed) && Q.contextualCache (key []) object
-                 && not (Q.contextualCache changed object)
+            in not (same (key []) changed) && same (last (toList fields)) (Q.list Q.encodeDatatype ds)
           _ -> False
         _ -> False)
   , ("declared IO write results are canonical unit", all (\p -> case Prim.primitiveSignature p of
@@ -130,11 +129,11 @@ checks =
   , ("declared ST write result is canonical unit", case Prim.primitiveSignature T.PWriteSTArray of
       (,) _ field -> E.eqField (terminal field)
         (T.Applied "ST" (list [T.Parameter "s",T.Applied "()" []])))
-  , ("all pre-v4 query formats rejected", let object = U.UnitObject (U.UnitInterface "Empty" [] [] [] [] [] [] "unused") (T.XConstructor "()" [])
-      in all (\tag -> not (Q.contextualCache (oldTag (B.literal tag) (key [])) object))
-           ["MLF-CRATE-QUERY-1","MLF-CRATE-QUERY-2","MLF-CRATE-QUERY-3"])
+  , ("lowered group key carries the current format", case U.unpack (key []) of
+      T.Right (tag:_) -> same tag "MLF-CRATE-QUERY-4"
+      _ -> False)
   , ("actual source canonical datatype fields preserve target type and erasure",
-      case C.compile "CanonicalFields.emlf" "data Box = Box [Int] (Int,Int) (); Box [42] (1,2) ()" of
+      case compiledSource of
         T.Left _ -> False
         T.Right result -> let term = C.compiledTerm result in
           case XP.parseTerm "CanonicalFields.xmlf" (Pretty.prettyTerm term) of
@@ -180,7 +179,7 @@ checks =
                  T.Applied "(,)" (list [T.Applied "Int" [], T.Applied "Char" []])])])])
         [] [] [] "test-object"))
   , ("pooled datatype canonical fields roundtrip", case A.decodeTypePool (U.pack (list [D.prettyDeclaration canonicalFamily])) of
-      T.Right pool -> case Map.lookup S.compareInt 0 pool of
+      T.Right pool -> case IntMap.lookup 0 pool of
         T.Just d -> E.eqDataDecl d canonicalFamily
         _ -> False
       _ -> False)
@@ -219,5 +218,6 @@ main = do
   case A.decodeInterface (A.encodeInterface (crate classes)) of
     T.Left err -> putStrLn ("CRATE DIAGNOSTIC: " ++ B.unpack err)
     _ -> pure ()
-  results <- mapM (\(name, ok) -> putStrLn ((if ok then "PASS " else "FAIL ") ++ name) >> pure ok) checks
+  compiledSource <- C.compile "CanonicalFields.emlf" "data Box = Box [Int] (Int,Int) (); Box [42] (1,2) ()"
+  results <- mapM (\(name, ok) -> putStrLn ((if ok then "PASS " else "FAIL ") ++ name) >> pure ok) (checks compiledSource)
   if and results then putStrLn "item4 artifact contracts: passed" else exitFailure

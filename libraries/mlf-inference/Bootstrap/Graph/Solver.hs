@@ -4,10 +4,13 @@
              MultiParamTypeClasses, OverloadedStrings #-}
 module Bootstrap.Graph.Solver where {
   import MLF.Primitive;
+  import qualified Bootstrap.Graph.ScopeIndex as Scope;
   import Bootstrap.Types;
   import qualified Bootstrap.Std as L;
+  import qualified Bootstrap.ST as ST;
   import qualified Bootstrap.IntMap as IM;
   import qualified Bootstrap.IntSet as IS;
+  import qualified Bootstrap.IntTree as IT;
   import qualified Bootstrap.IntRank as Rank;
   import qualified Bootstrap.Graph as G;
   -- The incremental solver projects a component closed under both directions
@@ -90,153 +93,50 @@ module Bootstrap.Graph.Solver where {
          Just parent -> removeIndex parent n descendants
        })
       scopes;
-  scopeVisit :: IntMap ([] Int) ->
-                (,) Int (IntMap ((,) Int Int)) -> Int -> (,) Int (IntMap ((,) Int Int));
-  scopeVisit descendants ((,) start intervals) n =
-    case L.foldlStrict (scopeVisit descendants) (G.strictPair (start + 1) intervals)
-           (IM.findWithDefault [] n descendants) of {
-      (,) end final -> G.strictPair end (IM.insert n (G.strictPair start end) final)
-    };
-  scopeLevels :: Int -> Int;
-  scopeLevels count = if (count <= 1) then 1 else (1 + scopeLevels (quotInt count 2 + remInt count 2));
-  scopeJumps :: Int -> IntMap Int -> [] (IntMap Int);
-  scopeJumps count parents =
-    if (count <= 0)
-    then []
-    else (:) parents (scopeJumps (count - 1) (IM.map (\n -> IM.get n parents) parents));
-  indexScopes :: Graph -> ScopeIndex;
-  indexScopes graph =
+  scopeLevels = Scope.scopeLevels;
+  indexScopes = Scope.indexScopes;
+  scopeContains = Scope.scopeContains;
+  scopeLCA = Scope.scopeLCA;
+  sortScopes = Scope.sortScopes;
+  projectScopes = Scope.projectScopes;
+  -- The initial graph is validated and canonical. Its children and binders
+  -- are live keys. Accumulate their incoming edges by offset, then construct
+  -- each set from ascending parent IDs. Duplicate edges set the same bit.
+  initialSolver graph = let {
+    entries = IM.toAscList (G.nodes graph);
+    scopes = indexScopes graph
+  } in case G.denseBounds graph of {
+    Nothing -> L.foldlStrict addNode (mkSolver graph IM.empty IM.empty scopes) entries;
+    Just ((,) low high) -> runST (initialDenseSolver graph scopes entries low high)
+  };
+  initialDenseSolver :: forall s. Graph -> ScopeIndex -> [] ((,) Int Node) ->
+    Int -> Int -> ST s Solver;
+  initialDenseSolver graph scopes entries low high = do {
+    let { size = high - low + 1 };
+    parents <- newSTArray size IS.NoState;
+    descendants <- newSTArray size IS.NoState;
     let {
-      gens = IM.filter (\v -> G.isGen (G.tag v)) (G.nodes graph)
-    } in
-    let {
-      parents =
-        IM.mapWithKey
-          (\n ->
-             \v ->
-               case G.binder v of {
-                 Nothing -> n;
-                 Just b -> G.resolve graph b
-               })
-          gens
-    } in
-    let {
-      descendants =
-        L.foldlStrict
-          (\table ->
-             \entry ->
-               case entry of {
-                 (,) n p ->
-                   if (n == p)
-                   then table
-                   else let {
-                          previous = IM.findWithDefault [] p table
-                        } in
-                        seq previous (IM.insert p ((:) n previous) table)
-               })
-          IM.empty
-          (IM.toList parents)
-    } in
-    let {
-      roots =
-        L.map
-          (\entry ->
-             case entry of {
-               (,) n p -> n
-             })
-          (L.filter
-             (\entry ->
-                case entry of {
-                  (,) n p -> (n == p)
-                })
-             (IM.toList parents))
-    } in
-    case L.foldlStrict (scopeVisit descendants) ((,) 0 IM.empty) roots of {
-      (,) count intervals -> ScopeIndex intervals (scopeJumps (scopeLevels (IM.size gens)) parents)
-    };
-  scopeContains :: ScopeIndex -> Int -> Int -> Bool;
-  scopeContains (ScopeIndex intervals jumps) a b = G.intervalContains intervals a b;
-  scopeLCA :: ScopeIndex -> Int -> Int -> Int;
-  scopeLCA (ScopeIndex intervals jumps) a b =
-    let {
-      scopes = ScopeIndex intervals jumps
-    } in
-    if scopeContains scopes a b
-    then a
-    else if scopeContains scopes b a
-         then b
-         else case jumps of {
-                [] -> panic "empty scope ancestry index";
-                (:) parents rest ->
-                  IM.get
-                    (L.foldr
-                       (\level ->
-                          \n ->
-                            let {
-                              parent = IM.get n level
-                            } in
-                            if scopeContains scopes parent b then n else parent)
-                       a
-                       jumps)
-                    parents
-              };
-  sortScopes :: ScopeIndex -> IntSet -> [] Int;
-  -- Cache each immutable interval key once, as the seed's sortOn does.
-  sortScopes (ScopeIndex intervals jumps) seeds =
-    let {
-      keyed = L.map (\n -> (,) (L.fst (IM.get n intervals)) n) (IS.toList seeds)
-    } in
-    L.map L.snd (L.sortBy (\a -> \b -> L.compareInt (L.fst a) (L.fst b)) keyed);
-  scopeRoot :: ScopeIndex -> Int -> Int;
-  scopeRoot (ScopeIndex intervals jumps) n =
-    case jumps of {
-      [] -> panic "empty scope ancestry index";
-      _ -> IM.get n (L.last jumps)
-    };
-  projectScopes :: ScopeIndex -> IntSet -> IntMap (Maybe Int);
-  projectScopes scopes seeds =
-    let {
-      boundary = sortScopes scopes seeds
-    } in
-    let {
-      adjacent = L.zip boundary (L.drop 1 boundary)
-    } in
-    let {
-      closure =
-        L.foldlStrict
-          (\seen ->
-             \entry ->
-               case entry of {
-                 (,) a b -> IS.insert (scopeLCA scopes a b) seen
-               })
-          seeds
-          adjacent
-    } in
-    let {
-      allScopes =
-        L.foldlStrict (\seen -> \n -> IS.insert (scopeRoot scopes n) seen) closure boundary
-    } in
-    let {
-      ordered = sortScopes scopes allScopes
-    } in
-    case L.foldlStrict (attachScope scopes) ((,) [] IM.empty) ordered of {
-      (,) ancestors parents -> parents
-    };
-  attachScope :: ScopeIndex ->
-                 (,) ([] Int) (IntMap (Maybe Int)) ->
-                 Int -> (,) ([] Int) (IntMap (Maybe Int));
-  attachScope scopes ((,) ancestors parents) n =
-    let {
-      enclosing = L.dropWhile (\a -> L.not (scopeContains scopes a n)) ancestors
-    } in
-    let {
-      parent =
-        case enclosing of {
-          [] -> Nothing;
-          (:) p rest -> Just p
+      insertRow rows n key = stBind (G.readDense low rows key) (\old -> let {
+        next = IS.ascInsert old n
+      } in seq next (G.writeDense low rows key next));
+      add ((,) n v) = do {
+        ST.map_ (insertRow parents n) (G.children (G.tag v));
+        case G.binder v of {
+          Nothing -> stReturn ();
+          Just b -> insertRow descendants n b
         }
-    } in
-    seq parent (G.strictPair ((:) n enclosing) (IM.insert n parent parents));
+      };
+      finish rows = stBind (freezeSTArray rows) (\at -> stReturn
+        (IM.mapMaybeWithKey (\n _ -> case at (n - low) of {
+          IS.NoState -> Nothing;
+          row -> let { slots = IS.finishAsc row } in seq (forceIntSet slots) (Just slots)
+        }) (G.nodes graph)))
+    };
+    ST.map_ add entries;
+    structural <- finish parents;
+    binding <- finish descendants;
+    stReturn (mkSolver graph structural binding scopes)
+  };
   prepare :: Graph -> Either String Solver;
   prepare input =
     G.bindE (G.validateGraph input)
@@ -250,10 +150,7 @@ module Bootstrap.Graph.Solver where {
                    else let {
                           canonical = G.canonicalize input
                         } in
-                        Right
-                          (L.foldlStrict addNode
-                             (mkSolver canonical IM.empty IM.empty (indexScopes canonical))
-                             (IM.toList (G.nodes canonical))));
+                        Right (initialSolver canonical));
   equalIntervals :: IntMap ((,) Int Int) -> IntMap ((,) Int Int) -> Bool;
   equalIntervals a b =
     IM.eqIntMap
@@ -440,28 +337,28 @@ module Bootstrap.Graph.Solver where {
            (:) next rest ->
              (equalScopeLevel previous next && scopeLevelCount next (remaining - 1) rest)
          };
-  scopeCheckedVisit :: IntMap ([] Int) -> IntMap ((,) Int Int) -> Int -> Int -> Maybe Int;
-  scopeCheckedVisit descendants intervals position n =
+  scopeCheckedVisit :: IntMap ([] Int) -> IntMap ((,) Int Int) -> Int -> Int -> Int -> Int -> Maybe ((,) Int Int);
+  scopeCheckedVisit descendants intervals depth position deepest n =
     case IM.lookup n intervals of {
       Nothing -> Nothing;
       Just ((,) start end) ->
         if (start /= position)
         then Nothing
-        else case scopeCheckedChildren descendants intervals (position + 1)
+        else case scopeCheckedChildren descendants intervals (depth + 1) (position + 1) (L.max deepest depth)
                     (IM.findWithDefault [] n descendants) of {
                Nothing -> Nothing;
-               Just actualEnd -> if (actualEnd == end) then Just end else Nothing
+               Just result@((,) actualEnd _) -> if (actualEnd == end) then Just result else Nothing
              }
     };
   scopeCheckedChildren :: IntMap ([] Int) ->
-                          IntMap ((,) Int Int) -> Int -> [] Int -> Maybe Int;
-  scopeCheckedChildren descendants intervals position children =
+    IntMap ((,) Int Int) -> Int -> Int -> Int -> [] Int -> Maybe ((,) Int Int);
+  scopeCheckedChildren descendants intervals depth position deepest children =
     case children of {
-      [] -> Just position;
+      [] -> Just (G.strictPair position deepest);
       (:) child rest ->
-        case scopeCheckedVisit descendants intervals position child of {
+        case scopeCheckedVisit descendants intervals depth position deepest child of {
           Nothing -> Nothing;
-          Just next -> scopeCheckedChildren descendants intervals next rest
+          Just ((,) next height) -> scopeCheckedChildren descendants intervals depth next height rest
         }
     };
   scopesAgreeValidated :: Graph -> ScopeIndex -> Bool;
@@ -525,11 +422,11 @@ module Bootstrap.Graph.Solver where {
                                     L.map L.fst
                                       (L.filter (\((,) n parent) -> (n == parent)) parents)
                                 } in
-                                case scopeCheckedChildren descendants intervals 0 roots of {
+                                case scopeCheckedChildren descendants intervals 0 0 0 roots of {
                                   Nothing -> False;
-                                  Just actualCount ->
+                                  Just ((,) actualCount depth) ->
                                     ((actualCount == count) &&
-                                     scopeLevelCount first (scopeLevels count - 1) rest)
+                                     scopeLevelCount first (scopeLevels depth - 1) rest)
                                 }
              }
     };
@@ -556,7 +453,7 @@ module Bootstrap.Graph.Solver where {
   -- index audit in finish, so the checked result remains valid after normalization.
   finishNormalized :: Solver -> Either String Solver;
   finishNormalized solver =
-    G.bindE (finish solver) (\checked -> Right (withGraph (G.normalize checked) solver));
+    G.bindE (finish solver) (\checked -> Right (withGraph (G.normalizeUsingChildren (Just (bindingChildren solver)) checked) solver));
   -- Collect scope boundaries while inspecting each newly discovered node.
   -- The identity has just been resolved, so a second alias lookup is redundant.
   componentScopesVisit :: Solver ->
@@ -990,90 +887,149 @@ module Bootstrap.Graph.Solver where {
                connected
                (IM.keys scopes)
          } in
-         let {
-           originals = IM.toList selected
-         } in
-         let {
-           count = L.length originals
-         } in
-         let {
-           forward =
-             Rank.indexMap selected
-         } in
-         let {
-           backward = forward
-         } in
-         let {
-           compact = \n -> rankIdentity (G.resolve old n) 0 forward
-         } in
-         let {
-           hiddenRoots =
-             L.filter
-               (\entry ->
-                  case entry of {
-                    (,) n v ->
-                      case G.tag v of {
-                        GGen root -> L.not (IM.member root selected);
-                        _ -> False
-                      }
-                  })
-               originals
-         } in
-         let {
-           stubIds = L.range count ((count + L.length hiddenRoots) - 1)
-         } in
-         let {
-           stubs =
-             IM.fromDistinctAscList
-               (L.zip
-                  (L.map
-                     (\entry ->
-                        case entry of {
-                          (,) n v -> n
-                        })
-                     hiddenRoots)
-                  stubIds)
-         } in
-         let {
-           existing = projectCanonicalNodes forward scopes stubs 0 originals
-         } in
-         let {
-           placeholders =
-             L.map
-               (\entry ->
-                  case entry of {
-                    (,) original stub ->
-                      (,) stub (G.mkNode GBot (Just (rankIdentity original 0 forward)) Flexible)
-                  })
-               (IM.toList stubs)
-         } in
-         let {
-           local =
-             G.mkGraph (G.nodesFromDistinctAscList (L.append existing placeholders)) IM.empty
-               (count + L.length hiddenRoots)
-         } in
+         case unifyDenseIdentities equations solver scopes selected of {
+           Right result -> Right result;
+           Left _ -> unifyCompactIdentities equations solver old scopes selected
+         });
+  unifyCompactIdentities :: [] ((,) Int Int) -> Solver -> Graph -> IntMap (Maybe Int) -> IntMap Node -> Either String Solver;
+  unifyCompactIdentities equations solver old scopes selected =
+    let {
+      originals = IM.toList selected
+    } in
+    let {
+      count = L.length originals
+    } in
+    let {
+      forward =
+        Rank.indexMap selected
+    } in
+    let {
+      backward = forward
+    } in
+    let {
+      compact = \n -> rankIdentity (G.resolve old n) 0 forward
+    } in
+    let {
+      hiddenRoots =
+        L.filter
+          (\entry ->
+             case entry of {
+               (,) n v ->
+                 case G.tag v of {
+                   GGen root -> L.not (IM.member root selected);
+                   _ -> False
+                 }
+             })
+          originals
+    } in
+    let {
+      stubIds = L.range count ((count + L.length hiddenRoots) - 1)
+    } in
+    let {
+      stubs =
+        IM.fromDistinctAscList
+          (L.zip
+             (L.map
+                (\entry ->
+                   case entry of {
+                     (,) n v -> n
+                   })
+                hiddenRoots)
+             stubIds)
+    } in
+    let {
+      existing = projectCanonicalNodes forward scopes stubs 0 originals
+    } in
+    let {
+      placeholders =
+        L.map
+          (\entry ->
+             case entry of {
+               (,) original stub ->
+                 (,) stub (G.mkNode GBot (Just (rankIdentity original 0 forward)) Flexible)
+             })
+          (IM.toList stubs)
+    } in
+    let {
+      local =
+        G.mkGraph (G.nodesFromDistinctAscList (L.append existing placeholders)) IM.empty
+          (count + L.length hiddenRoots)
+    } in
+    G.bindE
+      (G.unify
+         (L.map
+            (\entry ->
+               case entry of {
+                 (,) a b -> (,) (compact a) (compact b)
+               })
+            equations)
+         local)
+      (\solved ->
          G.bindE
-           (G.unify
-              (L.map
-                 (\entry ->
-                    case entry of {
-                      (,) a b -> (,) (compact a) (compact b)
-                    })
-                 equations)
-              local)
-           (\solved ->
-              G.bindE
-                (G.mapE_
-                   (\stub ->
-                      G.check
-                        (matchesNode (G.nodes solved) stub (G.nodeAt local stub) &&
-                         (G.resolve solved stub == stub))
-                        "local unification changed a hidden scope root")
-                   (IM.elems stubs))
-                (\checkedStubs ->
-                   G.bindE (G.mapE_ (checkPreservedScope old solved forward scopes) originals)
-                     (\checkedScopes ->
-                        restoreProjection solver originals backward count solved))));
+           (G.mapE_
+              (\stub ->
+                 G.check
+                   (matchesNode (G.nodes solved) stub (G.nodeAt local stub) &&
+                    (G.resolve solved stub == stub))
+                   "local unification changed a hidden scope root")
+              (IM.elems stubs))
+           (\checkedStubs ->
+              G.bindE (G.mapE_ (checkPreservedScope old solved forward scopes) originals)
+                (\checkedScopes ->
+                   restoreProjection solver originals backward count solved)));
+  -- Keep original identities when the selected graph is already dense. Only
+  -- scope rows need edits; all other nodes retain their fields. A decline runs
+  -- the existing compact projection, including its error order.
+  unifyDenseIdentities :: [] ((,) Int Int) -> Solver -> IntMap (Maybe Int) -> IntMap Node -> Either String Solver;
+  unifyDenseIdentities equations solver scopes selected = do {
+    let { old = graph solver; count = IM.size selected };
+    _ <- G.check (count >= 64) "small local component";
+    low <- case IM.lookupMin selected of { Nothing -> Left "empty local component"; Just ((,) n _) -> Right n };
+    high <- case IM.lookupMax selected of { Nothing -> Left "empty local component"; Just ((,) n _) -> Right n };
+    _ <- G.check (high - low >= 0 && high - low <= 4 * count &&
+      high <= 9223372036854775807 - IM.size scopes - 1) "sparse local component";
+    let {
+      hidden = L.filter (\n -> L.not (IM.member (G.genRoot old n) selected)) (IM.keys scopes);
+      firstStub = high + 1;
+      stubs = IM.fromDistinctAscList (L.zip hidden (L.range firstStub (firstStub + L.length hidden - 1)));
+      setScope nodes n parent =
+        let { oldScope = G.nodeAt old n; root = IM.findWithDefault (G.genRoot old n) n stubs } in
+        G.insertNodeMap n (G.mkNode (GGen root) parent (G.flag oldScope)) nodes;
+      existing = IM.foldlWithKey setScope selected scopes;
+      placeholders = IM.foldlWithKey (\ns n stub -> G.insertNodeMap stub (G.mkNode GBot (Just n) Flexible) ns)
+        IM.empty stubs;
+      local = G.mkGraph (IM.union existing placeholders) IM.empty (firstStub + L.length hidden)
+    };
+    let { canonical = L.map (\((,) a b) -> (,) (G.resolve old a) (G.resolve old b)) equations };
+    solved <- G.unify canonical local;
+    _ <- G.mapE_ (\stub -> G.check (matchesNode (G.nodes solved) stub (G.nodeAt local stub) &&
+      G.resolve solved stub == stub) "local unification changed a hidden scope root") (IM.elems stubs);
+    _ <- G.mapE_ (\((,) n parent) -> case IM.lookup n (G.nodes solved) of {
+      Nothing -> Left "local unification changed a generalization scope";
+      Just v -> G.check (G.equalMaybeInt (G.binder v) parent &&
+        G.equalFlag (G.flag v) (G.flag (G.nodeAt old n))) "local unification changed a generalization scope"
+    }) (IM.toList scopes);
+    _ <- G.mapE_ (\((,) a b) -> G.check (a < firstStub && b < firstStub)
+      "scope placeholder escaped local unification") (IM.toList (G.links solved));
+    let {
+      aliases = IM.union (G.links solved) (G.links old);
+      withAliases = G.mkGraph (G.nodes old) aliases (G.nextId old);
+      restore entry@((,) n v) = case IM.lookup n scopes of {
+        Nothing -> entry;
+        Just _ -> let { previous = G.nodeAt old n } in
+          (,) n (G.mkNode (GGen (G.resolve withAliases (G.genRoot old n))) (G.binder previous) (G.flag v))
+      };
+      restored = L.map restore (L.takeWhile (\entry -> L.fst entry < firstStub) (IM.toList (G.nodes solved)))
+    };
+    case projectionChanges (IM.toList selected) restored of {
+      (,,) removed changed deleted ->
+        let {
+          retained = L.foldlStrict (\nodes n -> IM.delete n nodes) (G.nodes old) deleted;
+          updated = L.foldlStrict (\nodes ((,) n v) -> G.insertNodeMap n v nodes) retained changed;
+          next = G.mkGraph updated aliases (G.nextId old)
+        } in Right (withGraph next (patchIndexedNodes solver removed changed))
+    }
+  };
   solverUnify :: [] ((,) Int Int) -> Solver -> Either String Solver;
   solverUnify equations solver =
     let {
@@ -1317,6 +1273,26 @@ module Bootstrap.Graph.Solver where {
         Right _ -> True
       }
   };
+  -- Prepared expansion copies a validated source. Its structural traversal
+  -- preserves occupied edges and kinds, and gives exterior children bottoms
+  -- of the original kinds. Binding paths inside the source scope now go
+  -- through the copied root, whose binder is the destination. A copied type
+  -- binder still structurally contains its children: a path to a local node
+  -- cannot pass through an exterior node because that edge would violate
+  -- dominance in the source. Check that every copied binder is present.
+  preparedFragmentCheck :: Int -> Int -> Maybe Int -> [] ((,) Int Node) -> Int -> Bool;
+  preparedFragmentCheck first root parent fresh next = case parent of {
+    Nothing -> False;
+    Just scope ->
+      let {
+        present n = first <= n && n < next;
+        bound ((,) n node) = case G.binder node of {
+          Nothing -> False;
+          Just binder -> binder == scope || present binder
+        }
+      } in scope < first && present root && L.all bound fresh ||
+        validFreshFragment root parent fresh next
+  };
   -- External frontier proxies can be removed in the same root graft only
   -- when their original Gen scope already dominates the destination Gen.
   -- The originals then keep their exact binders and flags: every eliminated
@@ -1324,7 +1300,10 @@ module Bootstrap.Graph.Solver where {
   -- final target retains the general simultaneous unifier; doing these merges
   -- eagerly and then allowing arbitrary further rebinding is not licensed.
   frontierBottomGraft :: Int -> Int -> Int -> [] ((,) Int Int) -> Solver -> Maybe Solver;
-  frontierBottomGraft first originalTarget root frontier solver =
+  frontierBottomGraft = frontierBottomGraftUsing True validFreshFragment;
+  frontierBottomGraftUsing :: Bool -> (Int -> Maybe Int -> [] ((,) Int Node) -> Int -> Bool) ->
+    Int -> Int -> Int -> [] ((,) Int Int) -> Solver -> Maybe Solver;
+  frontierBottomGraftUsing checkKinds fragmentCheck first originalTarget root frontier solver =
     let { current = graph solver; target = G.resolve current originalTarget } in
     case IM.lookup target (G.nodes current) of {
       Nothing -> Nothing;
@@ -1338,12 +1317,15 @@ module Bootstrap.Graph.Solver where {
                  G.isGen (G.tag scope) && G.equalFlag (G.flag scope) Flexible) ||
                L.not (IS.null (IM.findWithDefault IS.empty target (bindingChildren solver)))
             then Nothing
-            else frontierBottomGraftIn first target destination root old frontier solver
+            else frontierBottomGraftInUsing checkKinds fragmentCheck first target destination root old frontier solver
         }
       }
     };
   frontierBottomGraftIn :: Int -> Int -> Int -> Int -> Node -> [] ((,) Int Int) -> Solver -> Maybe Solver;
-  frontierBottomGraftIn first target destination root old frontier solver =
+  frontierBottomGraftIn = frontierBottomGraftInUsing True validFreshFragment;
+  frontierBottomGraftInUsing :: Bool -> (Int -> Maybe Int -> [] ((,) Int Node) -> Int -> Bool) ->
+    Int -> Int -> Int -> Int -> Node -> [] ((,) Int Int) -> Solver -> Maybe Solver;
+  frontierBottomGraftInUsing checkKinds fragmentCheck first target destination root old frontier solver =
     let {
       current = graph solver;
       fresh = allocatedNodes first (G.nextId current) (G.nodes current);
@@ -1370,8 +1352,8 @@ module Bootstrap.Graph.Solver where {
       rootAllowed && L.all closed fresh &&
       G.equalMaybeInt (G.binder (G.nodeAt current root)) (Just destination) &&
       G.equalFlag (G.flag (G.nodeAt current root)) Flexible &&
-      validFreshFragment root (Just destination) fresh (G.nextId current) &&
-      L.all (frontierGraftSource first target destination identities solver) frontier)
+      fragmentCheck root (Just destination) fresh (G.nextId current) &&
+      L.all (frontierGraftSourceUsing checkKinds first target destination identities solver) frontier)
     then Nothing
     else case G.kindAt current root of {
       Left _ -> Nothing;
@@ -1411,9 +1393,11 @@ module Bootstrap.Graph.Solver where {
       }
     };
   frontierGraftSource :: Int -> Int -> Int -> IntSet -> Solver -> (,) Int Int -> Bool;
-  frontierGraftSource first target destination identities solver pair =
+  frontierGraftSource = frontierGraftSourceUsing True;
+  frontierGraftSourceUsing :: Bool -> Int -> Int -> Int -> IntSet -> Solver -> (,) Int Int -> Bool;
+  frontierGraftSourceUsing checkKind first target destination identities solver pair =
     frontierGraftSourceShape first target destination identities solver pair &&
-    sameGraftKinds (graph solver) ((:) pair []);
+    (L.not checkKind || sameGraftKinds (graph solver) ((:) pair []));
   -- Structural and permission checks do not need a kind traversal. Congruent
   -- reuse checks all pair kinds together after these guards, sharing completed
   -- kind results across every fresh node and existing image.
@@ -1538,7 +1522,10 @@ module Bootstrap.Graph.Solver where {
       }
   };
   congruentExpansionGraft :: Int -> Int -> Int -> [] ((,) Int Int) -> Solver -> Maybe Solver;
-  congruentExpansionGraft first originalTarget root frontier solver =
+  congruentExpansionGraft = congruentExpansionGraftWith validFreshFragment;
+  congruentExpansionGraftWith :: (Int -> Maybe Int -> [] ((,) Int Node) -> Int -> Bool) ->
+    Int -> Int -> Int -> [] ((,) Int Int) -> Solver -> Maybe Solver;
+  congruentExpansionGraftWith fragmentCheck first originalTarget root frontier solver =
     let { current = graph solver; target = G.resolve current originalTarget;
       fresh = allocatedNodes first (G.nextId current) (G.nodes current);
       identities = IS.fromList (L.map L.fst fresh);
@@ -1560,7 +1547,7 @@ module Bootstrap.Graph.Solver where {
               Nothing -> Nothing;
               Just images ->
                 if IM.size images /= L.length fresh ||
-                   L.not (validFreshFragment root (Just destination) fresh (G.nextId current) &&
+                   L.not (fragmentCheck root (Just destination) fresh (G.nextId current) &&
                      L.all (frontierGraftSourceShape first target destination identities solver) frontier)
                 then Nothing else
                 let { image = \identity -> IM.findWithDefault identity identity images;
@@ -1574,8 +1561,12 @@ module Bootstrap.Graph.Solver where {
                     (if G.isBottom (G.tag node) then green current identity
                      else G.equalTag (G.mapTag image (G.tag node)) (G.tag old))
                 } in
-                if L.not (L.all exact fresh) ||
-                   L.not (sameGraftKinds current (IM.toList images))
+                -- A copied non-bottom tag is equal to its image, including
+                -- each child and any explicit kind. Only a copied bottom
+                -- needs a separate check against the kind of its image.
+                let { bottomPairs = L.map (\((,) n _) -> (,) n (IM.get n images))
+                  (L.filter (\((,) _ node) -> G.isBottom (G.tag node)) fresh) } in
+                if L.not (L.all exact fresh) || L.not (sameGraftKinds current bottomPairs)
                 then Nothing
                 else let {
                   remaining = L.foldlStrict (\nodes identity -> IM.delete identity nodes) (G.nodes current) (IM.keys images);
@@ -1587,16 +1578,26 @@ module Bootstrap.Graph.Solver where {
       }
     };
   expansionBottomGraft :: Int -> Int -> Int -> [] ((,) Int Int) -> Solver -> Maybe Solver;
-  expansionBottomGraft first target root frontier solver =
+  expansionBottomGraft = expansionBottomGraftWith validFreshFragment;
+  expansionBottomGraftWith :: (Int -> Maybe Int -> [] ((,) Int Node) -> Int -> Bool) ->
+    Int -> Int -> Int -> [] ((,) Int Int) -> Solver -> Maybe Solver;
+  expansionBottomGraftWith = expansionBottomGraftUsing False;
+  expansionBottomGraftUsing :: Bool -> (Int -> Maybe Int -> [] ((,) Int Node) -> Int -> Bool) ->
+    Int -> Int -> Int -> [] ((,) Int Int) -> Solver -> Maybe Solver;
+  expansionBottomGraftUsing prepared fragmentCheck first target root frontier solver =
     let { direct =
       if L.null frontier then freshBottomGraft first target root frontier solver
       else case frontierIdentityGraft first target root frontier solver of {
         Just answer -> Just answer;
-        Nothing -> frontierBottomGraft first target root frontier solver
+        -- A copy prepared in this solve derives each proxy's kind from its
+        -- source and checks presence of copied binders before installing it.
+        Nothing -> if prepared
+          then frontierBottomGraftUsing False fragmentCheck first target root frontier solver
+          else frontierBottomGraft first target root frontier solver
       }
     } in case direct of {
       Just answer -> Just answer;
-      Nothing -> congruentExpansionGraft first target root frontier solver
+      Nothing -> congruentExpansionGraftWith fragmentCheck first target root frontier solver
     };
   instantiateWithFreshBottom :: Int -> Int -> Solver -> Either String Solver;
   instantiateWithFreshBottom source target solver =
@@ -1786,7 +1787,7 @@ module Bootstrap.Graph.Solver where {
         } in
         if ((a == b) || pairSeen a b seen)
         then equalGround current seen rest
-        else case sameGroundShape (G.tag (G.nodeAt current a)) (G.tag (G.nodeAt current b)) of {
+        else case sameGroundShape (G.tag (G.nodeAtRepresentative current a a)) (G.tag (G.nodeAtRepresentative current b b)) of {
                Nothing -> False;
                Just pairs -> equalGround current (insertPair a b seen) (L.append pairs rest)
              }
@@ -1885,19 +1886,24 @@ module Bootstrap.Graph.Solver where {
          })
 
   ;
-  -- A prepared fallback transaction. The two Constraint drivers establish
-  -- prepare and preserve its canonical live fields, allocation separation and
-  -- complete indexes. Existing public Solver routes retain their P3 behavior.
-  -- The full expanded Graph and full local validation are not omitted. Only
-  -- fresh intermediate reverse indexes and their component rediscovery are
-  -- avoided, after an ordered negative prefix proves every graft must fail.
-  expandedGraphPrepared :: Int ->
-              Int -> Solver -> Either String ((,,,) Int (IntMap Int) ([] ((,) Int Int)) Graph);
+  -- The Constraint drivers establish prepare and preserve canonical live
+  -- fields, disjoint allocation and complete indexes. Keep the copied nodes
+  -- in ascending order for any transaction that publishes the expansion.
+  expandedGraphPrepared :: Int -> Int -> Solver ->
+    Either String ((,,,) Int (IntMap Int) ([] ((,) Int Int)) Graph);
   expandedGraphPrepared source target solver =
+    G.bindE (expandPrepared source target solver)
+      (\(G.PreparedExpansion root copies frontier _ expanded) -> Right ((,,,) root copies frontier expanded));
+  expandPrepared :: Int -> Int -> Solver -> Either String G.PreparedExpansion;
+  expandPrepared = expandUsing G.expandPreparedWithScopes;
+  expandUsing :: (IntMap ((,) Int Int) -> Int -> Int -> Graph -> Either String G.PreparedExpansion) ->
+    Int -> Int -> Solver -> Either String G.PreparedExpansion;
+  expandUsing buildExpansion source target solver =
     let {
-      old = graph solver
+      old = graph solver;
+      original = G.resolve old source
     } in
-    case IM.lookup (G.resolve old source) (G.nodes old) of {
+    case IM.lookup original (G.nodes old) of {
       Nothing -> Left "missing instance source";
       Just sourceNode ->
         if L.not (G.isGen (G.tag sourceNode))
@@ -1907,15 +1913,8 @@ module Bootstrap.Graph.Solver where {
                Just targetNode ->
                  case G.binder targetNode of {
                    Nothing -> Left "instance target has no binder";
-                   Just destination ->
-                     G.bindE
-                       (G.expandWithScopes (scopeIntervals (scopeIndex solver)) source destination
-                          old)
-                       (\answer ->
-                          case answer of {
-                            (,) ((,,) root copies frontier) next ->
-                              Right ((,,,) root copies frontier next)
-                          })
+                   Just destination -> buildExpansion (scopeIntervals (scopeIndex solver))
+                     original destination old
                  }
              }
     };
@@ -2033,34 +2032,40 @@ module Bootstrap.Graph.Solver where {
         (L.append (L.filter (\n -> n < first) (L.concatMap G.equationNodes equations))
           (expandedOldSeeds first fresh)))
       (\((,) connected boundaries) ->
-        let { scopes = projectScopes (scopeIndex solver) boundaries } in
-        let { selected = L.foldlStrict
-          (\found n -> if IM.member n found then found
-            else IM.insert n (IM.get n (G.nodes current)) found)
-          connected (IM.keys scopes) } in
-        let { oldOriginals = IM.toList selected } in
-        let { originals = L.append oldOriginals fresh } in
-        let { count = L.length originals } in
-        let { forward = Rank.indexMap selected } in
-        let { compact = \n -> expandedCompact first (G.nextId current) forward (G.resolve current n) } in
-        let { hiddenRoots = L.filter
-          (\((,) n v) -> case G.tag v of {
-            GGen root -> L.not (IM.member root selected);
-            _ -> False
-          }) oldOriginals } in
-        let { stubIds = L.range count ((count + L.length hiddenRoots) - 1) } in
-        let { stubs = IM.fromDistinctAscList (L.zip (L.map L.fst hiddenRoots) stubIds) } in
-        let { existing = projectExpandedNodes first (G.nextId current) forward scopes stubs 0 originals } in
-        let { placeholders = L.map
-          (\((,) original stub) ->
-            (,) stub (G.mkNode GBot (Just (rankIdentity original 0 forward)) Flexible))
-          (IM.toList stubs) } in
-        let { local = G.mkGraph
-          (G.nodesFromDistinctAscList (L.append existing placeholders)) IM.empty
-          (count + L.length hiddenRoots) } in
-        Right ((,,,) local
-          (L.map (\((,) a b) -> (,) (compact a) (compact b)) equations)
-          originals ((,,) forward scopes stubs)));
+        projectExpandedComponent current first fresh equations connected
+          (projectScopes (scopeIndex solver) boundaries));
+  projectExpandedComponent :: Graph -> Int -> [] ((,) Int Node) -> [] ((,) Int Int) ->
+    IntMap Node -> IntMap (Maybe Int) -> Either String
+                                  ((,,,) Graph ([] ((,) Int Int)) ([] ((,) Int Node))
+                                    ((,,) (Rank.MapIndex Node) (IntMap (Maybe Int)) (IntMap Int)));
+  projectExpandedComponent current first fresh equations connected scopes =
+    let { selected = L.foldlStrict
+      (\found n -> if IM.member n found then found
+        else IM.insert n (IM.get n (G.nodes current)) found)
+      connected (IM.keys scopes) } in
+    let { oldOriginals = IM.toList selected } in
+    let { originals = L.append oldOriginals fresh } in
+    let { count = L.length originals } in
+    let { forward = Rank.indexMap selected } in
+    let { compact = \n -> expandedCompact first (G.nextId current) forward (G.resolve current n) } in
+    let { hiddenRoots = L.filter
+      (\((,) n v) -> case G.tag v of {
+        GGen root -> L.not (IM.member root selected);
+        _ -> False
+      }) oldOriginals } in
+    let { stubIds = L.range count ((count + L.length hiddenRoots) - 1) } in
+    let { stubs = IM.fromDistinctAscList (L.zip (L.map L.fst hiddenRoots) stubIds) } in
+    let { existing = projectExpandedNodes first (G.nextId current) forward scopes stubs 0 originals } in
+    let { placeholders = L.map
+      (\((,) original stub) ->
+        (,) stub (G.mkNode GBot (Just (rankIdentity original 0 forward)) Flexible))
+      (IM.toList stubs) } in
+    let { local = G.mkGraph
+      (G.nodesFromDistinctAscList (L.append existing placeholders)) IM.empty
+      (count + L.length hiddenRoots) } in
+    Right ((,,,) local
+      (L.map (\((,) a b) -> (,) (compact a) (compact b)) equations)
+      originals ((,,) forward scopes stubs));
   restoreExpandedKnownNode :: Graph -> (Int -> Either String Int) ->
                               Int -> Node -> Node -> Either String ((,) Int Node);
   restoreExpandedKnownNode withAliases backward original previous node =
@@ -2139,14 +2144,17 @@ module Bootstrap.Graph.Solver where {
   emptyUnificationCache = UnificationCache IM.empty;
   solveProjected :: UnificationCache -> [] ((,) Int Int) -> Graph ->
     Either String ((,) Graph UnificationCache);
-  solveProjected cache equations local = let {
+  solveProjected = solveProjectedUsing G.unify;
+  solveProjectedUsing :: ([] ((,) Int Int) -> Graph -> Either String Graph) ->
+    UnificationCache -> [] ((,) Int Int) -> Graph -> Either String ((,) Graph UnificationCache);
+  solveProjectedUsing solve cache equations local = let {
     size = G.nextId local;
-    uncached = G.bindE (G.unify equations local) (\solved -> Right ((,) solved cache))
+    uncached = G.bindE (solve equations local) (\solved -> Right ((,) solved cache))
   } in case cache of {
     Uncached -> uncached;
     UnificationCache entries -> if size > 64 then uncached else let {
       bucket = IM.findWithDefault [] size entries;
-      fresh = G.bindE (G.unify equations local) (\solved -> let {
+      fresh = G.bindE (solve equations local) (\solved -> let {
         updated = IM.insert size ((:) (ProjectedUnification equations local solved) (L.take 3 bucket)) entries
       } in seq updated (Right ((,) solved (UnificationCache updated))));
       match candidates = case candidates of {
@@ -2159,6 +2167,393 @@ module Bootstrap.Graph.Solver where {
       }
     } in match bucket
   };
+  -- A completed permission check supplies its own rejection. When the local
+  -- binding plan needs the component, keep the completed first-order result.
+  data LocalUnification = LocalSolved Solver | LocalRejected String | LocalNeedsComponent String Graph;
+  unifyExpandedLocally :: [] ((,) Int Int) -> Solver -> Graph -> Int ->
+    [] ((,) Int Node) -> Int -> Either String Solver;
+  unifyExpandedLocally equations solver current destination fresh root = do {
+    result <- unifyExpandedLocallyWith validFreshFragment equations solver current destination fresh root;
+    case result of {
+      LocalSolved solved -> Right solved;
+      LocalRejected message -> Left message;
+      LocalNeedsComponent message _ -> Left message
+    }
+  };
+  unifyExpandedLocallyWith :: (Int -> Maybe Int -> [] ((,) Int Node) -> Int -> Bool) ->
+    [] ((,) Int Int) -> Solver -> Graph -> Int ->
+    [] ((,) Int Node) -> Int -> Either String LocalUnification;
+  unifyExpandedLocallyWith fragmentCheck equations solver current destination fresh root = do {
+    _ <- G.check (localExpansionAdmissible fragmentCheck current destination fresh root)
+      "expansion is not a closed fragment under a scope";
+    solveLocalExpansion False equations solver current fresh
+  };
+  localExpansionAdmissible :: (Int -> Maybe Int -> [] ((,) Int Node) -> Int -> Bool) ->
+    Graph -> Int -> [] ((,) Int Node) -> Int -> Bool;
+  localExpansionAdmissible fragmentCheck current destination fresh root =
+    G.isGen (G.tag (G.nodeAt current destination)) &&
+      fragmentCheck root (Just destination) fresh (G.nextId current);
+  noScopeLift :: Int -> Int -> Bool;
+  noScopeLift _ _ = False;
+  solveLocalExpansion :: Bool -> [] ((,) Int Int) -> Solver -> Graph ->
+    [] ((,) Int Node) -> Either String LocalUnification;
+  solveLocalExpansion = solveLocalExpansionUsing noScopeLift;
+  solveLocalExpansionUsing :: (Int -> Int -> Bool) -> Bool -> [] ((,) Int Int) -> Solver -> Graph ->
+    [] ((,) Int Node) -> Either String LocalUnification;
+  solveLocalExpansionUsing = solveLocalExpansionWithKinds False;
+  solveLocalExpansionWithKinds :: Bool -> (Int -> Int -> Bool) -> Bool -> [] ((,) Int Int) -> Solver ->
+    Graph -> [] ((,) Int Node) -> Either String LocalUnification;
+  solveLocalExpansionWithKinds = solveLocalExpansionDemand CompareSurvivors;
+  data SurvivorDemand = CompareSurvivors | SourcePayloads ();
+  -- Source graphs contain finite names and kinds. Demand them once, on the
+  -- first successful local quotient. Expansion copies these payloads; solving
+  -- changes only validated identities, links, binders and flags. Comparing
+  -- survivors thereafter cannot introduce a new payload demand.
+  sourcePayloads graph = SourcePayloads
+    (IM.foldr (\node rest -> seq (G.equalNode node node) rest) () (G.nodes graph));
+  solveLocalExpansionDemand demand prepared scopeLift projectedErrors equations solver current fresh = do {
+    let {
+      before = G.mkGraph (G.nodes current) IM.empty (G.nextId current);
+      canonical = L.map (\((,) a b) -> (,) (G.resolve current a) (G.resolve current b)) equations;
+      first = G.nextId (graph solver);
+      pending = L.filter (\((,) a b) -> a /= b) canonical;
+      projection = preparedFallbackProjection solver current first fresh pending;
+      -- The type graph keeps its first-order result. Relabel a failure for
+      -- the established compact projection only when a diagnostic needs it.
+      projectedMismatch a b = G.bindE projection (\((,,,) _ _ _ ((,,) forward _ _)) ->
+        let { compact n = expandedCompact first (G.nextId current) forward (G.resolve current n) } in
+        G.typeMismatch (G.mapTag compact a) (G.mapTag compact b));
+      diagnostic message = case projection of {
+        Left earlier -> earlier;
+        Right ((,,,) component _ _ _) -> case G.validateGraph component of {
+          Left earlier -> earlier;
+          Right _ -> message
+        }
+      };
+      mismatch = if projectedErrors then projectedMismatch else G.typeMismatch;
+      -- Every congruence class contains only members of one kind. The fresh
+      -- copy and the immutable pre-quotient graph provide that original kind.
+      -- The resulting quotient still undergoes its full cycle and kind check.
+      quotient = if prepared then
+        G.foldE (G.firstOrderKindsUsing mismatch (G.validatedKindUsing True) before) before canonical
+        else G.bindE (G.kindsAt before (L.concatMap G.equationNodes canonical))
+          (\kinds -> G.foldE (G.firstOrderWith mismatch kinds) before canonical)
+    };
+    case quotient of {
+      Left message -> if projectedErrors
+        then Right (LocalRejected (diagnostic message)) else Left message;
+      Right skeleton -> case closeLocalQuotientUsing scopeLift solver current before skeleton fresh of {
+        Left message -> Right (LocalNeedsComponent message skeleton);
+        Right result -> if L.not projectedErrors then Right result else case result of {
+          LocalSolved solved -> case demand of {
+            SourcePayloads proof -> seq proof (Right result);
+            CompareSurvivors -> G.bindE projection
+              (\((,,,) _ _ originals _) -> G.bindE
+                (compareExpandedSurvivors (graph solved) originals)
+                (\_ -> Right result))
+          };
+          _ -> Right result
+        }
+      }
+    }
+  };
+  -- The projected restoration compares nodes that survive, in ascending
+  -- original identity order. Keep that demand on constructor names and kinds
+  -- when returning the local fast result, without a second unification or
+  -- constructing the compact graph. Deleted nodes and unrelated components
+  -- must not acquire new demand.
+  compareExpandedSurvivors :: Graph -> [] ((,) Int Node) -> Either String ();
+  compareExpandedSurvivors solved = G.mapE_ (\((,) identity previous) ->
+    case IM.lookup identity (G.nodes solved) of {
+      Nothing -> Right ();
+      Just current -> seq (G.equalNode previous current) (Right ())
+    });
+  -- Several quotient passes ask for images in the same immutable graph.
+  -- Share each visited branch and the final representative of a queried alias.
+  localAliasImage :: Graph -> (Int -> Int);
+  localAliasImage skeleton = let {
+    search tree = case tree of {
+      IntMapNil -> \n -> n;
+      IntMapTip key next -> let { winner = G.resolve skeleton next } in
+        \n -> if n == key then winner else n;
+      IntMapBin _ prefix left right -> let { below = search left; above = search right } in
+        \n -> if IT.left n prefix then below n else above n
+    }
+  } in case G.links skeleton of { IntMap aliases -> search aliases };
+  closeLocalQuotientUsing :: (Int -> Int -> Bool) -> Solver -> Graph -> Graph -> Graph -> [] ((,) Int Node) -> Either String LocalUnification;
+  closeLocalQuotientUsing scopeLift solver current before skeleton fresh = do {
+    let {
+      image = localAliasImage skeleton;
+      aliases = G.links skeleton;
+      classes = IM.foldlWithKey (\found n _ ->
+        let { winner = image n } in
+        IM.insert winner ((:) n (IM.findWithDefault ((:) winner []) winner found)) found)
+        IM.empty aliases;
+      members = \n -> IM.findWithDefault ((:) n []) n classes;
+      filled = \n -> L.not (G.isBottom (G.tag (G.nodeAt skeleton n))) &&
+        L.any (\original -> G.isBottom (G.tag (G.nodeAt before original))) (members n);
+      grafted = L.foldlStrict (\seen n ->
+        if filled n then G.reachableVisit skeleton seen (G.children (G.tag (G.nodeAt skeleton n)))
+        else seen) IS.empty (IM.keys classes);
+      merged = IS.fromList (IM.keys classes);
+      first = G.nextId (graph solver);
+      freshIndexes = L.foldlStrict addNode (mkSolver current IM.empty IM.empty (scopeIndex solver)) fresh;
+      -- The fragment has no edge to the old graph except its binder scope.
+      -- That Gen cannot be merged or reached from a type graft. Read each
+      -- affected node's reverse edges from its own index until publication.
+      reverseEdges index n = IM.findWithDefault IS.empty n
+        (index (if n < first then solver else freshIndexes));
+      users index = IM.foldlWithKey (\found n _ ->
+        IS.union found (reverseEdges index n)) IS.empty aliases;
+      scopes = scopeIndex solver;
+      candidates widened n =
+        let {
+          originals = IS.fromList (L.map image (L.concatMap
+            (\original -> L.maybeToList (G.binder (G.nodeAt before original))) (members n)))
+        } in if IS.member n widened then L.foldlStrict (\found original ->
+          L.foldlStrict (\parents p -> IS.insert (image p) parents) found
+            (IS.toList (reverseEdges structuralParents original))) originals (members n)
+        else originals;
+      binderAt placements n = case IM.lookup n placements of {
+        Nothing -> G.mapMaybeInt image (G.binder (G.nodeAt skeleton n));
+        Just parent -> Just parent
+      };
+      hasAncestor placements ancestor n =
+        if ancestor == n then True
+        else if G.isGen (G.tag (G.nodeAt skeleton n)) then scopeContains scopes ancestor n
+        else case binderAt placements n of {
+          Nothing -> False;
+          Just parent -> hasAncestor placements ancestor parent
+        };
+      binderChanged placements n = let { parent = binderAt placements n } in
+        L.any (\original -> L.not
+          (G.equalMaybeInt (G.mapMaybeInt image (G.binder (G.nodeAt before original))) parent))
+          (members n);
+      -- Every legal lift shortens an old binder path modulo aliases. Its
+      -- new binding descendants are among the old descendants of its class.
+      missingDomination placements seen missing pending = case pending of {
+        [] -> missing;
+        (:) n rest -> if IS.member n seen then missingDomination placements seen missing rest
+          else let {
+            checkChild found originalChild = let {
+              child = image originalChild
+            } in case binderAt placements child of {
+              Just parent -> if hasAncestor placements parent n then found else IS.insert child found;
+              Nothing -> IS.insert child found
+            };
+            fromChildren = L.foldlStrict checkChild missing (G.children (G.tag (G.nodeAt skeleton n)));
+            descendants = L.foldlStrict (\more original ->
+              L.foldlStrict (\pendingChildren child -> (:) (image child) pendingChildren) more
+                (IS.toList (reverseEdges bindingChildren original))) rest (members n)
+          } in missingDomination placements (IS.insert n seen) fromChildren descendants
+      };
+      place widened = do {
+        let {
+          rebound = IS.toList (IS.union merged widened);
+          plan = LocalBinders skeleton scopes
+            (IM.fromDistinctAscList (L.map (\n -> (,) n (IS.toList (candidates widened n))) rebound))
+        };
+        placements <- G.foldE (\known n -> L.mapEither L.snd (placeLocalBinder plan IS.empty known n))
+          IM.empty rebound;
+        let {
+          lifted = L.filter (binderChanged placements) rebound;
+          missing = missingDomination placements IS.empty IS.empty lifted;
+          more = IS.difference (IS.intersection missing grafted) widened
+        };
+        if IS.size missing == 0 then Right placements
+        else if IS.size more == 0 then Left "ill-dominated local edge"
+        else place (IS.union widened more)
+      };
+    };
+    -- Each new structural cycle goes through a merged class.
+    _ <- G.kindsAt skeleton (IM.keys classes);
+    -- A singleton starts with its original binder's image. Compute a closed
+    -- plan before checking permissions or patching indexes. Only a graft
+    -- descendant can gain structural parent candidates.
+    placements <- place IS.empty;
+    checked <- G.foldE (\known n -> G.foldE (\result original -> case result of {
+      Nothing -> Right Nothing;
+      Just cache -> localLiftProvenUsing scopeLift before skeleton (IM.member n classes) n (IM.get n placements) cache original
+    }) known (members n)) (Just IM.empty) (IM.keys placements);
+    permissions <- case checked of {
+      Just _ -> Right (Right ());
+      Nothing -> checkLocalPermissions before skeleton
+        (\n -> IS.union (IM.findWithDefault IS.empty n (bindingChildren solver))
+          (IM.findWithDefault IS.empty n (bindingChildren freshIndexes))) classes placements
+    };
+    case permissions of {
+      Left message -> Right (LocalRejected message);
+      Right _ -> let {
+        touched = IS.union placedIds
+          (IS.union (users structuralParents) (users bindingChildren));
+        survivors = L.filter (\n -> IM.notMember n aliases)
+          (L.takeWhile (\n -> n < first) (IS.toList touched));
+        -- The quotient mutates a winner's tag, discards its aliases, and
+        -- may place a surviving binder. Every other old node retains its
+        -- outgoing edges after their destination keys have been renamed.
+        oldIds keys = L.takeWhile (\n -> n < first) (IS.toList keys);
+        placedIds = IS.fromList (IM.keys placements);
+        editIds = IS.union merged placedIds;
+        removed = L.map (\n -> let { v = G.nodeAt before n } in
+          (,) n (G.mkNode (G.mapTag image (G.tag v)) (G.mapMaybeInt image (G.binder v)) (G.flag v)))
+          (oldIds (IS.union editIds (IS.fromList (IM.keys aliases))));
+        -- Incoming edges can change even for a singleton class. Its original
+        -- flag is already on the surviving node. Force the new binder identity
+        -- before publishing it so a live edge cannot retain the old quotient.
+        replacement n = let {
+          v = G.nodeAtRepresentative skeleton n n;
+          newFlag = case IM.lookup n classes of {
+            Nothing -> G.flag v;
+            Just originals -> if L.any (\original -> G.equalFlag
+              (G.flag (G.nodeAtRepresentative before original original)) Rigid) originals
+              then Rigid else Flexible
+          };
+          parent = binderAt placements n;
+          strictParent = case parent of { Nothing -> Nothing; Just key -> seq key parent }
+        } in (,) n (G.mkNode (G.mapTag image (G.tag v)) strictParent newFlag);
+        -- All incoming edges of an alias acquire the same destination.
+        -- Move their source set once, then patch the outgoing edges of each
+        -- changed or deleted node against that renamed index.
+        moveIncoming index alias _ = case IM.lookup alias index of {
+          Nothing -> index;
+          Just sources -> IM.insertWith IS.union (image alias) sources (IM.delete alias index)
+        };
+        renameIndex index = IM.foldlWithKey moveIncoming index aliases;
+        renamed = mkSolver current (renameIndex (structuralParents solver))
+          (renameIndex (bindingChildren solver)) scopes;
+        changed = L.map replacement survivors;
+        retainedFresh = L.map (\entry@((,) n _) -> if IS.member n touched then replacement n else entry)
+          (L.filter (\((,) n _) -> IM.notMember n aliases) fresh);
+        published = G.nodesFromDistinctAscList (L.append changed retainedFresh);
+        result = G.mkGraph (IM.union published (G.nodes skeleton))
+          (IM.union aliases (G.links current)) (G.nextId current);
+        -- Share the exact replacements already materialized for the graph.
+        indexedEdits = L.map (\n -> (,) n (IM.get n published)) (oldIds editIds)
+      } in Right (LocalSolved (withGraph result (patchIndexedNodes renamed removed
+          (L.append indexedEdits retainedFresh))))
+    }
+  };
+  data LocalBinders = LocalBinders Graph ScopeIndex (IntMap ([] Int));
+  data LocalBinderPath = LocalBinderPath ([] Int) Int;
+  placeLocalBinder :: LocalBinders -> IntSet -> IntMap Int -> Int -> Either String ((,) Int (IntMap Int));
+  placeLocalBinder plan@(LocalBinders skeleton _ candidates) active known n =
+    case IM.lookup n known of {
+      Just parent -> Right ((,) parent known);
+      Nothing -> case IM.lookup n candidates of {
+        Nothing -> case G.binder (G.nodeAt skeleton n) of {
+          Nothing -> Left "missing local binder";
+          Just parent -> Right ((,) (G.resolve skeleton parent) known)
+        };
+        Just wanted ->
+          if IS.member n active then Left "cyclic local binder candidates" else do {
+            (,) parent next <- chooseLocalBinder plan (IS.insert n active) known wanted;
+            let { v = G.nodeAt skeleton n };
+            _ <- G.validateNodeBinder skeleton ((,) n (G.mkNode (G.tag v) (Just parent) (G.flag v)));
+            Right (G.strictPair parent (IM.insert n parent next))
+          }
+      }
+    };
+  chooseLocalBinder :: LocalBinders -> IntSet -> IntMap Int -> [] Int -> Either String ((,) Int (IntMap Int));
+  chooseLocalBinder plan@(LocalBinders _ scopes _) active known wanted = case wanted of {
+    [] -> Left "missing local binder candidates";
+    (:) first [] -> Right ((,) first known);
+    (:) first rest -> do {
+      (,) path next <- localBinderPath plan active known first;
+      (,) (LocalBinderPath common scope) placed <- G.foldE
+        (\((,) prior table) candidate -> do {
+          (,) path updated <- localBinderPath plan active table candidate;
+          Right ((,) (commonLocalBinderPath scopes prior path) updated)
+        }) ((,) path next) rest;
+      Right ((,) (case common of { [] -> scope; (:) parent _ -> parent }) placed)
+    }
+  };
+  localBinderPath :: LocalBinders -> IntSet -> IntMap Int -> Int -> Either String ((,) LocalBinderPath (IntMap Int));
+  localBinderPath plan@(LocalBinders skeleton _ _) active known n =
+    if G.isGen (G.tag (G.nodeAt skeleton n)) then Right ((,) (LocalBinderPath [] n) known)
+    else do {
+      (,) parent next <- placeLocalBinder plan active known n;
+      (,) (LocalBinderPath path scope) placed <- localBinderPath plan active next parent;
+      Right ((,) (LocalBinderPath ((:) n path) scope) placed)
+    };
+  commonLocalBinderPath :: ScopeIndex -> LocalBinderPath -> LocalBinderPath -> LocalBinderPath;
+  commonLocalBinderPath scopes (LocalBinderPath left a) (LocalBinderPath right b) =
+    if a /= b then LocalBinderPath [] (scopeLCA scopes a b)
+    else LocalBinderPath (L.dropWhile (\n -> L.not (L.elem eqInt n left)) right) a;
+  localLiftProvenUsing :: (Int -> Int -> Bool) -> Graph -> Graph -> Bool -> Int -> Int -> IntMap IntSet -> Int ->
+    Either String (Maybe (IntMap IntSet));
+  localLiftProvenUsing scopeLift before skeleton merged winner parent cache original = let {
+    old = G.nodeAt before original;
+    direct = G.equalMaybeInt (G.mapMaybeInt (G.resolve skeleton) (G.binder old)) (Just parent);
+    fillsBottom = G.isBottom (G.tag old) && L.not (G.isBottom (G.tag (G.nodeAt skeleton winner)))
+  } in
+    -- An unchanged singleton has no permission obligation. Otherwise a rigid
+    -- node cannot be Red, and a flexible path stays flexible in the raised
+    -- preimage: lifting only removes vertices from its original ancestry.
+    if L.not ((direct && L.not merged) ||
+      (G.equalFlag (G.flag old) Rigid && L.not fillsBottom) || G.flexiblePath before original)
+    then Right Nothing
+    else if direct then Right (Just cache) else do {
+      proven <- liftAncestorsUsing scopeLift before skeleton parent (IM.findWithDefault IS.empty parent cache) (G.binder old);
+      let { next = IM.insert parent proven cache };
+      seq next (Right (Just next))
+    };
+  -- A successful climb proves its intermediate binders for the same target.
+  -- The cache belongs to one expansion and its immutable quotient.
+  liftAncestors :: Graph -> Graph -> Int -> IntSet -> Maybe Int -> Either String IntSet;
+  liftAncestors = liftAncestorsUsing noScopeLift;
+  liftAncestorsUsing :: (Int -> Int -> Bool) -> Graph -> Graph -> Int -> IntSet -> Maybe Int -> Either String IntSet;
+  liftAncestorsUsing scopeLift before skeleton wanted proven current = case current of {
+    Nothing -> Left "a node's binder cannot be lowered";
+    Just n ->
+      -- A positive interval result covers only immutable, old Gen nodes.
+      -- Other binders still follow their exact pre-quotient ancestry.
+      if IS.member n proven || G.resolve skeleton n == wanted || scopeLift wanted n then Right proven
+      else do {
+        found <- liftAncestorsUsing scopeLift before skeleton wanted proven (G.binder (IM.get n (G.nodes before)));
+        let { next = IS.insert n found };
+        seq next (Right next)
+      }
+  };
+  checkLocalPermissions :: Graph -> Graph -> (Int -> IntSet) -> IntMap ([] Int) -> IntMap Int ->
+    Either String (Either String ());
+  checkLocalPermissions before skeleton oldChildren classes placements = do {
+    let {
+      classMembers = IM.mapWithKey (\n _ -> IM.findWithDefault ((:) n []) n classes) placements;
+      raise winner original = G.bindE
+        (G.raisedBinderClimb before skeleton (IM.get winner placements) (G.binder (G.nodeAt before original)))
+        (\parent -> Right ((,) original parent))
+    };
+    groups <- G.mapE (\((,) winner originals) -> G.mapE (raise winner) originals) (IM.toList classMembers);
+    let {
+      up = IM.fromList (L.concat groups);
+      changed = L.filter (\((,) n parent) -> L.not (G.equalMaybeInt parent (G.binder (G.nodeAt before n))))
+        (IM.toList up);
+      indexChild n parent index = case parent of {
+        Nothing -> index;
+        Just p -> insertIndex p n index
+      };
+      edgeChanges = L.foldlStrict (\((,) removed added) ((,) n parent) ->
+        G.strictPair (indexChild n (G.binder (G.nodeAt before n)) removed) (indexChild n parent added))
+        ((,) IM.empty IM.empty) changed;
+      raisedChildren n = IS.toList (IS.union
+        (IS.difference (oldChildren n) (IM.findWithDefault IS.empty n (L.fst edgeChanges)))
+        (IM.findWithDefault IS.empty n (L.snd edgeChanges)));
+      -- Permissions are checked in the raised preimage. Tags, flags and
+      -- identities stay original until the permissions on each class pass.
+      raisedNodes = G.nodesFromDistinctAscList (L.map (\((,) n parent) ->
+        let { v = G.nodeAt before n } in (,) n (G.mkNode (G.tag v) parent (G.flag v))) changed);
+      raised = G.mkGraph (IM.union raisedNodes (G.nodes before)) (G.links before) (G.nextId before);
+      originals = IM.keys up;
+      oldPermissions = G.permissionsAt before (\n -> IS.toList (oldChildren n)) originals;
+      raisedPermissions = G.permissionsAt raised raisedChildren originals;
+      newFlags = G.flagsIndex before classMembers
+    };
+    Right (do {
+      _ <- G.mapE_ (G.checkOriginalPermission skeleton oldPermissions raisedPermissions newFlags up)
+        (L.map (\n -> (,) n (G.nodeAt before n)) originals);
+      G.mapE_ (G.checkMergePairs raisedPermissions up) (IM.elems classes)
+    })
+  };
   unifyPreparedFallback :: [] ((,) Int Int) -> Solver -> Graph -> Int ->
                            [] ((,) Int Node) -> Either String Solver;
   unifyPreparedFallback equations solver current first fresh = L.mapEither L.fst
@@ -2166,6 +2561,25 @@ module Bootstrap.Graph.Solver where {
   unifyPreparedFallbackWith :: UnificationCache -> [] ((,) Int Int) -> Solver -> Graph -> Int ->
     [] ((,) Int Node) -> Either String ((,) Solver UnificationCache);
   unifyPreparedFallbackWith cache equations solver current first fresh =
+    unifyPreparedComponentWith cache equations solver current first fresh
+      (preparedFallbackProjection solver current first fresh);
+  unifyPreparedFromQuotient :: UnificationCache -> [] ((,) Int Int) -> Solver -> Graph -> Int ->
+    [] ((,) Int Node) -> Graph -> Either String ((,) Solver UnificationCache);
+  unifyPreparedFromQuotient cache equations solver current first fresh quotient =
+    unifyPreparedComponentUsing (Just quotient) cache equations solver current first fresh
+      (preparedFallbackProjection solver current first fresh);
+  unifyPreparedComponentWith :: UnificationCache -> [] ((,) Int Int) -> Solver -> Graph -> Int ->
+    [] ((,) Int Node) -> ([] ((,) Int Int) -> Either String
+                                  ((,,,) Graph ([] ((,) Int Int)) ([] ((,) Int Node))
+                                    ((,,) (Rank.MapIndex Node) (IntMap (Maybe Int)) (IntMap Int)))) ->
+    Either String ((,) Solver UnificationCache);
+  unifyPreparedComponentWith = unifyPreparedComponentUsing Nothing;
+  unifyPreparedComponentUsing :: Maybe Graph -> UnificationCache -> [] ((,) Int Int) -> Solver -> Graph -> Int ->
+    [] ((,) Int Node) -> ([] ((,) Int Int) -> Either String
+                                  ((,,,) Graph ([] ((,) Int Int)) ([] ((,) Int Node))
+                                    ((,,) (Rank.MapIndex Node) (IntMap (Maybe Int)) (IntMap Int)))) ->
+    Either String ((,) Solver UnificationCache);
+  unifyPreparedComponentUsing quotient cache equations solver current first fresh project =
     let { canonical = L.map
       (\((,) a b) -> (,) (G.resolve current a) (G.resolve current b)) equations } in
     G.bindE
@@ -2175,10 +2589,19 @@ module Bootstrap.Graph.Solver where {
         let { pending = L.filter (\((,) a b) -> L.not (a == b)) canonical } in
         case pending of {
           [] -> Right ((,) (L.foldlStrict addNode (withGraph current solver) fresh) cache);
-          (:) head tail -> G.bindE
-            (preparedFallbackProjection solver current first fresh pending)
-            (\((,,,) local localEquations originals ((,,) forward scopes stubs)) ->
-              G.bindE (solveProjected cache localEquations local)
+        (:) head tail -> G.bindE
+            (project pending)
+            (\((,,,) local localEquations originals ((,,) forward scopes stubs)) -> let {
+              solvedComponent = case quotient of {
+                Nothing -> solveProjected cache localEquations local;
+                Just skeleton -> solveProjectedUsing
+                  (\_ projected -> G.bindE (G.validateGraph projected)
+                    (\_ -> G.finishUnification projected
+                      (projectQuotient current first projected originals forward scopes stubs skeleton)))
+                  cache localEquations local
+              }
+            } in
+              G.bindE solvedComponent
                 (\((,) solved updated) -> G.bindE
                   (G.mapE_ (\stub -> G.check
                     (matchesNode (G.nodes solved) stub (G.nodeAt local stub) &&
@@ -2189,44 +2612,212 @@ module Bootstrap.Graph.Solver where {
                     (\checkedScopes -> L.mapEither (\result -> (,) result updated)
                       (restoreExpandedProjection solver current first originals forward (L.length originals) solved)))))
         });
+  -- Compaction preserves the first-order identity order. Scope rows and
+  -- hidden roots come from the projection because the equations merge types.
+  projectQuotient :: Graph -> Int -> Graph -> [] ((,) Int Node) -> Rank.MapIndex Node ->
+    IntMap (Maybe Int) -> IntMap Int -> Graph -> Graph;
+  projectQuotient current first projected originals forward scopes stubs skeleton =
+    let {
+      compact n = expandedCompact first (G.nextId current) forward (G.resolve current n);
+      aliases = G.links skeleton;
+      remaining = L.filter (\((,) n _) -> IM.notMember n aliases) originals;
+      relabel ((,) n _) = let { identity = compact n } in
+        if IM.member n scopes then (,) identity (G.nodeAt projected identity)
+        else let { node = G.nodeAt skeleton n } in
+          (,) identity (G.mkNode (G.mapTag compact (G.tag node))
+            (G.mapMaybeInt compact (G.binder node)) (G.flag node));
+      links = IM.fromDistinctAscList (L.map (\((,) a b) -> (,) (compact a) (compact b)) (IM.toList aliases));
+      placeholders = L.map (\n -> (,) n (G.nodeAt projected n)) (IM.elems stubs)
+    } in G.mkGraph (G.nodesFromDistinctAscList (L.append (L.map relabel remaining) placeholders))
+      links (G.nextId projected);
+  -- A closed arrow copied onto a scoped arrow with two distinct flexible
+  -- bottoms can only remove fresh nodes. The old endpoints keep their common
+  -- Gen binder, which already dominates every external structural parent.
+  -- Type binders of the fresh descendants remain inside the fragment. The
+  -- destination scope can therefore serve as the root of the compact solve.
+  closedArrowComponent :: Graph -> Int -> Int -> Int -> Int -> Maybe (IntMap Node);
+  closedArrowComponent current first scope root target =
+    case G.tag (G.nodeAt current root) of {
+      GArr a b -> if a < first || b < first || a == b then Nothing else
+        let { gate = G.nodeAt current scope; arrow = G.nodeAt current target } in
+        if L.not (G.isGen (G.tag gate)) then Nothing else case G.tag arrow of {
+          GArr left right ->
+            if left == right then Nothing else
+              let { x = G.nodeAt current left; y = G.nodeAt current right } in
+              if scopedBottom scope x && scopedBottom scope y
+              then Just (IM.fromList [(scope,gate), (target,arrow), (left,x), (right,y)])
+              else Nothing;
+          _ -> Nothing
+        };
+      _ -> Nothing
+    };
+  -- A copied tree of *-kind arrows/bottoms/nullary constructors with every
+  -- child bound to its immediate structural parent needs no binder search.
+  -- Only the two roots grafted onto the old bottoms move to the scope; all
+  -- their descendants retain their immediate binding parent modulo aliases.
+  graftClosedArrowTree :: Solver -> Graph -> [] ((,) Int Node) -> Int -> Int -> Int -> IntMap Node -> Maybe Solver;
+  graftClosedArrowTree = graftClosedArrowUsing False;
+  graftClosedArrowUsing allowClosedCopy solver current fresh scope root target connected =
+    case G.tag (G.nodeAt current root) of {
+      GArr a b -> case G.tag (IM.get target connected) of {
+        GArr left right ->
+          let {
+            first = G.nextId (graph solver);
+            treeNode ((,) n node) = case G.tag node of {
+              GBot -> True;
+              GCon _ [] -> True;
+              GArr x y -> directChild n x && directChild n y;
+              _ -> False
+            };
+            directChild n child = child >= first && child < G.nextId current &&
+              G.equalMaybeInt (G.binder (G.nodeAt current child)) (Just n);
+            freshId child = child >= first && child < G.nextId current;
+            -- The old arrow's two distinct bottoms and the copied root are
+            -- flexible under the destination Gen. A fresh child bound to the
+            -- copied root only moves up that flexible edge. A deeper binder
+            -- keeps its image. A fresh bottom meeting an old bottom keeps the
+            -- old GBot tag, so a direct GBotK uses the ordinary quotient.
+            closedNode ((,) n v) = (case G.binder v of {
+                Nothing -> False; Just parent -> if n == root then parent == scope else freshId parent
+              }) && (case G.tag v of {
+                GArr _ _ -> True; GTyApp _ _ -> True; GCon _ _ -> True; GTyCon _ _ -> True;
+                GBot -> True; GBotK _ -> n /= a && n /= b; _ -> False
+              }) && L.all freshId (G.children (G.tag v));
+            closedCopy = allowClosedCopy && L.all closedNode fresh;
+            rootNode = G.nodeAt current root
+          } in if L.not (G.equalFlag (G.flag rootNode) Flexible &&
+            G.equalMaybeInt (G.binder rootNode) (Just scope) && (L.all treeNode fresh || closedCopy)) then Nothing else
+          let {
+            image n = if n == root then target else if n == a then left else if n == b then right else n;
+            edge n node = G.mkNode (G.mapTag image (G.tag node))
+              (if n == a || n == b || G.equalMaybeInt (G.binder node) (Just root)
+               then Just scope else G.mapMaybeInt image (G.binder node)) (G.flag node);
+            replacement n = edge n (G.nodeAt current n);
+            before = graph solver;
+            leftNode = replacement a;
+            rightNode = replacement b;
+            retained = L.map (\((,) n node) -> (,) n (edge n node))
+              (L.filter (\((,) n _) -> n /= root && n /= a && n /= b) fresh);
+            nodes = G.insertNodeMap left leftNode (G.insertNodeMap right rightNode (G.nodes before));
+            aliases = IM.fromList [(root,target),(a,left),(b,right)];
+            result = G.mkGraph (IM.union (G.nodesFromDistinctAscList retained) nodes)
+              (IM.union aliases (G.links before)) (G.nextId current);
+            patched = patchNodeEdges right (IM.get right connected) rightNode
+              (patchNodeEdges left (IM.get left connected) leftNode solver)
+          } in Just (withGraph result (L.foldlStrict addNode patched retained));
+        _ -> Nothing
+      };
+      _ -> Nothing
+    };
+  scopedBottom :: Int -> Node -> Bool;
+  scopedBottom scope node = case node of {
+    Node GBot (Just owner) Flexible -> owner == scope;
+    _ -> False
+  };
   instantiateExpandedPrepared :: Int -> Int -> Solver -> Either String Solver;
   instantiateExpandedPrepared source target solver = L.mapEither L.fst
     (instantiateExpandedWith Uncached source target solver);
   instantiateExpandedWith :: UnificationCache -> Int -> Int -> Solver -> Either String ((,) Solver UnificationCache);
-  instantiateExpandedWith cache source target solver =
-    G.bindE (expandedGraphPrepared source target solver)
-      (\((,,,) root copies frontier current) ->
-        let { first = G.nextId (graph solver);
-          fresh = allocatedNodes first (G.nextId current) (G.nodes current);
-          indexed = L.foldlStrict addNode (withGraph current solver) fresh;
-          equations = L.append frontier ((:) ((,) root target) []);
-          fallback = \next -> solverUnify equations next;
-          oldTarget = G.resolve current target;
-          ordinary = case expansionBottomGraft first target root frontier indexed of {
-            Just grafted -> Right ((,) grafted cache);
-            Nothing -> L.mapEither (\result -> (,) result cache) (fallback indexed)
-          }
-        } in
-        seq (G.strictGraph current)
-          (if fallbackStageEligible first root oldTarget frontier current
-           then seq (forceExpansionEdges fresh)
-             (if fallbackPrefixRejected current first
-                   (IM.fromList (L.map (\((,) original proxy) -> (,) proxy original) frontier))
-                   ((:) ((,) root oldTarget) [])
-              then unifyPreparedFallbackWith cache equations solver current first fresh
-              else ordinary)
-           else ordinary));
-  -- Actual callers complete prepare and solverUnify before this internal fold.
-  -- Public instantiateClosed/evaluateStep remain unchanged for arbitrary input.
-  -- No reusable certificate survives an operation or accepts a mutated graph.
-  instantiateClosedPrepared :: Int -> Int -> Solver -> Either String Solver;
+  instantiateExpandedWith cache source target solver = runInstantiation (ExpandOne cache source target solver);
   instantiateClosedPrepared source target solver = L.mapEither L.fst
     (instantiateClosedWith Uncached source target solver);
-  instantiateClosedWith :: UnificationCache -> Int -> Int -> Solver -> Either String ((,) Solver UnificationCache);
-  instantiateClosedWith cache source target solver =
-    case groundGraft source target solver of {
+  instantiateClosedWith cache source target solver = runInstantiation (CloseOne cache source target solver);
+  solveGenerated input equations steps = L.mapEither L.fst (runInstantiation (SolveGenerated input equations steps));
+  solveFileGraph input equations steps = L.mapEither L.fst (runInstantiation (SolveFileGraph input equations steps));
+  data InstantiationRequest = ExpandOne UnificationCache Int Int Solver | CloseOne UnificationCache Int Int Solver |
+    SolveGenerated Graph ([] ((,) Int Int)) ([] SolveStep) | SolveFileGraph Graph ([] ((,) Int Int)) ([] SolveStep);
+  data InstantiationInput = Supplied Solver | Generated Solver SurvivorDemand;
+  -- Only the generated request prepares a graph and can enter the certified fold.
+  -- Every step preserves the original generalization scopes and their binders.
+  runInstantiation request = let {
+    current input = case input of { Supplied s -> s; Generated s _ -> s };
+    closed input cache source target = let { solver = current input } in case groundGraft source target solver of {
       Just grafted -> Right ((,) grafted cache);
-      Nothing -> if groundInstance (graph solver) source target
-        then Right ((,) solver cache) else instantiateExpandedWith cache source target solver
+      Nothing -> if groundInstance (graph solver) source target then Right ((,) solver cache)
+        else expanded input cache source target
+    };
+    advance demand ((,) solver cache) step = case step of {
+      Instantiate (Edge source target) -> closed (Generated solver demand) cache source target;
+      ProjectCase fields -> L.mapEither (\result -> (,) result cache) (projectCaseFields fields solver)
+    };
+    expanded input cache source target = let {
+      solver = current input;
+      checkedKinds = case input of { Supplied _ -> False; Generated _ _ -> True };
+      demand = case input of { Supplied _ -> CompareSurvivors; Generated _ known -> known };
+      expansion = if checkedKinds then expandUsing (G.expandPreparedRetaining G.preparedFrontierKinds)
+        else expandPrepared
+    } in G.bindE (expansion source target solver)
+        (\(G.PreparedExpansion root _ frontier fresh current) ->
+          let { first = G.nextId (graph solver);
+            fragmentCheck = preparedFragmentCheck first;
+            scopeLift = case input of { Supplied _ -> noScopeLift; Generated s _ -> scopeContains (scopeIndex s) };
+            prepared = checkedKinds;
+            indexed = L.foldlStrict addNode (withGraph current solver) fresh;
+            equations = L.append frontier ((:) ((,) root target) []);
+            oldTarget = G.resolve current target;
+            targetIsScope = G.isGen (G.tag (G.nodeAtRepresentative current oldTarget oldTarget));
+            scope = G.binder (G.nodeAt current root);
+            -- A certified copy under an old type binder fails the original
+            -- graph validation: that binder has no structural path to fresh IDs.
+            invalidTypeBinder = case scope of {
+              Just destination -> destination < first && L.not (G.isGen (G.tag (G.nodeAt current destination))) &&
+                fragmentCheck root scope fresh (G.nextId current);
+              Nothing -> False
+            };
+            component = unifyPreparedFallbackWith cache equations solver current first fresh;
+            -- Admission is decided before any equation is processed. In an
+            -- admitted copy both the root and structural frontier are types:
+            -- prepare has already ruled out Gen nodes as structural children.
+            plan destination = if L.not (localExpansionAdmissible fragmentCheck current destination fresh root)
+              then component else do {
+                result <- solveLocalExpansionDemand demand checkedKinds scopeLift True equations solver current fresh;
+                case result of {
+                  LocalRejected message -> Left message;
+                  LocalSolved solved -> Right ((,) solved cache);
+                  LocalNeedsComponent _ quotient ->
+                    unifyPreparedFromQuotient cache equations solver current first fresh quotient
+                }
+            };
+            ordinary = case expansionBottomGraftUsing prepared fragmentCheck first target root frontier indexed of {
+              Just grafted -> Right ((,) grafted cache);
+              Nothing -> case scope of {
+                Nothing -> component;
+                Just destination -> plan destination
+              }
+            }
+          } in
+          seq (G.strictGraph current)
+            (if invalidTypeBinder then Left G.typeBinderContainmentError
+             else if targetIsScope then component
+             else if fallbackStageEligible first root oldTarget frontier current
+             then seq (forceExpansionEdges fresh)
+               (if fallbackPrefixRejected current first
+                     (IM.fromList (L.map (\((,) original proxy) -> (,) proxy original) frontier))
+                     ((:) ((,) root oldTarget) [])
+                then case scope of {
+                  Nothing -> component;
+                  Just destination -> let {
+                    closed = if L.null frontier
+                      then closedArrowComponent current first destination root oldTarget else Nothing
+                  } in case closed of {
+                    Nothing -> plan destination;
+                    Just connected -> case graftClosedArrowUsing checkedKinds solver current fresh destination root oldTarget connected of {
+                      Just solved -> Right ((,) solved cache);
+                      Nothing -> plan destination
+                    }
+                  }
+                }
+                else ordinary)
+             else ordinary));
+    generated demandFor input equations steps = do {
+      prepared <- prepare input;
+      initial <- solverUnify equations prepared;
+      G.foldE (advance (demandFor (graph initial))) ((,) initial emptyUnificationCache) steps
     }
+  } in case request of {
+    ExpandOne cache source target solver -> expanded (Supplied solver) cache source target;
+    CloseOne cache source target solver -> closed (Supplied solver) cache source target;
+    SolveGenerated input equations steps -> generated (\_ -> CompareSurvivors) input equations steps;
+    SolveFileGraph input equations steps -> generated sourcePayloads input equations steps
+  }
 }

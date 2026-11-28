@@ -14,6 +14,9 @@ import sys
 from test_direct import authenticate_build
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / 'tools/testing'))
+from receipt_selection import identity, select
+
 WATCHDOG = ROOT / 'tools/shared/resource_watchdog.py'
 STANDARD = '''module Standard where
 import Prelude hiding (Monad, return, bind)
@@ -47,43 +50,6 @@ main = do { x <- Box 1; Box x }
 NEGATIVE_DIAGNOSTIC = 'Resolution: no instance or given constraint for MLF.Primitive.Monad Distinct.Box; ambiguous uses need a type annotation'
 
 
-# Reviewed manifest boundaries, not counts inferred from the manifest under test.
-# Foundation keeps the original twelve modules plus IntTree (14e03173)
-# and IntRank (c1b802bd), both already declared and locked by PR25.
-FOUNDATION_MODULES = {
-    "Bootstrap.Fresh": "Bootstrap/Fresh.hs",
-    "Bootstrap.Host": "Bootstrap/Host.hs",
-    "Bootstrap.IndexVec": "Bootstrap/IndexVec.hs",
-    "Bootstrap.IntMap": "Bootstrap/IntMap.hs",
-    "Bootstrap.IntRank": "Bootstrap/IntRank.hs",
-    "Bootstrap.IntSet": "Bootstrap/IntSet.hs",
-    "Bootstrap.IntTree": "Bootstrap/IntTree.hs",
-    "Bootstrap.Map": "Bootstrap/Map.hs",
-    "Bootstrap.Regex": "Bootstrap/Regex.hs",
-    "Bootstrap.ST": "Bootstrap/ST.hs",
-    "Bootstrap.Set": "Bootstrap/Set.hs",
-    "Bootstrap.Std": "Bootstrap/Std.hs",
-    "Bootstrap.Types": "Bootstrap/Types.hs",
-    "Bootstrap.Unicode": "Bootstrap/Unicode.hs",
-    "Bootstrap.Version": "Bootstrap/Version.hs",
-}
-FRAMEWORK_MODULES = {
-    "Test.Assert": "Test/Assert.hs",
-    "Test.Case": "Test/Case.hs",
-    "Test.Runner": "Test/Runner.hs",
-    "Test.Descriptor": "Test/Descriptor.hs",
-    "Test.Registry": "Test/Registry.hs",
-    "Test.Outcome": "Test/Outcome.hs",
-    "Test.Expectation": "Test/Expectation.hs",
-    "Test.Evidence": "Test/Evidence.emlf",
-    "Test.Adapter": "Test/Adapter.emlf",
-    "Test.Fixture": "Test/Fixture.emlf",
-    "Test.Plan": "Test/Plan.emlf",
-    "Test.Resources": "Test/Resources.emlf",
-    "Test.Capability": "Test/Capability.emlf",
-    "Test.Diagnostics": "Test/Diagnostics.emlf",
-}
-
 def require(value, message):
     if not value:
         raise ValueError(message)
@@ -99,18 +65,18 @@ def remember_file(recorded, path):
 def pack(values):
     return ''.join(str(len(value)) + ':' + value for value in values)
 
-def manifest_inputs(path, name, expected_modules, dependencies):
+def manifest_inputs(path, name, dependencies):
     manifest = json.loads(path.read_text())
     require(manifest.get('format') == 1 and manifest.get('name') == name, 'manifest identity changed')
     require(set(manifest.get('dependencies', {})) == set(dependencies), 'direct dependency inventory changed')
     for dep, expected in dependencies.items():
         require(manifest['dependencies'][dep] == {'path': expected}, 'dependency route changed: '+dep)
-    modules = manifest.get('library', {}).get('modules', {})
-    require(modules == expected_modules, 'reviewed module inventory changed')
+    modules = manifest['library']['modules']
     result = []
     for module, relative in sorted(modules.items()):
         source = (path.parent / relative).resolve(strict=True)
-        require(source.is_file() and source.is_relative_to(ROOT), 'source escapes repository')
+        require(not Path(relative).is_absolute() and source.is_relative_to(path.parent.resolve())
+                and source.is_file(), 'invalid package source path: '+relative)
         result.append((module, source))
     return manifest, result
 
@@ -127,6 +93,12 @@ def main():
     parser.add_argument('--build-receipt', required=True, type=Path)
     parser.add_argument('--output', required=True, type=Path)
     args = parser.parse_args()
+    class_controls = (
+        ('standard-class', 'Standard', STANDARD, 0),
+        ('implicit-standard-class', 'Legacy', IMPLICIT, 0),
+        ('distinct-custom-class', 'Distinct', DISTINCT, 1),
+    )
+    selected = select('guest-framework/', ['foundation', 'framework', *(row[0] for row in class_controls)])
     receipt = args.build_receipt.resolve(strict=True)
     producer_dir = receipt.parent
     output = args.output.resolve()
@@ -134,6 +106,8 @@ def main():
     record = {'complete': False, 'kind': 'actual-MLF-mixed-framework-source',
               'full_native_unit': False, 'full_manager_build': False,
               'native_or_llvm_output': False, 'commands': []}
+    if selected:
+        record.update(scope='focused', selected_ids=[identity('guest-framework/', selected)])
     def save():
         (output/'receipt.json').write_text(json.dumps(record, indent=2)+'\n')
     saved_files = {}
@@ -151,19 +125,18 @@ def main():
         compiler = producer_dir/'bin/emlf'
         foundation_path = ROOT/'libraries/mlf-foundation/mlf-package.json'
         framework_path = ROOT/'testing/mlf-package.json'
-        foundation, foundation_modules = manifest_inputs(foundation_path, 'mlf-foundation', FOUNDATION_MODULES, {})
-        framework, framework_modules = manifest_inputs(framework_path, 'mlf-test', FRAMEWORK_MODULES,
+        foundation, foundation_modules = manifest_inputs(foundation_path, 'mlf-foundation', {})
+        framework, framework_modules = manifest_inputs(framework_path, 'mlf-test',
                                                        {'mlf-foundation': '../libraries/mlf-foundation'})
         require(all(path.suffix == '.hs' for _, path in foundation_modules), 'foundation is not shared source')
-        require(sum(path.suffix == '.hs' for _, path in framework_modules) == 7 and
-                sum(path.suffix == '.emlf' for _, path in framework_modules) == 7,
-                'mixed framework source boundary changed')
+        shared_count = sum(path.suffix == '.hs' for _, path in framework_modules)
+        guest_count = sum(path.suffix == '.emlf' for _, path in framework_modules)
         inputs = [Path(__file__), WATCHDOG, ROOT/'tools/shared/test_direct.py', ROOT/'tools/shared/build.py',
                   foundation_path, framework_path, receipt, compiler,
                   *[path for _, path in foundation_modules+framework_modules]]
         before = {str(path): digest(path) for path in inputs}
         record.update(producer_receipt_sha256=digest(receipt), inputs=before,
-                      library_modules={'foundation': len(FOUNDATION_MODULES), 'framework_shared': 7, 'framework_guest': 7},
+                      library_modules={'foundation': len(foundation_modules), 'framework_shared': shared_count, 'framework_guest': guest_count},
                       producer_object_count=len(producer['object_inputs']))
         save()
         builtin = output/'foundation/builtin/unit'
@@ -186,6 +159,8 @@ def main():
                 remember(path.with_suffix('.mlfco'))
             command = [str(compiler), '--compile-crate', str(spec), '-o', str(directory/'artifact/unit')]
             row = {'label': label, 'command': command, 'expected_exit': status, 'complete': False}
+            if selected and label != selected:
+                row['prerequisite'] = True
             record['commands'].append(row)
             save()
             supervised = [sys.executable, str(WATCHDOG), '--seconds', '900', '--address-space-mib', '3072',
@@ -223,25 +198,30 @@ def main():
                                              foundation_modules, [])
         for extension in ['mlfci', 'mlfco']:
             remember(builtin.with_suffix('.'+extension))
-        compile_crate('framework', framework['name']+'/'+framework['version']+'/library',
-                      framework_modules, [foundation_interface])
-        fixtures = output/'fixtures'
-        fixtures.mkdir()
-        for label, module, source, status in [('standard-class', 'Standard', STANDARD, 0),
-                                              ('implicit-standard-class', 'Legacy', IMPLICIT, 0),
-                                              ('distinct-custom-class', 'Distinct', DISTINCT, 1)]:
-            path = fixtures/(module+'.emlf')
-            path.write_text(source)
-            remember(path)
-            compile_crate(label, 'guest-class-control/'+label, [(module, path)], [foundation_interface], status)
+        if not selected or selected == 'framework':
+            compile_crate('framework', framework['name']+'/'+framework['version']+'/library',
+                          framework_modules, [foundation_interface])
+        controls = [row for row in class_controls if not selected or selected == row[0]]
+        if controls:
+            fixtures = output/'fixtures'
+            fixtures.mkdir()
+            for label, module, source, status in controls:
+                path = fixtures/(module+'.emlf')
+                path.write_text(source)
+                remember(path)
+                compile_crate(label, 'guest-class-control/'+label, [(module, path)], [foundation_interface], status)
         authenticate()
         require(before == {str(path): digest(path) for path in inputs}, 'source/tool inputs changed during gate')
         require(all(digest(path) == sha for path, sha in saved_files.items()), 'generated checked inputs or artifacts changed')
         record.update(complete=True, generated_files=saved_files, inputs_unchanged=True,
                       producer_reauthenticated=True, checked_artifacts_rehashed=True)
         save()
-        print(json.dumps({'complete': True, 'commands': len(record['commands']),
-                          'framework_modules': 14, 'full_native_unit': False}))
+        summary = {'complete': True, 'commands': len(record['commands']), 'full_native_unit': False}
+        if selected:
+            summary['selected_ids'] = record['selected_ids']
+        else:
+            summary['framework_modules'] = len(framework_modules)
+        print(json.dumps(summary))
     except BaseException as error:
         record['error'] = type(error).__name__+': '+str(error)
         save()

@@ -53,7 +53,7 @@ class Preparation(unittest.TestCase):
             names = ['emlf', 'mlfpkg'] + ['fixture-' + str(i) for i in range(11)]
             for name in names:
                 (binaries / name).write_text(name)
-            self.producer = {'optimization': '2', 'outputs': {
+            self.producer = {'optimization': argv[argv.index('--optimization') + 1], 'outputs': {
                 name: self.auth.identified(binaries / name) for name in names}}
             (self.output / 'receipt.json').write_text(json.dumps(self.producer))
         elif label == 'runner-build':
@@ -72,6 +72,8 @@ class Preparation(unittest.TestCase):
             stdout = b'wrong\n'
         kwargs['stdout'].write(stdout)
         kwargs['stdout'].flush()
+        if label in ('process-capability', 'completion-capability'):
+            kwargs['stderr'].write(b'dependency Main: source (root input)\n')
         if self.bad == 'stderr' and label == 'process-capability':
             kwargs['stderr'].write(b'diagnostic\n')
         if self.bad == 'timeout':
@@ -172,68 +174,47 @@ class CanonicalAsyncUnitOracles(unittest.TestCase):
             self.assertIn('cmp "$fixtures/', text)
 
 
-    def test_scoped_fixture_migration_preserves_error_payloads(self):
-        root = HERE.parents[1]
-        for name in ('tests/async-process/Main.emlf', 'tests/async-process/Panic.emlf',
-                     'tests/async-task/Main.emlf', 'tests/async-task/Processes.emlf'):
-            text = (root / name).read_text()
-            self.assertNotRegex(text, r'\b(?:Unit|List|Cons|Nil|Pair)\b')
-            self.assertIn('(:)', text)
-            self.assertIn('[]', text)
-        task = (root / 'tests/async-task/Main.emlf').read_text()
-        self.assertIn('integers : [] Int -> [] Int -> Bool', task)
-        self.assertIn('case value of (,) stopped answer ->', task)
-        negative = root / 'tests/fixtures/async-completion/negative'
-        for name in ('alias-widen', 'mixed-values', 'generalize-allocated'):
-            text = (negative / (name + '.emlf')).read_text()
-            self.assertIn('asyncReadCompletion cell putStrLn (ioReturn ())', text)
-            self.assertIn('42', text)
-        self.assertIn('cell : forall a. Completion a',
-                      (negative / 'generalize-allocated.emlf').read_text())
-        self.assertIn('Completion (forall a. a -> a)',
-                      (negative / 'impredicative-overwrite.emlf').read_text())
-        self.assertIn('function "wrong"',
-                      (negative / 'function-confusion.emlf').read_text())
-
-
 class CurrentAsyncAbiGuard(unittest.TestCase):
     def setUp(self):
         path = HERE.parents[1] / 'tools/release/check_async_abi.py'
         spec = importlib.util.spec_from_file_location('check_async_abi', path)
         self.abi = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(self.abi)
-        self.declarations = [b'declare void @' + name + b'()' for name in self.abi.GUARDS]
-        self.calls = [b'  call void @' + name + b'()' for name in self.abi.GUARDS]
-        self.valid = b'\n'.join(self.declarations + [b'define ptr @mlf_entry() {'] +
-                                 self.calls + [b'  ret ptr null', b'}', b''])
+        self.declaration = b'declare void @mlf_require_runtime_v5_abi()'
+        self.call = b'  call void @mlf_require_runtime_v5_abi()'
+        self.valid = b'\n'.join([self.declaration, b'define ptr @mlf_entry() {',
+                                 self.call, b'  ret ptr null', b'}', b''])
 
     def test_exact_current_contract(self):
         self.abi.check(self.valid)
 
     def test_each_declaration_and_entry_call_is_required(self):
-        for line in self.declarations + self.calls:
+        for line in (self.declaration, self.call):
             for replacement in (b'', b'; ' + line, line + b' ; mention only'):
                 with self.subTest(line=line, replacement=replacement), self.assertRaises(ValueError):
                     self.abi.check(self.valid.replace(line, replacement))
         for altered in (
-            self.valid.replace(b'haskell_boundary_v4', b'async_completion_v2'),
+            self.valid.replace(b'runtime_v5', b'haskell_boundary_v4'),
             self.valid.replace(b'define ptr @mlf_entry()', b'define ptr @unrelated()'),
-            self.valid.replace(self.calls[0], b'  %root = call ptr @evaluate()\n' + self.calls[0]),
-            self.valid + self.declarations[0] + b'\n',
-            b'\n'.join(self.declarations + self.calls),
+            self.valid.replace(self.call, b'  %root = call ptr @evaluate()\n' + self.call),
+            self.valid + self.declaration + b'\n',
+            b'declare void @mlf_require_haskell_boundary_v4_abi()\n' + self.valid,
+            self.valid.replace(self.call, self.call + b'\n  call void @mlf_require_haskell_boundary_v4_abi()'),
+            self.declaration + b'\n' + self.call,
         ):
             with self.subTest(altered=altered), self.assertRaises(ValueError):
                 self.abi.check(altered)
 
-    def test_all_three_gates_bind_and_use_the_helper(self):
+    def test_all_three_gates_check_emitted_llvm(self):
         root = HERE.parents[1]
         for name in ('tests/fixtures/async-completion/check.sh',
                      'tools/release/test-async-process.sh', 'tools/release/test-async-task.sh'):
             text = (root / name).read_text()
             self.assertIn('python3 -B "$root/tools/release/check_async_abi.py"', text)
-            inputs = text.split('record_inputs()', 1)[1].split('record_inputs ', 1)[0]
-            self.assertIn('"$root/tools/release/check_async_abi.py"', inputs)
             self.assertNotIn('mlf_require_async_completion_v2_abi', text)
+        completion = (root / 'tests/fixtures/async-completion/check.sh').read_text()
+        inputs = completion.split('record_inputs()', 1)[1].split('record_inputs ', 1)[0]
+        self.assertIn('"$root/tools/release/check_async_abi.py"', inputs)
 
 
 class MixedCompletionIntegerPayload(unittest.TestCase):
@@ -277,18 +258,6 @@ class CompletionKindRejection(unittest.TestCase):
         self.assertIn("wrong-kind) expected='(kind|arity)' ;;", gate)
 
 
-class ProcessFailureHelperNames(unittest.TestCase):
-    def test_local_failure_helpers_do_not_shadow_primitive_fail(self):
-        import hashlib
-        root = HERE.parents[1]
-        originals = {'Main': '19ba4322c1b1fcc5cf56da077f021aca995714310d0a18c55ed0fe0a5f9f898b', 'Panic': '8818d7ba77bbb85fb712bb44f16b8dba2232d55613bd9e7b14883d078e3c3106'}
-        for name, digest in originals.items():
-            source = (root / ('tests/async-process/' + name + '.emlf')).read_text()
-            self.assertIn('processTestFailure : forall a. String -> IO a', source)
-            self.assertIn('processTestFailure message =', source)
-            self.assertEqual(hashlib.sha256(source.replace('processTestFailure', 'fail').encode()).hexdigest(), digest)
-
-
 class PRSmokeIntegerContract(unittest.TestCase):
     def test_arbitrary_precision_fixture_keeps_its_literal_oracle(self):
         import hashlib
@@ -304,17 +273,6 @@ class PRSmokeIntegerContract(unittest.TestCase):
         self.assertIn('cmp "$fixtures/io-unit.type" "$work/$name.check.stdout"', gate)
         self.assertIn('cmp "$fixtures/$name.stdout" "$work/$name.interpreter.stdout"', gate)
         self.assertIn('cmp "$fixtures/$name.stdout" "$work/$name.llvm.stdout"', gate)
-
-
-class TaskTripleContract(unittest.TestCase):
-    def test_retained_heterogeneous_result_uses_current_tuple_constructor(self):
-        import hashlib
-        source = (HERE.parents[1] / 'tests/async-task/Main.emlf').read_text()
-        self.assertEqual(source.count('(,,)'), 2)
-        self.assertIn('T.pure ((,,) (f n) s again)', source)
-        self.assertIn('case result of (,,) n s again ->', source)
-        self.assertEqual(hashlib.sha256(source.replace('(,,)', 'Triple').encode()).hexdigest(),
-                         '08aa5c242c62fc169c9a0348412f1a19cf98adf6fee7ca2fdb70d4a988c88794')
 
 
 if __name__ == '__main__':

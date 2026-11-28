@@ -25,8 +25,12 @@ extra = ((:) (Fixture "identity" [] "\\x -> x") ((:) (Fixture "arithmetic" [] "m
 fixtures : Either String ([] ( Fixture ))
 fixtures = do { figure <- (S.mapM (\c -> (S.mapEither (Fixture (H.append "Fig12-" (Figure.caseId c)) []) (Figure.program c))) Figure.cases); (return (H.append extra figure)) }
 
-report : Fixture -> String
-report (Fixture name modules source) = (H.append name (H.append "\t" (case (Compiler.compileModules (Map.fromList modules) (H.append name ".emlf") source) of { (Left err) -> (H.append "REJECT " (Compiler.prettyPhase (Compiler.phase err))); (Right result) -> (H.append "ACCEPT " (Compiler.sourceType result)) })))
+report : Fixture -> IO String
+report (Fixture name modules source) = do
+ compilation <- Compiler.compileModules (Map.fromList modules) (H.append name ".emlf") source
+ return (H.append name (H.append "\t" (case compilation of
+  Left err -> H.append "REJECT " (Compiler.prettyPhase (Compiler.phase err))
+  Right result -> H.append "ACCEPT " (Compiler.sourceType result))))
 
 list : forall a. ( a -> String ) -> ([] ( a )) -> String
 list f = (S.foldr (\x xs -> (H.append "(:) (" (H.append (f x) (H.append ") (" (H.append xs ")"))))) "[]")
@@ -35,7 +39,20 @@ fixture : Fixture -> String
 fixture (Fixture name modules source) = (let { moduleEntry ((,) n ((,) f s)) = (H.append "(,) " (H.append (H.show n) (H.append " ((,) " (H.append (H.show f) (H.append " " (H.append (H.show s) ")")))))) } in (H.append "(,,) " (H.append (H.show name) (H.append " (" (H.append (list moduleEntry modules) (H.append ") " (H.show source)))))))
 
 program : ([] ( Fixture )) -> String
-program fs = (S.unlines ((:) "module Main where" ((:) "import Bootstrap.Types" ((:) "import qualified Bootstrap.Std as L" ((:) "import qualified Bootstrap.Map as M" ((:) "import qualified Bootstrap.Compiler as Compiler" ((:) (H.append "fixtures = " (list fixture fs)) ((:) "report : (,,) String ([] ((,) String ((,) String String))) String -> IO ()" ((:) "report ((,,) name modules source) = putStrLn (name ++ \"\\t\" ++ (case Compiler.compileModules (M.fromList compareString modules) (name ++ \".emlf\") source of" ((:) "  Left err -> \"REJECT \" ++ Compiler.prettyPhase (Compiler.phase err)" ((:) "  Right result -> \"ACCEPT \" ++ Compiler.sourceType result))" ((:) "main = L.mapM_ report fixtures" []))))))))))))
+program fs = S.unlines
+ ["module Main where",
+  "import Bootstrap.Types",
+  "import qualified Bootstrap.Std as L",
+  "import qualified Bootstrap.Map as M",
+  "import qualified Bootstrap.Compiler as Compiler",
+  H.append "fixtures = " (list fixture fs),
+  "report : (,,) String ([] ((,) String ((,) String String))) String -> IO ()",
+  "report ((,,) name modules source) = do",
+  "  compilation <- Compiler.compileModules (M.fromList compareString modules) (name ++ \".emlf\") source",
+  "  putStrLn (name ++ \"\\t\" ++ (case compilation of",
+  "    Left err -> \"REJECT \" ++ Compiler.prettyPhase (Compiler.phase err)",
+  "    Right result -> \"ACCEPT \" ++ Compiler.sourceType result))",
+  "main = L.mapM_ report fixtures"]
 
 main : IO ()
-main = do { args <- O.allArguments; do { fs <- (S.either H.fail return fixtures); (case args of { ((:) "--generate" []) -> (putStr (program fs)); [] -> (H.forM_ fs (S.compose putStrLn report)); _ -> (H.fail "usage: references InferenceReference [--generate]") }) } }
+main = do { args <- O.allArguments; do { fs <- (S.either H.fail return fixtures); (case args of { ((:) "--generate" []) -> (putStr (program fs)); [] -> (H.forM_ fs (\fixture -> ioBind (report fixture) putStrLn)); _ -> (H.fail "usage: references InferenceReference [--generate]") }) } }

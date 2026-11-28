@@ -9,6 +9,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 from pathlib import Path
 import shutil
 import subprocess
@@ -18,6 +19,26 @@ import tempfile
 ROOT = Path(__file__).resolve().parents[2]
 FORMAT_FLAGS = ['--no-cabal', '--no-dot-ormolu', '--check-idempotence', '--color', 'never']
 PACKAGES = ['base', 'array', 'bytestring', 'text', 'containers', 'directory']
+CONTROL_NAMES = ('identity', 'literal', 'binding', 'import-selection', 'parser-rejection')
+HARNESS_ID = 'formatter/toolchain-and-harness'
+INPUTS_ID = 'formatter/unchanged-inputs'
+
+
+def file_id(path):
+    return 'formatter/file/' + path.relative_to(ROOT).as_posix()
+
+
+def publish(event):
+    if os.environ.get('MLF_TEST_SUITE') != 'formatter-compatibility':
+        return
+    path = os.environ.get('MLF_TEST_EVENTS')
+    if path:
+        with open(path, 'a', encoding='utf-8') as stream:
+            stream.write(json.dumps(event) + '\n')
+
+
+def observe(identity, passed, detail):
+    publish({'id': identity, 'status': 'pass' if passed else 'fail', 'detail': detail})
 
 
 def sha(path):
@@ -72,7 +93,13 @@ def require_success(result, label):
     return result[1].strip()
 
 
-def controls(binary, output, timeout, receipt):
+def require_tool_versions(ghc_version, formatter_version):
+    banner = formatter_version.split('\n', 1)[0].split()
+    if ghc_version != '9.14.1' or banner[:2] != ['ormolu', '0.9.0.0']:
+        raise RuntimeError('requires GHC 9.14.1 and Ormolu 0.9.0.0')
+
+
+def controls(binary, output, timeout, receipt, planned):
     folder = output / 'controls'
     folder.mkdir()
     prologue = ('-- mlf:syntax shared-haskell-v1\n'
@@ -88,13 +115,22 @@ def controls(binary, output, timeout, receipt):
              ('import-selection', baseline.replace('(Int)', '(Bool)'), 'import multiset changed'),
              ('parser-rejection', prologue + 'module Control where\nvalue = (\n', 'parse failed:')]
     for name, content, diagnostic in cases:
+        identity = 'formatter/control/' + name
+        if identity not in planned:
+            continue
         altered = folder / (name + '.hs')
         altered.write_text(content)
-        result = run([binary, original, altered], output, 'control-' + name, timeout, receipt)
+        try:
+            result = run([binary, original, altered], output, 'control-' + name, timeout, receipt)
+        except (OSError, RuntimeError) as error:
+            observe(identity, False, {'name': name, 'error': str(error)})
+            raise
         passed = (result[0] == 0 if diagnostic is None else
                   result[0] == 1 and diagnostic in result[2])
-        receipt['controls'].append({'name': name, 'passed': passed,
-                                    'original_sha256': sha(original), 'altered_sha256': sha(altered)})
+        event = {'name': name, 'passed': passed,
+                 'original_sha256': sha(original), 'altered_sha256': sha(altered)}
+        receipt['controls'].append(event)
+        observe(identity, passed, {**event, 'returncode': result[0]})
         if not passed:
             raise RuntimeError('harness control failed: ' + name)
 
@@ -106,7 +142,21 @@ def main():
     parser.add_argument('--output', type=Path, help='must not already exist')
     parser.add_argument('--timeout', type=int, default=60, help='seconds per formatter/parser invocation')
     parser.add_argument('--compile-timeout', type=int, default=600)
+    parser.add_argument('--framework-list', action='store_true', help=argparse.SUPPRESS)
     args = parser.parse_args()
+    sources = corpus_sources(ROOT)
+    if not sources:
+        parser.error('empty corpus')
+    all_ids = [HARNESS_ID, *('formatter/control/' + name for name in CONTROL_NAMES),
+               *(file_id(path) for path in sources), INPUTS_ID]
+    if args.framework_list:
+        print(json.dumps(all_ids))
+        return 0
+    exact = os.environ.get('MLF_TEST_EXACT') if os.environ.get('MLF_TEST_SUITE') == 'formatter-compatibility' else None
+    if exact and exact not in all_ids:
+        parser.error('unknown formatter case: ' + exact)
+    planned = {exact} if exact else set(all_ids)
+    publish({'plan': [identity for identity in all_ids if identity in planned]})
     if args.timeout <= 0 or args.compile_timeout <= 0:
         parser.error('timeouts must be positive')
     if args.output:
@@ -115,15 +165,16 @@ def main():
     else:
         output = Path(tempfile.mkdtemp(prefix='mlf-formatter-compat-'))
     (output / 'logs').mkdir()
-    receipt = {'schema': 1, 'completed': False, 'scope': 'host parser syntax/AST compatibility',
+    receipt = {'schema': 1, 'completed': False,
+               'scope': 'selected host parser syntax/AST compatibility' if exact else 'host parser syntax/AST compatibility',
                'output': str(output), 'files': [], 'controls': [], 'commands': [],
                'formatted_count': 0, 'passed_count': 0}
+    active = HARNESS_ID
     try:
         ghc, ormolu = executable(args.ghc), executable(args.ormolu)
         ghc_version = require_success(run([ghc, '--numeric-version'], output, 'ghc-version', args.timeout, receipt), 'GHC version')
         formatter_version = require_success(run([ormolu, '--version'], output, 'ormolu-version', args.timeout, receipt), 'Ormolu version')
-        if ghc_version != '9.14.1' or not formatter_version.startswith('ormolu 0.9.0.0 '):
-            raise RuntimeError('requires GHC 9.14.1 and Ormolu 0.9.0.0')
+        require_tool_versions(ghc_version, formatter_version)
         libdir = Path(require_success(run([ghc, '--print-libdir'], output, 'ghc-libdir', args.timeout, receipt), 'GHC libdir'))
         actual_ghc = libdir.parent / 'bin' / 'ghc-9.14.1'
         receipt['tools'] = {'ghc': {'path': str(ghc), 'sha256': sha(ghc), 'version': ghc_version,
@@ -136,10 +187,9 @@ def main():
                        or not (ROOT / p).is_dir() for p in roots)):
             raise RuntimeError('invalid source roots')
         receipt['source_sha256'] = source_inputs(ROOT, roots)
-        sources = corpus_sources(ROOT)
-        if not sources:
-            raise RuntimeError('empty corpus')
-        receipt['files'] = [{'path': str(p.relative_to(ROOT)), 'original_sha256': sha(p), 'passed': False} for p in sources]
+        selected_sources = [path for path in sources if file_id(path) in planned]
+        receipt['files'] = [{'path': str(p.relative_to(ROOT)), 'original_sha256': sha(p), 'passed': False}
+                            for p in selected_sources]
         objects = output / 'objects'
         objects.mkdir()
         binary = output / 'formatter-compatibility'
@@ -154,9 +204,13 @@ def main():
                              ROOT / 'host/ghc/cbits/host.c', ROOT / 'runtime/mlf_process_supervisor.c',
                              '-I' + str(ROOT / 'runtime'), '-o', binary], output, 'compile', args.compile_timeout, receipt), 'harness build')
         receipt['harness_sha256'] = sha(binary)
-        controls(binary, output, args.timeout, receipt)
+        if HARNESS_ID in planned:
+            observe(HARNESS_ID, True, {'harness_sha256': receipt['harness_sha256'], 'tools': receipt['tools']})
+        active = None
+        controls(binary, output, args.timeout, receipt, planned)
         failures = []
-        for index, (source, entry) in enumerate(zip(sources, receipt['files'])):
+        for index, (source, entry) in enumerate(zip(selected_sources, receipt['files'])):
+            active = file_id(source)
             formatted = output / 'formatted' / entry['path']
             formatted.parent.mkdir(parents=True, exist_ok=True)
             entry['formatted_path'] = str(formatted)
@@ -164,15 +218,26 @@ def main():
             entry['formatted_sha256'] = sha(formatted)
             if result[0] != 0:
                 failures.append(entry['path'] + ': formatter failed')
+                observe(active, False, {**entry, 'stage': 'format', 'returncode': result[0]})
+                active = None
                 continue
             receipt['formatted_count'] += 1
             result = run([binary, source, formatted], output, f'compare-{index}', args.timeout, receipt)
             if result[0] != 0:
                 failures.append(entry['path'] + ': parser comparison failed')
+                observe(active, False, {**entry, 'stage': 'compare', 'returncode': result[0]})
+                active = None
                 continue
             entry['passed'] = True
             receipt['passed_count'] += 1
-        if source_inputs(ROOT, roots) != receipt['source_sha256']:
+            observe(active, True, entry)
+            active = None
+        active = INPUTS_ID
+        unchanged = source_inputs(ROOT, roots) == receipt['source_sha256']
+        if INPUTS_ID in planned:
+            observe(INPUTS_ID, unchanged, {'source_count': len(receipt['source_sha256'])})
+        active = None
+        if not unchanged:
             failures.append('source inputs changed during run')
         if failures:
             receipt['failures'] = failures
@@ -180,6 +245,8 @@ def main():
         receipt['completed'] = True
     except (OSError, ValueError, KeyError, RuntimeError) as error:
         receipt['error'] = str(error)
+        if active in planned:
+            observe(active, False, {'error': str(error)})
     finally:
         (output / 'receipt.json').write_text(json.dumps(receipt, indent=2) + '\n')
     print(str(output / 'receipt.json'))

@@ -83,26 +83,19 @@ the independent raw-byte comparison. These are diagnostic source-path counts,
 not ordinary allocated-byte measurements, exclusive CPU shares or a percentage
 of time saved.
 
-O0 and O2 controls compare the full frozen baseline owner with the complete
-candidate, using only reversible module/export-header adaptation. All 28
-retained authored/renamed C4 fixtures and 35 offset variants are retained:
-63 exact graph/index/scope traces, exact success/error outcomes, legacy failure
-Store epochs, repeated instantiations, reflexive equalities, old expansion
-descriptors, full component selection and handwritten fresh-survivor graphs.
-Eight partial-value observations retain source/target exception order, prefix
-and survivor Name demand, and unused Name/Kind/alias laziness. These finite
-controls supplement the full retained oracle; they do not prove all partial
-values equivalent.
+The O0 and O2 controls run 28 authored/renamed C4 fixtures and 35 offset
+variants against the private session. [SessionModel.hs](SessionModel.hs) uses
+the public immutable solver for the expected graph, expansion descriptor and
+first diagnostic. It rebuilds structural and binder reverse indexes from graph
+edges. On a rejected instantiation, the caller's retained handle exposes its
+original graph and scopes, together with the index edges of any expansion
+published before rejection. The model checks that state after the failure.
 
-The source-admission layer records the one-owner C3 transition after the
-inherited canonical-carry layer for e123603d. Historical manifests and semantic
-oracles remain intact. A fixed, reversible two-block
-inverse recovers the entire previous owner for source-ownership proofs only;
-runtime candidates are never projected. All 128 current shared source hashes
-and corruption/partial-transition rejection are checked. CrateSession is
-outside the canonical builtin preparation closure, so no builtin regeneration
-is needed. The source lock snapshot is refreshed and the actual locked plan
-is part of integration qualification.
+For component selection the model follows graph edges in both directions and
+stops at generalization nodes. The controls also check repeated instantiations,
+reflexive equality, handwritten survivor graphs and eight demand observations.
+The historical full-owner comparison is available in the
+[recorded revision](https://github.com/mlf-lang/mlf/blob/0704d216b8cf6d887d3737efa30a2eae3c152f0a/tools/performance/c3-delayed-index/oracles/LegacySession.hs).
 
 All 14 scheduled integration checks passed: retained P1–P3, graph/transaction,
 Map balance, validation boundary, builtin, nine parsed-file cases through both
@@ -131,8 +124,8 @@ python3 -B tools/performance/c3-delayed-index/run_controls.py \
 ```
 
 Select O0 with `--optimization 0` and a different fresh output directory.
-CI keeps the O2 source copies, receipts, stdout and stderr; the frozen oracle
-requires full Git history. Raw experiment plans, timing legs, authentication,
+CI keeps the O2 source copies, receipts, stdout and stderr. The fixed oracle is
+included in this checkout, so full Git history is unnecessary. Raw experiment plans, timing legs, authentication,
 controls and diagnostic sources are under `.mlf-build/c3-delayed-index-20261101/`.
 
 Preparation failures are retained: the first O0 control build rejected a

@@ -5,6 +5,7 @@ import argparse
 import hashlib
 import importlib.util
 import json
+import os
 from pathlib import Path
 import platform
 import statistics
@@ -13,6 +14,8 @@ import sys
 import time
 
 import generate
+from fit_growth import median_peak_rss, peak_rss_ratio
+from framework_results import events
 from prepare import prepare_host_package
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -31,6 +34,18 @@ LIMITS = {
     "process_tree_rss_bytes": 5 * GiB,
     "wall_seconds": 180,
 }
+WORKLOADS = ("dependency_chain", "flat_functions", "recursive_ring", "module_diamond", "compiler_unicode")
+
+
+def select_cases(names, size, edited):
+    cases = {name: f"{name}-{size}" + ("-edited" if edited else "") for name in names}
+    by_id = {f"compiler-shapes-installed/{kind}/{cell}": name
+             for name, cell in cases.items() for kind in ("correctness", "comparison")}
+    exact = os.environ.get("MLF_TEST_EXACT") if os.environ.get("MLF_TEST_SUITE") == "compiler-shapes-installed" else None
+    if exact:
+        require(exact in by_id, "unknown installed shape case: " + exact)
+        return {exact: by_id[exact]}
+    return by_id
 
 
 def require(ok, message):
@@ -58,7 +73,8 @@ def installation(path):
         "an authenticated optimized public installation is required",
     )
     native = json.loads((path / "native/receipt.json").read_text())
-    require(native["complete"], "native library regeneration did not succeed")
+    require(native["format"] == "MLF-NATIVE-INSTALL-2" and native["complete"],
+            "native crate installation regeneration did not succeed")
     compiler = path / "bin/emlf"
     identity = subprocess.check_output([compiler, "--implementation-identity"], text=True).strip()
     require(identity == build["implementation_identity"], "compiler identity differs from receipt")
@@ -151,10 +167,10 @@ def leaf_edit(case):
     }
 
 
-def measured(argv, cwd, directory, runner):
+def measured(argv, cwd, directory, runner, env_overrides):
     started = time.time_ns()
     try:
-        row = runner.run(argv, cwd, directory, timed=True)
+        row = runner.run(argv, cwd, directory, timed=True, env_overrides=env_overrides)
     except RuntimeError:
         if not (directory / "command.json").exists():
             raise
@@ -198,7 +214,16 @@ def summarize(cases, samples, repeats, states):
                         field: statistics.median(s[field] for s in group)
                         for field in ("wall_s", "user_s", "system_s", "peak_rss_bytes")
                     }
+                    medians[lane]["sampled_group_rss_bytes"] = median_peak_rss(
+                        [s.get("sampled_group_rss_bytes") for s in group]
+                    )
             row = {"case": name, "state": state, "medians": medians}
+            ghc_rss = medians.get("ghc", {}).get("sampled_group_rss_bytes")
+            for lane in ("before", "after"):
+                mlf_rss = medians.get(lane, {}).get("sampled_group_rss_bytes")
+                ratio = peak_rss_ratio(mlf_rss, ghc_rss)
+                row[lane + "_over_ghc_peak_rss"] = ratio
+                row[lane + "_peak_rss_at_most_ghc"] = None if ratio is None else ratio <= 1.
             if len(medians) == 3:
                 times = {k: v["wall_s"] for k, v in medians.items()}
                 row.update(
@@ -212,8 +237,10 @@ def summarize(cases, samples, repeats, states):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
+    listing = "--framework-list" in sys.argv[1:]
+    parser.add_argument("--framework-list", action="store_true")
     for option in ("before", "after", "output"):
-        parser.add_argument("--" + option, type=Path, required=True)
+        parser.add_argument("--" + option, type=Path, required=not listing)
     parser.add_argument("--size", type=int, default=16)
     parser.add_argument("--repeats", type=int, default=3)
     parser.add_argument(
@@ -223,6 +250,14 @@ def main():
     )
     args = parser.parse_args()
     require(args.size > 0 and args.repeats >= 3, "positive size and at least three rounds required")
+    identities = select_cases(("module_diamond",) if args.diamond_edit else WORKLOADS,
+                              args.size, args.diamond_edit)
+    if args.framework_list:
+        print(json.dumps(list(identities)))
+        return 0
+    report_cases = os.environ.get("MLF_TEST_SUITE") == "compiler-shapes-installed"
+    if report_cases:
+        events.plan(identities)
     out = args.output.resolve()
     out.mkdir(parents=True, exist_ok=False)
     producers = {k: installation(getattr(args, k)) for k in ("before", "after")}
@@ -239,6 +274,8 @@ def main():
 
     db = prepare_host_package(ghc, before / "sources", before, out / "host", run_setup)
     cases = workloads(out / "sources", args.size)
+    require(tuple(cases) == WORKLOADS, "installed shape case inventory differs")
+    cases = {name: case for name, case in cases.items() if name in identities.values()}
     edit = None
     states = ("fresh", "warm")
     if args.diamond_edit:
@@ -267,6 +304,7 @@ def main():
         "ghc_host_package": sha(out / "host/libHSmlf-shape-primitives-0.1.a"),
         "setup": setup_commands,
         "os_cache": "not flushed",
+        "source_query_cache": "isolated per workload, round and MLF producer; shared with its warm or edited build",
         "limits": LIMITS,
         "producers": producers,
         "cases": cases,
@@ -276,9 +314,17 @@ def main():
     dump(out / "plan.json", plan)
     results = {"plan_sha256": sha(out / "plan.json"), "samples": [], "complete": False}
     runner = resources.Runner(out, LIMITS)
+    started = set()
+    expected_per_case = args.repeats * len(states) * 3
+    by_case = {name: [] for name in cases}
     for item in schedule:
         lane, name, state, r = (item[k] for k in ("lane", "case", "state", "round"))
         case = cases[name]
+        if report_cases and name not in started:
+            for identity, workload in identities.items():
+                if workload == name:
+                    events.start(identity, endpoint=plan["endpoint"], repeats=args.repeats)
+            started.add(name)
         src = Path(case["directory"])
         dest = out / "legs" / name / str(r) / lane
         dest.mkdir(parents=True, exist_ok=True)
@@ -307,6 +353,7 @@ def main():
                 )
             else:
                 require(not program.exists(), "fresh output exists")
+            env_overrides = {}
             if lane == "ghc":
                 command = [
                     ghc,
@@ -336,6 +383,11 @@ def main():
                     program,
                 ]
             else:
+                source_queries = dest / "source-queries"
+                if state == "fresh":
+                    require(not source_queries.exists(), "fresh source query cache exists")
+                env_overrides["MLF_SOURCE_CACHE_DIR"] = str(source_queries)
+                sample["source_query_cache"] = str(source_queries)
                 build = dest / (state + "-build")
                 require(not build.exists(), "user build directory exists")
                 command = [
@@ -348,7 +400,7 @@ def main():
                     "--build-dir",
                     build,
                 ]
-            sample.update(measured(command, src, dest / state, runner))
+            sample.update(measured(command, src, dest / state, runner, env_overrides))
             require(
                 sample["exit"] == 0 and not sample["guard"],
                 sample["guard"] or (dest / state / "stderr").read_text()[-1400:],
@@ -356,15 +408,34 @@ def main():
             if lane != "ghc":
                 receipt = json.loads((build / "receipt.json").read_text())
                 require(
-                    receipt["complete"]
+                    receipt["format"] == "MLF-NATIVE-PROGRAM-BUILD-3"
+                    and receipt["complete"]
                     and receipt["fresh_user_compilation"]
-                    and receipt["fixed_runtime_reused"]
+                    and receipt["runtime_reused"]
                     and receipt["source_sha256"] == case["sources"]["Main.hs"]
                     and receipt["output_sha256"] == sha(program)
                     and [c["phase"] for c in receipt["commands"]] == ["llvm", "link"]
                     and receipt["compiler"] == producers[lane]["binary"],
                     "incomplete or mismatched installed receipt",
                 )
+                providers = receipt["native_providers"]
+                owners = [row["dependency"] for row in providers]
+                selected = [row["dependency"] for row in receipt["dependency_modes"]
+                            if row["mode"] == "native" and row["dependency"] != "runtime"]
+                installed = {row["contract"]["crate_id"]: row
+                             for row in receipt["installation"]["providers"]}
+                objects = [{"path": row["path"], "sha256": row["sha256"]} for row in providers]
+                expected = [*objects, receipt["installation"]["runtime"]]
+                require(len(owners) == len(set(owners)) and sorted(owners) == sorted(selected)
+                        and receipt["link_objects"] == expected
+                        and any(row["dependency"] == "runtime" and row["mode"] == "native"
+                                for row in receipt["dependency_modes"])
+                        and all(installed[row["dependency"]]["object"] == objects[index]
+                                and installed[row["dependency"]]["contract"]["export_abi"] == "mlf-crate-boxed/1"
+                                for index, row in enumerate(providers))
+                        and all(sha(row["path"]) == row["sha256"]
+                                and receipt["commands"][1]["command"].count(row["path"]) == 1
+                                for row in expected), "native dependency selection differs from actual link inputs")
                 for key, digest in case["sources"].items():
                     if key != "Main.hs":
                         require(
@@ -377,9 +448,10 @@ def main():
                 sample["installed"] = {
                     k: receipt[k]
                     for k in (
-                        "stdlib_path",
-                        "native_export_count",
-                        "builtin_inline_count",
+                        "native_providers",
+                        "dependency_modes",
+                        "link_objects",
+                        "runtime_reused",
                         "llvm_sha256",
                         "user_object_sha256",
                         "commands",
@@ -395,13 +467,22 @@ def main():
         except (OSError, ValueError, RuntimeError, KeyError, subprocess.SubprocessError) as exc:
             sample.update(passed=False, error=str(exc))
         results["samples"].append(sample)
+        by_case[name].append(sample)
         dump(out / "receipt.json", results)
         print(
             f"{name} {r} {state} {lane} {sample.get('wall_s', '-')} {sample.get('error', 'OK')}", flush=True
         )
+        if report_cases and len(by_case[name]) == expected_per_case:
+            failed = sum(not sample["passed"] for sample in by_case[name])
+            for identity, workload in identities.items():
+                if workload == name:
+                    events.result(identity, "fail" if failed else "pass", receipt=str(out / "receipt.json"),
+                                  states=list(states), failed=failed)
     results["complete"] = all(s["passed"] for s in results["samples"])
     results["summary"] = summarize(cases, results["samples"], args.repeats, states)
+    results["growth"] = {"status": "incomplete", "reason": "each installed workload has one size"}
     dump(out / "receipt.json", results)
+    print("Compile-time growth checks require several sizes of the same workload", flush=True)
     return 0 if results["complete"] else 1
 
 

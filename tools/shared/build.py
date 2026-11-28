@@ -40,10 +40,10 @@ def optimization_flags(level):
 
 
 def executable_link_flags(name, optimization):
-    # The compiler's larger nursery reduces copying of short-lived syntax trees.
+    # Keep cold crate plans within the process memory budget during inference.
     if name == 'emlf':
         # The Darwin RTS joins its sleeping ticker at process exit.
-        settings = '-F4 -A48m'
+        settings = '-F2 -A32m'
         if sys.platform == 'darwin':
             settings += ' -V0.002'
         flags = [*LINK_FLAGS, '-with-rtsopts=' + settings]

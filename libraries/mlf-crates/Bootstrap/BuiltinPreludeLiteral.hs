@@ -269,7 +269,9 @@ module Bootstrap.BuiltinPreludeLiteral where {
     SVar n -> application "SVar" [string n];
     SConstructor n -> application "SConstructor" [string n];
     SLam n signature body -> application "SLam" [string n, maybe annotation signature, sourceExpression body];
+    SBindDictionaries names body -> sourceExpression (L.dictionaryAbstraction names body);
     SApp a b -> application "SApp" [sourceExpression a, sourceExpression b];
+    SApplyDictionaries function names -> sourceExpression (L.dictionaryApplication function names);
     SLet n a b -> application "SLet" [string n, sourceExpression a, sourceExpression b];
     SAnn body signature -> application "SAnn" [sourceExpression body, annotation signature];
     SSignature body signature -> application "SSignature" [sourceExpression body, annotation signature];
@@ -411,6 +413,10 @@ module Bootstrap.BuiltinPreludeLiteral where {
     XVarTerm n -> application "XVarTerm" [name n];
     XAbs n ty body -> application "XAbs" [name n, typeLiteral ty, term body];
     XApp a b -> application "XApp" [term a, term b];
+    XProjection binders selected -> application "XProjection"
+      [list (triple name variable (maybe variable)) binders,name selected];
+    XInstantiationSpine callee rows -> application "XInstantiationSpine"
+      [name callee,list (triple string boolean term) rows];
     XTypeAbs a bound body -> application "XTypeAbs" [variable a, typeLiteral bound, term body];
     XTypeApp body proof -> application "XTypeApp" [term body, computation proof];
     XLet n a b -> application "XLet" [name n, term a, term b];

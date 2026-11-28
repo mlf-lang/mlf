@@ -44,8 +44,7 @@
       "modules": {
         "Tests.IndependentCheck": "tests/shared/Tests/IndependentCheck.hs",
         "Tests.IndependentType": "tests/shared/Tests/IndependentType.hs",
-        "Tests.TupleList": "tests/Tests/TupleList.hs",
-        "Tests.TupleListLegacy": "tests/Tests/TupleListLegacy.hs"
+        "Tests.TupleList": "tests/Tests/TupleList.hs"
       },
       "dependencies": [
         "mlf-crates",
@@ -79,6 +78,7 @@
         "MLF.PreparedCompiler": "bootstrap/MLF/PreparedCompiler.hs",
         "MLF.PreparedLibraryData": "bootstrap/MLF/PreparedLibraryData.hs",
         "MLF.PreparedNativeData": "bootstrap/MLF/PreparedNativeData.hs",
+        "MLF.CrateNativeCommand": "bootstrap/MLF/CrateNativeCommand.hs",
         "MLF.NativeBuild": "bootstrap/MLF/NativeBuild.hs"
       }
     },
@@ -99,8 +99,10 @@
         "Tests.CorePartitions": "tests/Tests/CorePartitions.hs",
         "Tests.Coverage": "tests/Tests/Coverage.hs",
         "Tests.TestDrivers": "tests/Tests/TestDrivers.hs",
+        "Tests.TestCompilation": "tests/Tests/TestCompilation.hs",
         "Tests.TestSources": "tests/Tests/TestSources.hs",
         "Tests.Catalog": "tests/Tests/Catalog.hs",
+        "Tests.ReportJournal": "tests/Tests/ReportJournal.hs",
         "Tests.Selection": "tests/Tests/Selection.hs",
         "Tests.BuildReceipts": "tests/shared/Tests/BuildReceipts.hs"
       },
@@ -108,7 +110,8 @@
         "mlf-developer-tools",
         "mlf-foundation",
         "mlf-frontend",
-        "mlf-package-core"
+        "mlf-package-core",
+        "mlf-test"
       ],
       "source-syntax": "shared-haskell-v1"
     },
@@ -133,11 +136,17 @@
     },
     "tuple-list-native": {
       "requires": [
-        "emlf"
+        "emlf",
+        "compiler-tests"
       ],
       "command": [
-        "bash",
-        "{root}/tools/release/test-tuple-list.sh",
+        "python3",
+        "-B",
+        "{root}/tools/testing/run.py",
+        "tuple-list-native",
+        "--report",
+        "{build}/tuple-list-runtime-framework.json",
+        "--",
         "{bin:emlf}",
         "{build}/tuple-list-runtime"
       ]

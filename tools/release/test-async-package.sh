@@ -4,6 +4,8 @@
 set -euo pipefail
 test "$#" -eq 3 || { echo 'Usage: test-async-package.sh COMPILER MANAGER OUTPUT-DIRECTORY' >&2; exit 2; }
 root=$(cd -- "$(dirname -- "$0")/../.." && pwd)
+. "$root/tools/testing/native-events.sh"
+. "$root/tools/testing/compiler-diagnostics.sh"
 compiler=$(cd -- "$(dirname -- "$1")" && pwd)/$(basename -- "$1")
 manager=$(cd -- "$(dirname -- "$2")" && pwd)/$(basename -- "$2")
 runner="$(dirname -- "$manager")/mlf-build-runner"
@@ -18,7 +20,7 @@ output=$(cd -- "$3" && pwd)
 printf '{"complete":false}\n' > "$output/result.json"
 work=$(mktemp -d "$output/run.XXXXXXXX")
 source="$work/source"
-mkdir -p "$source/libraries" "$source/tests" "$source/tools/release"
+mkdir -p "$source/libraries" "$source/tests" "$source/tools/release" "$source/tools/testing"
 cd -- "$root"
 case $(uname -s) in Linux) ulimit -s unlimited ;; Darwin) ;; *) echo 'Package gate supports Linux and macOS.' >&2; exit 2 ;; esac
 GC_FREE_SPACE_DIVISOR=${GC_FREE_SPACE_DIVISOR:-8}
@@ -35,7 +37,7 @@ cleanup() {
  if [ -n "$watchdog_pid" ]; then kill "$watchdog_pid" 2>/dev/null || true; fi
  if [ -n "$command_pid" ]; then kill "$command_pid" 2>/dev/null || true; fi
 }
-trap cleanup EXIT
+trap 'status=$?; cleanup; mlf_case_cleanup "$status"' EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
 run() {
@@ -60,7 +62,7 @@ run() {
  wait "$watchdog_pid" 2>/dev/null || true
  watchdog_pid=
  printf '%s\n' "$status" > "$work/$label.status"
- test ! -e "$work/$label.timed-out" || fail "$label timed out"
+ test ! -e "$work/$label.timed-out" || { mlf_case_result timeout "$status"; fail "$label timed out"; }
  return "$status"
 }
 record_inputs() {
@@ -69,13 +71,14 @@ record_inputs() {
  while IFS= read -r file; do
   jq --arg path "$file" --arg hash "$(sha256 "$base/$file")" '. + {($path):$hash}' "$destination" > "$destination.tmp"
   mv "$destination.tmp" "$destination"
- done < <(cd "$base"; find libraries/mlf-foundation libraries/mlf-async runtime tests/async-package tools/release/test-async-package.sh -type f | LC_ALL=C sort)
+ done < <(cd "$base"; find libraries/mlf-foundation libraries/mlf-async runtime tests/async-package tools/release/test-async-package.sh tools/testing/native-events.sh tools/testing/compiler-diagnostics.sh -type f | LC_ALL=C sort)
 }
 record_inputs "$root" "$work/inputs.json"
 cp -R "$root/libraries/mlf-foundation" "$root/libraries/mlf-async" "$source/libraries/"
 cp -R "$root/runtime" "$source/runtime"
 cp -R "$root/tests/async-package" "$source/tests/async-package"
 cp "$root/tools/release/test-async-package.sh" "$source/tools/release/"
+cp "$root/tools/testing/native-events.sh" "$root/tools/testing/compiler-diagnostics.sh" "$source/tools/testing/"
 record_inputs "$source" "$work/snapshot.json"
 cmp "$work/inputs.json" "$work/snapshot.json" || fail 'source changed while copying'
 compiler_hash=$(sha256 "$compiler")
@@ -86,6 +89,7 @@ run protocol "$runner" --protocol-version || fail 'runner protocol query failed'
 test "$(cat "$work/protocol.stdout")" = 1 && test ! -s "$work/protocol.stderr" || fail 'runner protocol mismatch'
 args=(--manifest "$source/tests/async-package/mlf-package.json" --compiler "$compiler" --runtime "$source/runtime/mlf_runtime.c" --clang "$clang" --timeout "$timeout_seconds" --jobs 1 --build-dir "$work/build" --cache-dir "$work/cache")
 if [ -n "${MLF_GC_PREFIX:-}" ]; then args+=(--gc-prefix "$MLF_GC_PREFIX"); fi
+if mlf_case_selected async-package/fresh-and-cached; then mlf_case_start async-package/fresh-and-cached; fi
 for phase in initial cached; do
  run "$phase.build" "$manager" "${args[@]}" build --target answer || fail "$phase package build failed"
  cp "$work/build/build-report.json" "$work/$phase.build-report.json"
@@ -102,27 +106,32 @@ for phase in initial cached; do
  cmp "$source/tests/async-package/suite.stdout" "$work/$phase.native.stdout" || fail "$phase consumer differs from literal oracle"
  echo "PASS packaged async consumer: $phase native execution"
 done
+mlf_case_result pass 0
 async_key=$(jq -er '.builds[] | select(.kind | startswith("crate mlf-async/")) | .key' "$work/initial.build-report.json")
 interface="$work/cache/$async_key/unit.mlfci"
 test -s "$interface" || fail 'compiled async interface missing'
 for kind in opaque-fiber opaque-task opaque-internal-fiber opaque-internal-task opaque-handle opaque-scope mixed-fiber; do
+ mlf_case_selected "async-package/rejection/$kind" || continue
+ mlf_case_start "async-package/rejection/$kind"
  status=0
  run "$kind" "$manager" "${args[@]}" build --target "$kind" || status=$?
  test "$status" -eq 1 || fail "$kind expected rejection 1, got $status"
  test ! -e "$work/build/bin/$kind" || fail "$kind published a rejected executable"
  cp "$work/build/build-report.json" "$work/$kind.build-report.json"
+ mlf_compiler_diagnostics < "$work/$kind.stderr" > "$work/$kind.diagnostics"
  case $kind in
   mixed-fiber)
-   grep -Ei 'type constructor mismatch|cannot unify|incompatible' "$work/$kind.stderr" >/dev/null || fail "$kind unrelated rejection"
-   grep -F 'String' "$work/$kind.stderr" >/dev/null || fail "$kind lacks String diagnostic"
-   grep -F 'Int' "$work/$kind.stderr" >/dev/null || fail "$kind lacks Int diagnostic" ;;
+   grep -Ei 'type constructor mismatch|cannot unify|incompatible' "$work/$kind.diagnostics" >/dev/null || fail "$kind unrelated rejection"
+   grep -F 'String' "$work/$kind.diagnostics" >/dev/null || fail "$kind lacks String diagnostic"
+   grep -F 'Int' "$work/$kind.diagnostics" >/dev/null || fail "$kind lacks Int diagnostic" ;;
   *)
    case $kind in *fiber) constructor=Fiber ;; *task) constructor=Task ;; *handle) constructor=ProcessHandle ;; *scope) constructor=ProcessScope ;; esac
-   grep -F "$constructor" "$work/$kind.stderr" >/dev/null || fail "$kind unrelated rejection"
-   grep -Ei 'unknown|unbound|not (in scope|exported)|undefined|unresolved' "$work/$kind.stderr" >/dev/null || fail "$kind missing inaccessible-constructor diagnostic" ;;
+   grep -F "$constructor" "$work/$kind.diagnostics" >/dev/null || fail "$kind unrelated rejection"
+   grep -Ei 'unknown|unbound|not (in scope|exported)|undefined|unresolved' "$work/$kind.diagnostics" >/dev/null || fail "$kind missing inaccessible-constructor diagnostic" ;;
  esac
  # Require the rejection to have consumed the already-compiled async library.
  jq -e '.complete == false and any(.builds[]; (.kind | startswith("crate mlf-async/")) and .cached == true)' "$work/$kind.build-report.json" >/dev/null || fail "$kind did not validate cached package interface"
+ mlf_case_result pass "$status"
  echo "PASS packaged $kind rejection"
 done
 record_inputs "$source" "$work/snapshot.final.json"
@@ -133,7 +142,7 @@ test "$(sha256 "$compiler")" = "$compiler_hash" || fail 'compiler changed'
 test "$(sha256 "$manager")" = "$manager_hash" || fail 'manager changed'
 test "$(sha256 "$runner")" = "$runner_hash" || fail 'runner changed'
 test "$(sha256 "$clang")" = "$clang_hash" || fail 'clang changed'
-test "${#labels[@]}" -eq 12 || fail 'command coverage changed'
+test -n "${MLF_TEST_EXACT:-}" || test "${#labels[@]}" -eq 12 || fail 'command coverage changed'
 printf '{}\n' > "$work/observations.json"
 for label in "${labels[@]}"; do
  for suffix in stdout stderr status; do
@@ -147,15 +156,17 @@ for file in "$work/"*.build-report.json; do
  jq --arg path "$(basename "$file")" --arg hash "$(sha256 "$file")" '. + {($path):$hash}' "$work/reports.json" > "$work/reports.tmp"
  mv "$work/reports.tmp" "$work/reports.json"
 done
-jq -n --arg work "$work" --arg compiler_sha256 "$compiler_hash" --arg manager_sha256 "$manager_hash" \
+jq -n --arg exact "${MLF_TEST_EXACT:-}" --arg work "$work" --arg compiler_sha256 "$compiler_hash" --arg manager_sha256 "$manager_hash" \
  --arg runner_sha256 "$runner_hash" --arg clang_sha256 "$clang_hash" --arg native_sha256 "$binary_hash" \
  --arg async_interface_sha256 "$(sha256 "$interface")" --arg async_crate_key "$async_key" \
  --argjson seconds "$((SECONDS-started))" --argjson timeout_seconds "$timeout_seconds" \
  --slurpfile inputs "$work/inputs.json" --slurpfile observations "$work/observations.json" --slurpfile reports "$work/reports.json" \
- '{complete:true,backend:"llvm",native_executions:2,cache_replay:true,opaque_rejections:6,type_rejections:1,commands:12,
+ '{complete:($exact == ""),backend:"llvm",native_executions:2,cache_replay:true,opaque_rejections:6,type_rejections:1,commands:12,
  work:$work,compiler_sha256:$compiler_sha256,manager_sha256:$manager_sha256,runner_sha256:$runner_sha256,
  clang_sha256:$clang_sha256,native_sha256:$native_sha256,async_interface_sha256:$async_interface_sha256,
  async_crate_key:$async_crate_key,seconds:$seconds,timeout_seconds:$timeout_seconds,
  inputs:$inputs[0],observations:$observations[0],reports:$reports[0]}' > "$output/result.tmp"
 mv "$output/result.tmp" "$output/result.json"
-echo 'Async package gate passed: native checked-crate consumer, exact cache replay, 6 opaque and 1 typed rejections.'
+if [ -z "${MLF_TEST_EXACT:-}" ]; then
+ echo 'Async package gate passed: native checked-crate consumer, exact cache replay, 6 opaque and 1 typed rejections.'
+fi

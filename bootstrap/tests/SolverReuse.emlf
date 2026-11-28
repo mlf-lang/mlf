@@ -8,12 +8,11 @@ import qualified Bootstrap.IntSet as IS
 import qualified Bootstrap.Graph as G
 import qualified Bootstrap.Graph.Solver as S
 import qualified Bootstrap.Constraint as C
-import qualified Bootstrap.Compiler as Compiler
+import qualified Bootstrap.CompilerCore as Core
+import qualified Bootstrap.SourceFrontend as Frontend
 import qualified Bootstrap.Elaborate as E
 import qualified Bootstrap.Parser as P
 import qualified Bootstrap.Module as Modules
-import qualified Bootstrap.Prelude as Prelude
-import qualified Bootstrap.Standalone as Standalone
 import qualified Bootstrap.Classes as Classes
 import qualified Bootstrap.X.Check as Check
 import qualified Bootstrap.X.Syntax as X
@@ -35,19 +34,12 @@ legacySolve constraints = do
   G.validateGraph normalized
   Right normalized
 
-lowerProgram imports program = do
-  canonical <- Classes.canonicalSourceProgram imports program
-  Classes.lowerClassesWithImports imports canonical
-
 lower sources file source = do
   root <- P.parseModule file source
-  if Compiler.standalone root then do
+  if Frontend.standalone root then do
     original <- P.standaloneProgram root
-    normalized <- Standalone.normalize ImplicitPrelude original
-    case normalized of
-      Just ((,,) imports program _) -> lowerProgram imports program
-      Nothing -> case Prelude.withPrelude ImplicitPrelude original of
-        (,) imports program -> lowerProgram imports program
+    (,) _ lowered <- L.mapLeft Core.prettyError (Frontend.lowerStandalone ImplicitPrelude original)
+    Right lowered
   else do
     modules <- Modules.loadModuleMap sources root
     (,) (LinkedModule program names _ instanceScopes) valueScopes <- Modules.linkModulesInScopes ImplicitPrelude modules
@@ -92,9 +84,11 @@ checkFixture sources file source = do
       assert (X.equalErased (X.erase oldTerm) (C.eraseSourceWith oldEvidence (C.skeleton constraints))) "legacy erasure agreement failed"
       assert (X.equalErased (X.erase term) (C.eraseSourceWith evidence (C.skeleton constraints))) "solver reuse erasure agreement failed"
       assert (X.equalErased (X.erase oldTerm) (X.erase term)) "solver reuse changed runtime erasure"
-      case Compiler.compileModules sources file source of
-        Left error -> Left (Compiler.prettyError error)
-        Right compiled -> assert (eqString (Pretty.prettyTerm (Compiler.compiledTerm compiled)) (Pretty.prettyTerm term)) "compiler did not use the equivalent checked route"
+      -- Compare the checked solver consumer directly. Public compilation now
+      -- partitions a root into declaration groups and has no single solver graph.
+      case Core.finishCompilation ((,) program names) of
+        Left error -> Left (Core.prettyError error)
+        Right compiled -> assert (eqString (Pretty.prettyTerm (Core.compiledTerm compiled)) (Pretty.prettyTerm term)) "compiler did not use the equivalent checked route"
 
 run label modules source = case checkFixture (M.fromList compareString modules) (label ++ ".emlf") source of
   Left error -> panic (label ++ ": " ++ error)

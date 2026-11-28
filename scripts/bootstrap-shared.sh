@@ -213,8 +213,10 @@ phase=current-shared-source
 # One invocation preserves the genuine aggregate report and both tool rows.
 # Bootstrap deliberately precedes lock qualification; callers subsequently
 # validate the regenerated committed lock with the new compiler and manager.
+# The bridge emits its own native ABI while compiling the current sources.
+# Stage 2 subsequently emits the checkout ABI for its own callers.
 set -- --manifest "$root/mlf-package.json" --compiler "$bridge" \
-  --runtime "$root/runtime/mlf_runtime.c" --timeout 21600 --jobs 1 \
+  --runtime "$source/runtime/mlf_runtime.c" --timeout 21600 --jobs 1 \
   --build-dir "$build/native" --cache-dir "$build/native-cache"
 if [ -n "${MLF_GC_PREFIX:-}" ]; then set -- "$@" --gc-prefix "$MLF_GC_PREFIX"; fi
 if [ -n "${CC:-}" ]; then set -- "$@" --clang "$CC"; fi

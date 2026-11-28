@@ -3,6 +3,8 @@
 -- FrozenSelectors is independently captured from the corrected baseline.
 module Main where
 
+import Data.Int (Int64)
+
 import Control.Exception (SomeException, evaluate, try)
 import Control.Monad (forM_, unless)
 import Data.IORef
@@ -17,11 +19,11 @@ import qualified Bootstrap.Set as CandidateSet
 import qualified Bootstrap.Primitive as Primitive
 import qualified MLF.Host.Base as Host
 
-type EntityImage = (String, String, (Integer, String))
-type InterfaceImage = [((Integer, String), [EntityImage])]
+type EntityImage = (String, String, (Int64, String))
+type InterfaceImage = [((Int64, String), [EntityImage])]
 type Entry = (String, Candidate.Entity)
 
-roleImage :: Candidate.Role -> (Integer, String)
+roleImage :: Candidate.Role -> (Int64, String)
 roleImage role = case role of
   Candidate.Value -> (0, "")
   Candidate.Datatype -> (1, "")
@@ -74,7 +76,7 @@ memberCases =
   , ("boolean", T.Members ["True", "False"])
   ]
 
-compareValue :: (Eq a, Show a) => IORef Integer -> String -> a -> a -> IO ()
+compareValue :: (Eq a, Show a) => IORef Int64 -> String -> a -> a -> IO ()
 compareValue count label expected actual = do
   outcome <- try (evaluate (expected == actual)) :: IO (Either SomeException Bool)
   case outcome of
@@ -82,7 +84,7 @@ compareValue count label expected actual = do
     Right False -> error (label ++ ":\nexpected " ++ show expected ++ "\nactual " ++ show actual)
     Right True -> modifyIORef' count (+1)
 
-checkEnvironment :: IORef Integer -> String -> [String] -> [Entry] -> IO ()
+checkEnvironment :: IORef Int64 -> String -> [String] -> [Entry] -> IO ()
 checkEnvironment count label names entries = do
   let env = environment entries
   forM_ names $ \name -> forM_ memberCases $ \(memberLabel, members) -> do
@@ -194,14 +196,14 @@ poisonedEnvironment = Candidate.Interface $
     , ((Candidate.Terms, "ok"), Set.singleton (entity "A" "ok" Candidate.Value))
     , ((Candidate.Terms, "unused"), error "unused child memo forced") ]
 
-expectThrows :: IORef Integer -> String -> Bool -> IO ()
+expectThrows :: IORef Int64 -> String -> Bool -> IO ()
 expectThrows count label value = do
   outcome <- try (evaluate value) :: IO (Either SomeException Bool)
   case outcome of
     Left exception | "unused child memo forced" `isInfixOf` show exception -> modifyIORef' count (+1)
     _ -> error (label ++ ": poison control did not raise the expected exception")
 
-lazyControls :: IORef Integer -> IO ()
+lazyControls :: IORef Int64 -> IO ()
 lazyControls count = do
   let env = poisonedEnvironment
       expectedType = resultImage (T.Right (Oracle.interface [entity "A" "T" Candidate.Datatype]))
@@ -232,7 +234,7 @@ lazyControls count = do
   expectThrows count "lazy/candidate/all-sensitive"
     (resultImage (Candidate.selectType env "T" T.AllMembers) == expectedType)
 
-fixedExpectations :: IORef Integer -> IO ()
+fixedExpectations :: IORef Int64 -> IO ()
 fixedExpectations count = do
   let t = entity "A" "T" Candidate.Datatype
       c = entity "A" "C" (Candidate.Constructor "T")
@@ -252,14 +254,14 @@ fixedExpectations count = do
 -- Equal ranks deliberately have different observable key representatives.
 -- List-authored expectations neither call candidate operations nor derive from
 -- the frozen map result; they check both implementations independently.
-type CollectionKey = (Integer, String)
+type CollectionKey = (Int64, String)
 
-compareCollectionKey :: CollectionKey -> CollectionKey -> Integer
+compareCollectionKey :: CollectionKey -> CollectionKey -> Int64
 compareCollectionKey (a, _) (b, _) = if a < b then -1 else if a > b then 1 else 0
 
-collectionControls :: IORef Integer -> IO ()
+collectionControls :: IORef Int64 -> IO ()
 collectionControls count = do
-  let ranks = [0..4] :: [Integer]
+  let ranks = [0..4] :: [Int64]
       leftKey rank = (rank, "left-" ++ show rank)
       rightKey rank = (rank, "right-" ++ show rank)
       leftValue rank = "L" ++ show rank
@@ -281,7 +283,7 @@ collectionControls count = do
         wantCombined = [(key rank, value rank) | rank <- selected]
         wantUnion = [(key rank, leftBiased rank) | rank <- selected]
         wantSet = map key selected
-        expectedSize = toInteger (length selected)
+        expectedSize = fromIntegral (length selected)
         mapImage tree = (Map.toList tree, Map.valid cmp tree, Map.size tree)
         setImage values@(T.Set tree) = (Set.toList values, Map.valid cmp tree, Map.size tree)
         label = "collections/" ++ show left ++ "/" ++ show right
@@ -331,7 +333,7 @@ collectionControls count = do
     expectCollectionPoison count (label ++ "/combiner-sensitive") "combine poison"
       (Map.get cmp (0, "lookup") (unionWith cmp unusedCombine a b) == "unused")
 
-expectCollectionPoison :: IORef Integer -> String -> String -> Bool -> IO ()
+expectCollectionPoison :: IORef Int64 -> String -> String -> Bool -> IO ()
 expectCollectionPoison count label message value = do
   outcome <- try (evaluate value) :: IO (Either SomeException Bool)
   case outcome of

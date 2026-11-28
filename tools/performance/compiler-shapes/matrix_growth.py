@@ -3,11 +3,13 @@ import csv
 import math
 import re
 
-import numpy as np
-
 import analyze
-from fit_growth import LANES, power_fit
+from fit_growth import LANES, MIN_PAIRED_REPEATS, power_fit, power_order_issue
 from sweep import completed_pairs, failure_detail
+
+
+# The published CSV predates a repeat-count column and fixed six pairs per cell.
+PUBLISHED_REPEATS = 6
 
 
 def producer(revision, binary, receipt):
@@ -32,7 +34,7 @@ def published_cell(row, repeats):
     return ident, [float(row[lane + '_seconds']) for lane in LANES], ''
 
 
-def sweep_cell(root, row, repeats, profiles):
+def sweep_cell(root, row, profiles):
     # The plan records the executable and receipt hashes. Its source commit
     # belongs to the recorder and need not identify the measured compiler.
     size = int(row['size'])
@@ -68,14 +70,17 @@ def sweep_cell(root, row, repeats, profiles):
     else:
         analyze.require(status == 'passed', 'unknown sweep status')
         metrics, plan, receipt, _ = analyze.analyze(folder)
-        analyze.require(len(metrics) == 1 and completed_pairs(receipt['runs']) == repeats
-                        and int(row['completed_pairs']) == repeats, 'summary differs from measured pairs')
+        analyze.require(len(metrics) == 1, 'summary differs from measured cell')
         measurements = [metrics[0][lane + '_wall_median'] for lane in LANES]
         analyze.require(measurements == [float(row[lane + '_seconds']) for lane in LANES], 'summary median mismatch')
         issue = ''
+    repeats = plan['benchmark']['repeats']
     cases = [(case['family'], case['size']) for case in plan['cases']]
-    analyze.require(cases == [(row['family'], size)] and plan['benchmark']['repeats'] == repeats,
+    analyze.require(cases == [(row['family'], size)] and type(repeats) is int and repeats >= MIN_PAIRED_REPEATS,
                     'summary differs from measured cell')
+    if status == 'passed':
+        analyze.require(completed_pairs(receipt['runs']) == repeats == int(row['completed_pairs']),
+                        'summary differs from measured pairs')
     profile = analyze.compatibility(plan)
     analyze.require(profiles.setdefault(row['family'], profile) == profile,
                     f"incompatible measurements in {row['family']}")
@@ -87,7 +92,6 @@ def points(source, matrix):
     sweep = source.is_dir()
     path = source / 'summary.csv' if sweep else source
     sizes = matrix['sizes']
-    repeats = matrix['repeats']
     groups = {}
     profiles = {}
     with path.open(newline='') as stream:
@@ -98,8 +102,8 @@ def points(source, matrix):
             analyze.require(family in matrix['families'], f'unknown family {family}')
             cells = groups.setdefault(family, {})
             analyze.require(size not in cells, f'duplicate {family}/{size}')
-            ident, times, issue = (sweep_cell(source, row, repeats, profiles) if sweep
-                                   else published_cell(row, repeats))
+            ident, times, issue = (sweep_cell(source, row, profiles) if sweep
+                                   else published_cell(row, PUBLISHED_REPEATS))
             analyze.require(times is None or all(math.isfinite(t) and t > 0 for t in times),
                             f'invalid times at {family}/{size}')
             cells[size] = ident, times, issue
@@ -119,19 +123,15 @@ def points(source, matrix):
         if failures:
             row['reason'] = '; '.join(failures)
         else:
-            issues = []
-            for lane, times in zip(LANES, np.asarray([cells[n][1] for n in sizes]).T):
-                fit = power_fit(np.asarray(sizes), times)
-                if fit['scale_seconds'] == 0:
-                    issues.append(lane + ' zero fitted growth')
-                else:
+            fits = [power_fit(sizes, times) for times in zip(*(cells[n][1] for n in sizes))]
+            for lane, fit in zip(LANES, fits):
+                if fit['scale_seconds'] > 0:
                     row[lane + '_p'] = fit['p']
-                    if not fit['interior']:
-                        issues.append(lane + ' boundary fit')
             if row['mlf_p'] is not None and row['ghc_p'] is not None:
                 row['delta_p'] = row['mlf_p'] - row['ghc_p']
-            if issues:
-                row.update(status='indeterminate', reason='; '.join(issues))
+            issue = power_order_issue(*fits)
+            if issue:
+                row.update(status='indeterminate', reason=issue)
             else:
                 row['status'] = 'met' if row['delta_p'] <= 0 else 'higher'
         yield row

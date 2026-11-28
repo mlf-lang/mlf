@@ -4,14 +4,17 @@
   "ref": "48275901cd7b760cc8dd000ed54898a23a494a87",
   "sources": {
     "CrateQuery": {
-      "frozen_sha256": "c80628e72103f4898d0b8f610a7aee8657fd13fc8ef026e59aa410a1de4c4c0f",
+      "frozen_sha256": "e7459a7699d48a73b65001ed996d0905abe1ebb06ed7237474bf16da4a4e8637",
       "path": "libraries/mlf-crates/Bootstrap/CrateQuery.hs",
-      "source_sha256": "03938b24a01727e6a655c57399fd111d47b0c8befb8b4533d74fc5ad0d9b02a7"
+      "source_sha256": "03938b24a01727e6a655c57399fd111d47b0c8befb8b4533d74fc5ad0d9b02a7",
+      "adaptation": "Retain the named query encoder algorithm. Frame v7 directly using its dictionary tag and user-only datatype field. Omit unrelated group compilation, reporting and cache I/O."
     },
     "SourceInference": {
-      "frozen_sha256": "e233ec0405345d7e1c67c254a03c82d5675647805114afd49d60c294f55ba2d3",
+      "frozen_sha256": "59286a064c91028ce6dc3996aab356868185e9f1cf790944baf783041f3532fc",
       "path": "libraries/mlf-crates/Bootstrap/SourceInference.hs",
-      "source_sha256": "3cbcf934a1390a578916534cc12e9cb9f424b30faf8f9c7a58d5c6ed3700c75e"
+      "source_sha256": "3cbcf934a1390a578916534cc12e9cb9f424b30faf8f9c7a58d5c6ed3700c75e",
+      "file": "FullyFrozenSourceInference.hs",
+      "adaptation": "Compile-ready module name and FrozenClasses import; original algorithm bodies unchanged."
     }
   }
 }

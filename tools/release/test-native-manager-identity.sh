@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Control-only regression for already-shared-aware native input pairs.
 set -euo pipefail
+. "$(dirname -- "$0")/test-events.sh" release-native-manager-identity
 root=$(cd -- "$(dirname -- "$0")/../.." && pwd)
 work=$(mktemp -d "${TMPDIR:-/tmp}/mlf-manager-identity.XXXXXXXX")
 trap 'rm -rf "$work"' EXIT
@@ -45,6 +46,7 @@ chmod +x "$work/compiler" "$work/manager" "$project/tools/release/"*.sh
 export MLF_COMPILER="$work/compiler" MLF_PACKAGE_MANAGER="$work/manager"
 export TEST_BUILD_CALLS="$work/build-calls"
 for TEST_MANAGER_HOST in GHC unknown; do
+ release_begin "release/native-manager-identity/reject-$TEST_MANAGER_HOST"
  export TEST_MANAGER_HOST
  status=0
  "$project/tools/release/bootstrap-manager.sh" "$work/rejected-$TEST_MANAGER_HOST" > "$work/$TEST_MANAGER_HOST.log" 2>&1 || status=$?
@@ -52,7 +54,9 @@ for TEST_MANAGER_HOST in GHC unknown; do
  grep -F 'native-MLF manager as well as compiler' "$work/$TEST_MANAGER_HOST.log" >/dev/null
  test ! -e "$TEST_BUILD_CALLS"
  echo "PASS shared-aware branch rejects $TEST_MANAGER_HOST manager before build"
+ release_pass
 done
+release_begin release/native-manager-identity/actual-ghc
 if [ "$#" -gt 0 ]; then
  status=0
  MLF_PACKAGE_MANAGER="$1" "$project/tools/release/bootstrap-manager.sh" "$work/actual-ghc-rejected" > "$work/actual-ghc.log" 2>&1 || status=$?
@@ -60,7 +64,11 @@ if [ "$#" -gt 0 ]; then
  grep -F 'native-MLF manager as well as compiler' "$work/actual-ghc.log" >/dev/null
  test ! -e "$TEST_BUILD_CALLS"
  echo 'PASS shared-aware branch rejects supplied actual GHC-produced manager before build'
+ release_pass
+elif [ "${MLF_TEST_SUITE:-}" = release-native-manager-identity ] && [ -n "${MLF_TEST_EVENTS:-}" ]; then
+ mlf_case_result skip 0
 fi
+release_begin release/native-manager-identity/reject-nonnative-output
 export TEST_MANAGER_HOST=native-MLF
 status=0
 TEST_BAD_OUTPUT=1 "$project/tools/release/bootstrap-manager.sh" "$work/bad-output" > "$work/bad-output.log" 2>&1 || status=$?
@@ -68,9 +76,12 @@ test "$status" -eq 2
 grep -F 'Produced manager does not identify as native-MLF' "$work/bad-output.log" >/dev/null
 test ! -e "$work/bad-output/compiler.path"
 echo 'PASS shared-aware branch rejects non-native output manager before publishing pointer'
+release_pass
+release_begin release/native-manager-identity/accept-native
 "$project/tools/release/bootstrap-manager.sh" "$work/native-pair" > "$work/native.log" 2>&1
 test -f "$TEST_BUILD_CALLS"
 test "$(cat "$work/native-pair/compiler.path")" = "$MLF_COMPILER"
 jq -e '.complete == true and .route == "shared-aware-native"' "$work/native-pair/bootstrap.json" >/dev/null
 echo 'PASS shared-aware branch accepts explicit native pair without release-bundle layout'
+release_pass
 echo 'Control fixtures establish dispatch only, not native producer authenticity or compiler correctness.'

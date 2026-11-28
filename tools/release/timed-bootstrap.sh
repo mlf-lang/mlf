@@ -3,6 +3,12 @@
 set -euo pipefail
 test "$(uname -s):$(uname -m)" = Darwin:arm64
 scripts=$(cd -- "$(dirname -- "$0")" && pwd)
+release_begin() { :; }
+release_pass() { :; }
+if [ "${MLF_TEST_SUITE:-}" = bootstrap-macos-native ]; then
+  . "$(dirname -- "$0")/test-events.sh" bootstrap-macos-native
+fi
+release_begin bootstrap/macos/seed-toolchain
 # Current tools release inference graphs per SCC; older seed managers use the
 # default separate-module path. Immutable older tags can request source linking.
 # Explicit caller collection policies remain authoritative.
@@ -53,6 +59,7 @@ jq -n --arg commit "$(git rev-parse HEAD)" \
   --arg divisor "$GC_FREE_SPACE_DIVISOR" --arg initial "${GC_INITIAL_HEAP_SIZE:-}" --arg maximum "${GC_MAXIMUM_HEAP_SIZE:-}" \
   --argjson budget "$MLF_BOOTSTRAP_MAX_RSS_BYTES" \
   '{commit:$commit,compiler:{path:$compiler,sha256:$compiler_hash},seed_manager:{path:$manager,sha256:$manager_hash},clang:{path:$clang,sha256:$clang_hash},gc_environment:{GC_FREE_SPACE_DIVISOR:$divisor,GC_INITIAL_HEAP_SIZE:$initial,GC_MAXIMUM_HEAP_SIZE:$maximum},memory_budget_bytes:$budget,rss_units:"bytes",time_resolution_seconds:0.01}' > "$MLF_TIMING_DIR/context.json"
+release_pass
 tail -n +1 -f "$MLF_TIMING_DIR/events.log" &
 logger=$!
 summarized=0
@@ -67,6 +74,7 @@ finish() {
   exit "$code"
 }
 trap finish EXIT
+release_begin bootstrap/macos/native-bridge
 # Select the transition by source architecture, never by a mutable tool hint.
 if [ -f shared-sources.json ]; then
   # The frozen shared bridge verifies actual seed bytes and bundle provenance.
@@ -112,13 +120,20 @@ else
     "$MLF_TIMING_DIR/context.json" > "$MLF_TIMING_DIR/context.tmp"
 fi
 mv "$MLF_TIMING_DIR/context.tmp" "$MLF_TIMING_DIR/context.json"
+release_pass
+release_begin bootstrap/macos/fresh-candidate
 "$MLF_TIMING_DRIVER" "$MLF_TIMING_DIR" package-manager "$PWD/mlfpkg" \
   --compiler "$MLF_TIMING_DIR/bin/emlf" --clang "$MLF_TIMING_DIR/bin/clang" \
   --runtime "$PWD/runtime/mlf_runtime.c" --timeout 21600 --locked --build-dir "$build" build
+release_pass
+release_begin bootstrap/macos/native-helper
 "$MLF_TIMING_DRIVER" "$MLF_TIMING_DIR" native-helper "$scripts/ensure-build-runner.sh" "$build/bin" "$MLF_TIMING_CLANG"
+release_pass
+release_begin bootstrap/macos/resource-budget
 # The resource gate must succeed before later CI steps receive this candidate.
 summarized=1
 "$scripts/summarize-bootstrap.sh" "$build"
+release_pass
 if [ -n "${GITHUB_ENV:-}" ]; then
   printf 'MLF_COMPILER=%s\nMLF_PACKAGE_MANAGER=%s\nGC_FREE_SPACE_DIVISOR=%s\n' "$build/bin/emlf" "$build/bin/mlfpkg" "$GC_FREE_SPACE_DIVISOR" >> "$GITHUB_ENV"
 fi

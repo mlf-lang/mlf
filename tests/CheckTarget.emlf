@@ -1,4 +1,4 @@
-module Main where
+module CheckTarget where
 import Bootstrap.Types
 import qualified Bootstrap.Std as S
 import qualified Bootstrap.X.Parser as P
@@ -6,15 +6,41 @@ import qualified Tests.IndependentCheck as C
 import qualified Tests.IndependentType as T
 import qualified Bootstrap.X.Pretty as Pretty
 import qualified Package.OS as O
-main = do
-  targetPath <- getArg 0
-  expectedPath <- getArg 1
+import qualified Package.Json as J
+
+check targetPath expectedPath = do
   source <- readFile targetPath
   expected <- readFile expectedPath
   case P.parseTerm targetPath source of
-    Left error -> O.fatal error
+    Left error -> return (Left error)
     Right term -> case C.checkClosed term of
-      Left error -> O.fatal error
+      Left error -> return (Left error)
       Right actual -> case P.parseType expected of
-        Left error -> O.fatal error
-        Right ty -> O.require (T.alphaEq actual ty) ("inferred type mismatch\nexpected: " ++ Pretty.prettyType ty ++ "\nactual: " ++ Pretty.prettyType actual)
+        Left error -> return (Left error)
+        Right ty ->
+          if T.alphaEq actual ty then return (Right ())
+          else return (Left ("inferred type mismatch\nexpected: " ++ Pretty.prettyType ty ++ "\nactual: " ++ Pretty.prettyType actual))
+
+batch request = do
+  manifest <- J.read request
+  S.mapM_ (\row -> do
+    let stem = J.getText "stem" "" row
+    result <- check (stem ++ ".xmlf") (stem ++ ".type")
+    case result of
+      Left error -> do
+        writeFile (stem ++ ".check.out") ""
+        writeFile (stem ++ ".check.err") (error ++ "\n")
+        putStrLn (J.render (J.set "id" (J.get "id" row) (J.set "independent_check_exit" (J.num 1) J.empty)))
+      Right () -> do
+        writeFile (stem ++ ".check.out") ""
+        writeFile (stem ++ ".check.err") ""
+        putStrLn (J.render (J.set "id" (J.get "id" row) (J.set "independent_check_exit" (J.num 0) J.empty)))) (J.values manifest)
+
+main = do
+  args <- O.allArguments
+  case args of
+    (:) "--batch" ((:) request []) -> batch request
+    (:) target ((:) expected []) -> do
+      checked <- check target expected
+      case checked of { Left error -> O.fatal error; Right () -> return () }
+    _ -> O.fatal "check-target TARGET EXPECTED-TYPE | --batch REQUEST"
