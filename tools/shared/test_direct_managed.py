@@ -41,7 +41,7 @@ class EntryControls(unittest.TestCase):
                 for options in ({'timeout': 625}, {'timeout': 600, 'overrides': {'X': '1'}},
                                 {'timeout': 600, 'status': False}, {'timeout': 600, 'expected': b''}):
                     with self.assertRaises(RuntimeError): runner.run(suite.name, argv, **options)
-                runner.receipt['inputs'][argv[4]] = 'different'
+                runner.receipt['producer']['sha256'] = 'different'
                 with self.assertRaises(RuntimeError): runner.run(suite.name, argv, timeout=600)
                 call.assert_not_called()
 
