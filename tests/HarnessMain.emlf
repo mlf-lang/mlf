@@ -12,6 +12,7 @@ import qualified Tests.BenchmarkSuite as Bench
 import qualified Tests.RegexRedux as RegexRedux
 import qualified Tests.TestSourceCache as SourceCache
 import qualified Tests.TestDriverCache as DriverCache
+import qualified Tests.TestCompilationCache as CompilationCache
 import qualified Test.Assert as Assert
 import qualified Test.Case as Case
 import qualified Test.Runner as Runner
@@ -118,7 +119,8 @@ registry manifest evidence = S.concat
  ((:) ((:) (family "harness/matrix-evidence" Boot.matrixChecks)
   ((:) (family "harness/corpus-evidence" Boot.parityChecks) []))
  ((:) ((:) (ioFamily "harness/source-dependency-cache" (do { SourceCache.main; Coverage.passed "harness" "test_source_dependency_cache_controls" }))
-  ((:) (ioFamily "harness/native-driver-cache" (do { DriverCache.main; Coverage.passed "harness" "test_checked_native_driver_cache" })) []))
+  ((:) (ioFamily "harness/native-driver-cache" (do { DriverCache.main; Coverage.passed "harness" "test_checked_native_driver_cache" }))
+  ((:) (ioFamily "harness/test-compilation-cache" (do { CompilationCache.main; Coverage.passed "harness" "test_unified_test_compilation_cache" })) [])))
  ((:) ((:) (family "harness/release-evidence" (Release.evidenceChecks evidence manifest))
   ((:) (ioFamily "harness/release-steps" Release.stepChecks)
   ((:) (ioFamily "harness/release-installation" (Release.installationChecks evidence manifest)) [])))
@@ -181,4 +183,6 @@ main = do
    values <- S.mapM getEnv names
    H.assert (S.all (\value -> eqString value "") values) "gate inherited compiler or collector overrides"
   (:) "--driver-cache-case" ((:) compiler []) -> DriverCache.run compiler
+  (:) "--test-compilation-cache-case" ((:) compiler []) -> CompilationCache.run compiler
+  (:) "--test-compilation-producer-changed" ((:) compiler []) -> CompilationCache.producerChanged compiler
   _ -> runFamilies args

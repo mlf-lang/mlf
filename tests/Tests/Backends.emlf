@@ -14,6 +14,7 @@ import qualified Bootstrap.X.Pretty as Pretty
 import qualified Tests.ReportJournal as Journal
 import qualified Tests.Helpers as H
 import qualified Tests.Bytes as Bytes
+import qualified Tests.TestCompilation as TC
 import qualified Package.OS as O
 import qualified Package.Json as J
 import qualified Test.Assert as A
@@ -23,7 +24,8 @@ data Event = ReadLine | Write String | WriteBytes Bytes.Bytes | WriteError Strin
 data Input = Input String Bool | RawInput Bytes.Bytes Bool
 data RuntimeError = RuntimeError String
 data Observation = Observation (Either RuntimeError ()) ([] Event) String
-data Backends = Backends String IntArray Int Int Int
+data Compilation = Compilation TC.Service J.Json J.Json ([] String)
+data Backends = Backends String IntArray Int Int Int (Maybe Compilation)
 instance H.Eq RuntimeError where { eq (RuntimeError a) (RuntimeError b) = eqString a b }
 instance H.Show RuntimeError where { show (RuntimeError a) = a }
 instance H.Eq Event where
@@ -50,15 +52,22 @@ stderrOutput observed = S.concatStrings (S.map (\event -> case event of { WriteE
 encodedInput input = case input of { Input text _ -> Bytes.encode text; RawInput bytes _ -> bytes }
 failWrites input = case input of { Input _ fail -> fail; RawInput _ fail -> fail }
 decodeInput input bytes = case input of { Input _ _ -> Bytes.decodeText bytes; RawInput _ _ -> Bytes.latin1 bytes }
-directory (Backends d _ _ _ _) = d
-serial (Backends _ s _ _ _) = s
-budget (Backends _ _ n _ _) = n
-candidateBudget (Backends _ _ _ n _) = n
-interpreterBudget (Backends _ _ _ _ n) = n
-withExecutionTimeout seconds (Backends d s _ candidate interpreter) = Backends d s seconds candidate interpreter
-withInterpreterTimeout seconds (Backends d s native candidate _) = Backends d s native candidate seconds
+directory (Backends d _ _ _ _ _) = d
+serial (Backends _ s _ _ _ _) = s
+budget (Backends _ _ n _ _ _) = n
+candidateBudget (Backends _ _ _ n _ _) = n
+interpreterBudget (Backends _ _ _ _ n _) = n
+compilation (Backends _ _ _ _ _ service) = case service of
+  Just value -> value
+  Nothing -> panic "backend execution has no test compilation service"
+compilationService (Compilation value _ _ _) = value
+compilationProducer (Compilation _ value _ _) = value
+compilationNative (Compilation _ _ value _) = value
+compilationFlags (Compilation _ _ _ value) = value
+withExecutionTimeout seconds (Backends d s _ candidate interpreter service) = Backends d s seconds candidate interpreter service
+withInterpreterTimeout seconds (Backends d s native candidate _ service) = Backends d s native candidate seconds service
 inventoryContext : Backends
-inventoryContext = Backends "" (panic "backend discovery cannot execute a fixture") 0 0 0
+inventoryContext = Backends "" (panic "backend discovery cannot execute a fixture") 0 0 0 Nothing
 
 -- These tests keep their batched IO fixtures. Only explicit assertion errors
 -- travel through this recovery channel; unexpected IO errors are rethrown.
@@ -106,18 +115,36 @@ withBackends action = do
   emitterPresent <- if eqString emitter "" then ioReturn false else fileExists emitter
   emitterHash <- if emitterPresent then fileDigest emitter else ioReturn ""
   writeFile (dir ++ "/emitter.sha256") emitterHash
+  -- A source-only selection does not prepare the compiler or native toolchain.
+  -- Execution owns a fresh report; only successful immutable products cross
+  -- suite directories through the package builder's checked artifact store.
+  service <- if emitterPresent then do
+    sourceRoot <- getEnv "MLF_TEST_SOURCE_ROOT"
+    compiler <- getEnv "MLF_BOOTSTRAP_COMPILER"
+    cache <- getEnv "MLF_TEST_COMPILATION_CACHE"
+    O.require (stringLength sourceRoot > 0 && stringLength compiler > 0 && stringLength cache > 0)
+      "backend execution requires the selected test compilation service"
+    value <- TC.open sourceRoot compiler cache (dir ++ "/compilation")
+    producer <- TC.registerProducer value emitter
+    flagsFile <- getEnv "MLF_TEST_LINK_FLAGS_FILE"
+    packedFlags <- readFile flagsFile
+    let flags = S.append (O.unpack packedFlags) ((:) "-lm" [])
+    native <- TC.nativeIdentity value flags
+    ioReturn (Just (Compilation value producer native flags))
+   else ioReturn Nothing
   setEnv rowReport (dir ++ "/rows.jsonl")
   Journal.begin rowReport (dir ++ "/rows.jsonl") ""
   writeFile (dir ++ "/current-label") "<unlabelled>"
   writeFile (dir ++ "/current-id") "<unregistered>"
   count <- newIntArray 2 0
-  value <- catchIOError (action (Backends dir count 60 candidate candidate))
+  value <- catchIOError (action (Backends dir count 60 candidate candidate service))
     (\error -> do { flushRows; ioError error })
   flushRows
   if emitterPresent then do
     after <- fileDigest emitter
     H.assert (eqString after emitterHash) "backend emitter changed during the matrix"
   else ioReturn ()
+  case service of { Just selected -> TC.finish (compilationService selected); Nothing -> ioReturn () }
   ioReturn value
 inCase context label action = inRegisteredCase context label label action
 inRegisteredCase context identity label action = do
@@ -227,29 +254,28 @@ runCoordinate context index coordinate hash backend action = do
     ioReturn (Left error))
 native : Backends -> String -> String -> [] String -> Entry -> Input -> IO Observation
 native context stem sourceHash arguments entry input = do
-  emitter <- getEnv "MLF_BOOTSTRAP_LLVM"
-  emitterHash <- readFile (directory context ++ "/emitter.sha256")
   let mode = (case entry of { IOEntry -> "--xmlf-to-llvm-io"; ProgramEntry -> "--xmlf-to-llvm" })
-  let prepared = directory context ++ "/emitted-" ++ mode ++ "-" ++ emitterHash ++ "-" ++ sourceHash
-  cachedEmission <- fileExists prepared
-  code <- if cachedEmission then ioReturn 0
-    else O.exec "" ((:) emitter ((:) mode ((:) (stem ++ ".xmlf") []))) "" (stem ++ ".ll") (stem ++ ".emit.err") (candidateBudget context)
-  error <- if cachedEmission then ioReturn "" else readFile (stem ++ ".emit.err")
-  if code == 1 then ioReturn (Observation (Left (RuntimeError (normalize (stripFinalNewline error)))) [] (decodeInput input (encodedInput input))) else do
-    assertCase (code == 0 && eqString error "") ("LLVM emitter failed: " ++ error)
-    (,) llvm hash <- if cachedEmission then do
-      saved <- J.read prepared
-      let first = J.getText "llvm" "" saved
-      let digest = J.getText "sha256" "" saved
-      writeFile (stem ++ ".llvm-source") (first ++ "\n")
-      ioReturn ((,) first digest)
-     else do
-      let first = stem ++ ".ll"
-      digest <- fileDigest first
-      let receipt = J.set "llvm" (J.str first) (J.set "sha256" (J.str digest) J.empty)
-      writeFile prepared (J.render receipt ++ "\n")
-      ioReturn ((,) first digest)
-    runLinkedLLVM context stem llvm hash arguments input
+  actual <- fileDigest (stem ++ ".xmlf")
+  assertCase (eqString actual sourceHash) "backend serialized target changed before emission"
+  let selected = compilation context
+  let service = compilationService selected
+  emitted <- TC.emittedLLVMWithIdentity service (compilationProducer selected) mode [] (stem ++ ".xmlf") (candidateBudget context)
+  case emitted of
+    Left ((,,) code text error) -> do
+      writeFile (stem ++ ".ll") text
+      writeFile (stem ++ ".emit.err") error
+      if code == 1
+      then ioReturn (Observation (Left (RuntimeError (normalize (stripFinalNewline error)))) [] (decodeInput input (encodedInput input)))
+      else failCase ("LLVM emitter failed (" ++ showInt code ++ "): " ++ error)
+    Right artifact -> do
+      let llvm = artifact ++ "/program.ll"
+      saved <- TC.receipt service artifact
+      J.write (stem ++ ".emission.json") saved
+      writeFile (stem ++ ".llvm-source") (llvm ++ "\n")
+      O.copy llvm (stem ++ ".ll")
+      writeFile (stem ++ ".emit.err") ""
+      hash <- fileDigest llvm
+      runLinkedLLVM context stem llvm hash arguments input
 
 -- Raw erased terms have no checked xMLF serialization. Run their emitted
 -- module with the same runtime, native observation and link cache as the matrix.
@@ -262,16 +288,32 @@ executeGeneratedLLVM context name llvm = do
   runLinkedLLVM context path modulePath hash [] (Input "" false)
 
 runLinkedLLVM context stem llvm hash arguments input = do
-  let program = directory context ++ "/program-" ++ hash
-  cached <- fileExists program
-  if cached then ioReturn () else do
-    flagsFile <- getEnv "MLF_TEST_LINK_FLAGS_FILE"
-    flags <- readFile flagsFile
-    root <- getEnv "MLF_TEST_ROOT"
-    let runtime = directory context ++ "/runtime.o"
-    let argv = S.append ((:) "clang" ((:) "-O2" ((:) "-Wno-override-module" ((:) llvm ((:) runtime ((:) (root ++ "/trace.o") [])))))) (S.append (O.unpack flags) ((:) "-lm" ((:) "-o" ((:) program []))))
-    code <- O.exec "" argv "" (stem ++ ".link.out") (stem ++ ".link.err") 1800
-    assertCase (code == 0) ("LLVM link failed (" ++ showInt code ++ "); see " ++ stem ++ ".link.err")
+  actual <- fileDigest llvm
+  assertCase (eqString actual hash) "backend LLVM changed before linking"
+  flagsFile <- getEnv "MLF_TEST_LINK_FLAGS_FILE"
+  flags <- readFile flagsFile
+  root <- getEnv "MLF_TEST_ROOT"
+  let runtime = directory context ++ "/runtime.o"
+  let selected = compilation context
+  let service = compilationService selected
+  let options = S.append (O.unpack flags) ((:) "-lm" [])
+  assertCase (S.eqList eqString options (compilationFlags selected)) "backend native options changed during the matrix"
+  result <- TC.nativeLLVMWithIdentityResult service (compilationNative selected) llvm
+    ((:) runtime ((:) (root ++ "/trace.o") [])) options
+  linked <- case result of
+    Left ((,,) code out err) -> do
+      writeFile (stem ++ ".link.out") out
+      writeFile (stem ++ ".link.err") err
+      failCase ("LLVM link failed (" ++ showInt code ++ "); see " ++ stem ++ ".link.err")
+    Right artifact -> do
+      writeFile (stem ++ ".link.out") ""
+      writeFile (stem ++ ".link.err") ""
+      ioReturn artifact
+  saved <- TC.receipt service linked
+  J.write (stem ++ ".native.json") saved
+  program <- O.executable (linked ++ "/program")
+  -- The artifact is shared; arguments, stdin, status, traces and all assertions
+  -- belong to this coordinate and always execute again.
   observe context (stem ++ "-llvm") ((:) program arguments) input
 observe : Backends -> String -> [] String -> Input -> IO Observation
 observe context stem argv input = do

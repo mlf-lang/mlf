@@ -33,7 +33,7 @@ class DriverCacheTests(unittest.TestCase):
         for name in ('RuntimeDriver', 'LLVMDriver'):
             stages = {}
             products = {'llvm': (f'crate {name} LLVM', 'program.ll'), 'object': ('LLVM object', 'program.o'),
-                        'linked': ('test driver native link', 'program'), 'runtime': ('test driver C object', 'object.o')}
+                        'linked': ('test native link', 'program'), 'runtime': ('test driver C object', 'object.o')}
             if name == 'RuntimeDriver':
                 products['trace'] = ('test driver C object', 'object.o')
             for stage, (kind, filename) in products.items():

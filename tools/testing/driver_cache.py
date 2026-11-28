@@ -98,7 +98,7 @@ def export(report_path, output):
         for stage, row in stages.items():
             key = digest(row['key'])
             kind = {'llvm': f'{frontend} {name} LLVM', 'object': 'LLVM object',
-                    'linked': 'test driver native link'}.get(stage, 'test driver C object')
+                    'linked': 'test native link'}.get(stage, 'test driver C object')
             decision = {'key': key, 'kind': kind, 'cached': row['cached']}
             require(row['kind'] == kind and type(row['cached']) is bool and decision in build['builds'],
                     f'missing matching driver build decision: {name}/{stage}')

@@ -488,7 +488,9 @@ module Package.Build where {
       else if eqString output "" then readFile result else ioReturn ""
     };
   gcFlags :: Builder -> IO J.Json;
-  gcFlags b =
+  gcFlags b = gcFlagsIn b (root b);
+  gcFlagsIn :: Builder -> String -> IO J.Json;
+  gcFlagsIn b workingDirectory =
     do {
       let {
         prefix = J.getText "gc-prefix" "" (config b)
@@ -497,7 +499,7 @@ module Package.Build where {
         if eqString prefix ""
         then do {
                text <-
-                 capture b (root b)
+                 capture b workingDirectory
                    ((:) (J.getText "path" "" (J.get "pkg-config" (tools b)))
                       (O.words "--cflags --libs bdw-gc"))
                    ""
@@ -645,6 +647,18 @@ module Package.Build where {
         destination = (cacheDirectory b ++ ("/" ++ key))
       };
       lock <- acquireFileLock (cacheDirectory b ++ ("/.locks/" ++ key));
+      result <- catchIOError
+        (cachedWhileLocked b kind inputs validate action key destination)
+        (\error -> do { releaseFileLock lock; ioError error });
+      releaseFileLock lock;
+      ioReturn result
+    };
+  -- Process death still releases the OS lock; recoverable IO failures also
+  -- release it before returning control to the current process.
+  cachedWhileLocked :: Builder -> String -> J.Json -> (String -> IO Bool) ->
+                       (String -> IO ()) -> String -> String -> IO J.Json;
+  cachedWhileLocked b kind inputs validate action key destination =
+    do {
       ownValid <- cacheValid destination key;
       reusable <- if ownValid then validate destination else ioReturn False;
       if reusable
@@ -652,7 +666,12 @@ module Package.Build where {
       else do {
              putErr ("Building " ++ (kind ++ "\n"));
              work <- temporaryDirectory (directory b) (destination ++ ".work-");
-             action work;
+             -- A rejected compile must neither publish a partial artifact nor
+             -- retain a lock in a caller that recovers and continues testing.
+             catchIOError (action work) (\error -> do {
+               O.remove work;
+               ioError error
+             });
              paths <- O.files work;
              hashes <-
                S.mapM
@@ -678,7 +697,6 @@ module Package.Build where {
       };
       stamp <- J.read (destination ++ "/artifact.json");
       record b "builds" row;
-      releaseFileLock lock;
       ioReturn
         (J.set "artifact" (J.str destination)
            (J.set "receipt" (J.str (destination ++ "/artifact.json"))

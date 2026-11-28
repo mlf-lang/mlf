@@ -18,6 +18,7 @@ module Tests.CompilerTests where {
   import qualified Package.Scheduler as Jobs;
   import qualified Tests.Coverage as Coverage;
   import qualified Tests.TestDrivers as TD;
+  import qualified Tests.TestCompilation as TC;
   import qualified Tests.TestSources as TS;
   import qualified Tests.Catalog as Catalog;
   import qualified Tests.Selection as Selection;
@@ -122,7 +123,7 @@ module Tests.CompilerTests where {
   clearDrivers =
     S.mapM_ unsetEnv
       (O.words
-         "MLF_BENCH_SPLIT_RUNTIME MLF_MOCK_FAIL_SUPERVISOR MLF_BENCH_STREAM_LINK MLF_MOCK_FAIL_RUNTIME MLF_BENCH_STREAM_LLVM MLF_BENCH_MLF_CLANG MLF_MOCK_FAST_FRONTEND MLF_BOOTSTRAP_INTERPRETER MLF_BOOTSTRAP_LLVM MLF_BOOTSTRAP_TIMEOUT_SECONDS MLF_TEST_TRACE MLF_TEST_FAIL_WRITE MLF_LLVM_TEST_ABI MLF_LLVM_TEST_CFLAGS MLF_LLVM_TEST_LIBS MLF_LLVM_TEST_OPT MLF_TEST_PORT_TARGETS MLF_TEST_PORT_TARGETS_SHA256");
+         "MLF_BENCH_SPLIT_RUNTIME MLF_MOCK_FAIL_SUPERVISOR MLF_BENCH_STREAM_LINK MLF_MOCK_FAIL_RUNTIME MLF_BENCH_STREAM_LLVM MLF_BENCH_MLF_CLANG MLF_MOCK_FAST_FRONTEND MLF_BOOTSTRAP_INTERPRETER MLF_BOOTSTRAP_LLVM MLF_BOOTSTRAP_TIMEOUT_SECONDS MLF_TEST_TRACE MLF_TEST_FAIL_WRITE MLF_LLVM_TEST_ABI MLF_LLVM_TEST_CFLAGS MLF_LLVM_TEST_LIBS MLF_LLVM_TEST_OPT MLF_TEST_PORT_TARGETS MLF_TEST_PORT_TARGETS_SHA256 MLF_TEST_SOURCE_ROOT MLF_TEST_COMPILATION_CACHE");
   nativeFlags :: TestContext -> IO ([] String);
   nativeFlags c =
     do {
@@ -160,23 +161,32 @@ module Tests.CompilerTests where {
         (if eqString (O.trim system) "Darwin" then (:) "-Wl,-stack_size,0x10000000" [] else [])
     };
   compileRuntime :: TestContext -> [] String -> Bool -> String -> IO ();
-  compileRuntime c flags trace name =
+  compileRuntime c flags trace name = do {
+    service <- testCompilation c (name ++ ".build");
+    compileRuntimeWith c service flags trace name;
+    TC.finish service
+  };
+  compileRuntimeWith :: TestContext -> TC.Service -> [] String -> Bool -> String -> IO ();
+  compileRuntimeWith c service flags trace name =
     do {
       let {
+        builder = TC.builder service;
         interpose =
           if trace
           then O.words
                  "-Dgetline=mlf_test_getline -Dfwrite=mlf_test_fwrite -Dfputc=mlf_test_fputc -Dfflush=mlf_test_fflush"
           else []
       };
-      run c
-        (S.append (O.words "clang -O2 -std=c11 -Wall -Wextra -Werror")
-           (S.append (S.filter (O.starts "-I") flags)
-              (S.append []
-                 (S.append interpose
-                    ((:) "-c"
-                       ((:) (root c ++ "/runtime/mlf_runtime.c")
-                          ((:) "-o" ((:) (output c ++ ("/" ++ name)) []))))))))
+      libraries <- nativeFlags c;
+      native <- TC.nativeIdentity service (S.append libraries ["-lm"]);
+      artifact <- TC.cObject service native (root c ++ "/runtime/mlf_runtime.c")
+        (J.get "runtime" (B.tools builder))
+        (S.append (O.words "-O2 -std=c11 -Wall -Wextra -Werror")
+          (S.append (S.filter (O.starts "-I") flags) interpose));
+      O.copy (artifact ++ "/object.o") (output c ++ ("/" ++ name));
+      receipt <- TC.receipt service artifact;
+      saved <- J.read (report c);
+      record c "runtime_artifacts" (J.set name receipt (J.getObject "runtime_artifacts" saved))
     };
   link :: TestContext -> String -> [] String -> [] String -> String -> [] String -> IO ();
   link c ir objects flags binary extra =
@@ -294,19 +304,35 @@ module Tests.CompilerTests where {
   transports :: TestContext -> IO ();
   transports c =
     do {
+      service <- testCompilation c "transport-build";
+      let { builder = TC.builder service;
+            options = O.words "-O2 -std=c11 -Wall -Wextra -Werror" };
+      native <- TC.nativeIdentity service [];
       S.mapM_
-        (\((,) source target) ->
-           run c
-             (S.append (O.words "clang -O2 -std=c11 -Wall -Wextra -Werror")
-                ((:) (root c ++ ("/tests/native/" ++ source))
-                   ((:) "-o" ((:) (output c ++ ("/" ++ target)) [])))))
+        (\((,) source target) -> do {
+           let { path = root c ++ ("/tests/native/" ++ source) };
+           inputs <- B.hashFiles [path];
+           object <- TC.cObject service native path inputs options;
+           linked <- TC.linkObjects service native [object ++ "/object.o"] [];
+           O.copy (B.executable builder (linked ++ "/program"))
+             (B.executable builder (output c ++ ("/" ++ target)))
+         })
         ((:) ((,) "binary_files.c" "binary-files")
            ((:) ((,) "host_support.c" "host-support") []));
+      TC.finish service;
+      hash <- fileDigest (B.reportPath builder);
+      record c "transport_build" (B.obj2 "path" (J.str (B.reportPath builder)) "sha256" (J.str hash));
       setEnv "MLF_TEST_BINARY_FILES" (output c ++ "/binary-files");
       setEnv "MLF_TEST_HOST_SUPPORT" (output c ++ "/host-support");
       setEnv "MLF_TEST_WORK" (output c);
-      setEnv "MLF_TEST_ROOT" (output c)
+      setEnv "MLF_TEST_ROOT" (output c);
+      compilationEnvironment c
     };
+  compilationEnvironment :: TestContext -> IO ();
+  compilationEnvironment c = do {
+    setEnv "MLF_TEST_SOURCE_ROOT" (root c);
+    setEnv "MLF_TEST_COMPILATION_CACHE" (sharedCache c)
+  };
   suite :: TestContext -> String -> [] String -> IO ();
   suite c target expectations = suiteArgs c target [] expectations;
   suiteArgs :: TestContext -> String -> [] String -> [] String -> IO ();
@@ -393,6 +419,7 @@ module Tests.CompilerTests where {
                        [] String -> [] String -> Maybe J.Json -> Maybe ([] String) -> IO ();
   suiteArgsEvidence c target args expectations selected wantedFamilies =
     do {
+      compilationEnvironment c;
       binary <- nativeTest c target;
       binaryHash <- fileDigest binary;
       let {
@@ -832,6 +859,11 @@ module Tests.CompilerTests where {
                  ((:) "1 target dependency integration test passed"
                     ((:) "28 checked package release cases passed" [])))))
     };
+  testCompilation :: TestContext -> String -> IO TC.Service;
+  testCompilation c name = TC.openWith (root c)
+    (B.info [(,) "compiler" (J.str (compiler c)),
+      (,) "cache-dir" (J.str (sharedCache c)),
+      (,) "timeout" (J.str "21600")]) (output c ++ ("/" ++ name));
   testBuilder :: TestContext -> String -> String -> IO B.Builder;
   -- Build.create fingerprints the executable actually running its build/cache
   -- code. Here that is the campaign runner, distinct from the package manager
@@ -984,6 +1016,7 @@ module Tests.CompilerTests where {
                      Bool -> Int -> [] String -> [] String -> Maybe ([] J.Json) -> IO ();
   matrixSuiteArgs c binary portFixtures expectedRows expectations arguments selected =
     do {
+      compilationEnvironment c;
       previousHeap <- getEnv "GC_INITIAL_HEAP_SIZE";
       previousDivisor <- getEnv "GC_FREE_SPACE_DIVISOR";
       requestedDivisor <- getEnv "MLF_TEST_MATRIX_GC_DIVISOR";
@@ -1016,7 +1049,8 @@ module Tests.CompilerTests where {
       if portFixtures
       then unsetEnv "MLF_BOOTSTRAP_INTERPRETER"
       else setEnv "MLF_BOOTSTRAP_INTERPRETER" (output c ++ "/RuntimeDriver");
-      setEnv "MLF_BOOTSTRAP_LLVM" (output c ++ "/LLVMDriver");
+      if expectedRows == 0 then unsetEnv "MLF_BOOTSTRAP_LLVM"
+      else setEnv "MLF_BOOTSTRAP_LLVM" (output c ++ "/LLVMDriver");
       setEnv "MLF_BOOTSTRAP_COMPILER" (compiler c);
       setEnv "MLF_BOOTSTRAP_TIMEOUT_SECONDS" "1800";
       S.mapM_
@@ -1138,13 +1172,21 @@ module Tests.CompilerTests where {
                     };
              O.require (S.all (\expected -> contains expected text) expectations)
                "native fixture coverage changed";
+             compilationEvidence <- if expectedRows == 0 then return J.empty else do {
+               let { path = directory ++ "/compilation/build-report.json" };
+               completed <- J.read path;
+               O.require (J.getBool "complete" False completed)
+                 "matrix compilation inputs were not verified";
+               digest <- fileDigest path;
+               return (B.obj1 "compilation" (B.obj2 "path" (J.str path) "sha256" (J.str digest)))
+             };
              hash <- fileDigest log;
              let {
                row =
                  J.set "scope" (J.str (if S.isJust selected then "partial" else "full"))
                    (J.set "backend_names" (J.stringArray backendNames)
                       (J.Object
-                         (S.append (S.append (J.items cases) (J.items rowEvidence))
+                         (S.append (S.append (J.items cases) (S.append (J.items rowEvidence) (J.items compilationEvidence)))
                             (J.items
                                (B.info
                                   ((:)
@@ -1738,21 +1780,35 @@ module Tests.CompilerTests where {
             let {
               selectedRuntime = S.length (S.filter (J.has "expected_stdout") selected)
             };
-            flags <-
-              if selectedRuntime == 0 then return [] else do {
+            preparation <-
+              if selectedRuntime == 0 then return ((,) [] Nothing) else do {
                 parityStderrControl c;
                 options <- nativeFlags c;
-                compileRuntime c options False "runtime.o";
-                return options
+                service <- testCompilation c "parity-compilation";
+                compileRuntimeWith c service options False "runtime.o";
+                native <- TC.nativeIdentity service (S.append options ["-lm"]);
+                producer <- TC.registerProducer service (compiler c);
+                return ((,) options (Just ((,) service ((,) native producer))))
               };
             let {
+              flags = S.fst preparation;
+              compilation = S.snd preparation;
               actual = S.map (\row -> parityEntry row
                 (case Map.lookup compareString (parityIdentity row) canonical of {
                    Nothing -> TestAssert.fail "case has no selected compilation";
-                   Just target -> parityCase c flags row target sourceResults checked
+                   Just target -> parityCase c flags compilation row target sourceResults checked
                  })) rows
             };
             status <- TestRunner.run campaignArgs actual;
+            case compilation of {
+              Nothing -> return ();
+              Just ((,) service _) -> do {
+                TC.finish service;
+                let { path = B.reportPath (TC.builder service) };
+                hash <- fileDigest path;
+                record c "parity_compilation" (B.obj2 "path" (J.str path) "sha256" (J.str hash))
+              }
+            };
             if status == 0 then return () else exitWith status;
             manifestHash <- fileDigest (corpus ++ "/manifest.jsonl");
             let {
@@ -1765,6 +1821,8 @@ module Tests.CompilerTests where {
                 , (,) "runtime_rows" (J.num selectedRuntime)
                 , (,) "runtime_executions" (J.num (selectedRuntime * 2))
                 , (,) "source_compilations" (J.num (S.length targets))
+                , (,) "runtime_source_recompilations" (J.num 0)
+                , (,) "runtime_target_reuses" (J.num (selectedRuntime * 2))
                 , (,) "shared_source_cases" (J.num (S.length aliases))
                 , (,) "shared_cases" (J.Array aliases)
                 , (,) "independent_target_checks" (J.num (S.length checks + referenceChecks))
@@ -1881,7 +1939,7 @@ module Tests.CompilerTests where {
         O.require (status == 0) "independent crate-cycle reference typing failed"
       }) (S.filter (\row -> Set.member compareString (parityIdentity row) selected) references)
     };
-  parityCase c flags row target sourceResults checked =
+  parityCase c flags compilation row target sourceResults checked =
     let {
       identity = J.getText "id" "" target;
       stem = J.getText "stem" "" target;
@@ -1917,35 +1975,46 @@ module Tests.CompilerTests where {
       if J.has "expected_stdout" row
       then do {
         TestAssert.assert accept "rejected corpus row has runtime expectation";
-        let {
-          source = J.getText "source" "" target;
-          prefix = S.append
-            (if J.getBool "no_prelude" False row then [compiler c, "--no-prelude"] else [compiler c])
-            (S.concatMap (\path -> ["-i", path]) (J.getStrings "include_dirs" target))
-        };
+        let { preparation = S.fromMaybe (panic "runtime parity has no compilation service") compilation;
+              service = S.fst preparation;
+              native = S.fst (S.snd preparation);
+              producer = S.snd (S.snd preparation) };
         TestAssert.liftIO (writeFile (stem ++ ".stdin") (J.getText "expected_stdin" "" row));
         TestAssert.assert (J.has "dependency_stderr" compiled) "missing source dependency decisions";
-        interpreter <- TestAssert.liftIO (parityOutput c row (J.getText "dependency_stderr" "" compiled)
-          (S.append prefix ["--run", source]) stem "interpreter");
+        -- The source batch and both target checkers have already run. Reuse
+        -- that exact target while executing each runtime observation afresh.
+        interpreter <- TestAssert.liftIO (parityOutput c row ""
+          [compiler c, "--run-xmlf", stem ++ ".xmlf"] stem "interpreter");
         generated <- TestAssert.liftIO
-          (O.exec (root c) (S.append prefix ["--emit-llvm", source]) "" (stem ++ ".ll") (stem ++ ".llvm.err") 1800);
-        llvm <- if generated == 0
-          then do {
-            binary <- TestAssert.liftIO (O.executable (stem ++ ".native"));
-            linked <- TestAssert.liftIO (O.exec (root c)
-              (S.append (O.words "clang -O2 -Wno-override-module")
-                (S.append [stem ++ ".ll", output c ++ "/runtime.o"] (S.append flags ["-lm", "-o", binary])))
-              "" (stem ++ ".link.out") (stem ++ ".link.err") 1800);
-            if linked == 0 then TestAssert.liftIO (parityOutput c row "" [binary] stem "llvm")
-            else do {
-              diagnostics <- TestAssert.liftIO (readFile (stem ++ ".link.err"));
-              TestAssert.succeed (Just ("LLVM link failed: " ++ diagnostics))
+          (TC.emittedLLVMWithIdentity service producer "--xmlf-to-llvm-io" [] (stem ++ ".xmlf") 1800);
+        llvm <- case generated of {
+          Left ((,,) _ out error) -> do {
+            TestAssert.liftIO (writeFile (stem ++ ".ll") out);
+            TestAssert.liftIO (writeFile (stem ++ ".llvm.err") error);
+            TestAssert.succeed (Just ("LLVM emission failed: " ++ error))
+          };
+          Right emitted -> do {
+            TestAssert.liftIO (O.copy (emitted ++ "/program.ll") (stem ++ ".ll"));
+            TestAssert.liftIO (writeFile (stem ++ ".llvm.err") "");
+            receipt <- TestAssert.liftIO (TC.receipt service emitted);
+            TestAssert.liftIO (J.write (stem ++ ".emission.json") receipt);
+            linked <- TestAssert.liftIO (TC.nativeLLVMWithIdentityResult service native (emitted ++ "/program.ll")
+              [output c ++ "/runtime.o"] (S.append flags ["-lm"]));
+            case linked of {
+              Left ((,,) _ out error) -> do {
+                TestAssert.liftIO (writeFile (stem ++ ".link.out") out);
+                TestAssert.liftIO (writeFile (stem ++ ".link.err") error);
+                TestAssert.succeed (Just ("LLVM link failed: " ++ error))
+              };
+              Right artifact -> do {
+                saved <- TestAssert.liftIO (TC.receipt service artifact);
+                TestAssert.liftIO (J.write (stem ++ ".native.json") saved);
+                let { binary = B.executable (TC.builder service) (artifact ++ "/program") };
+                TestAssert.liftIO (parityOutput c row "" [binary] stem "llvm")
+              }
             }
           }
-          else do {
-            diagnostics <- TestAssert.liftIO (readFile (stem ++ ".llvm.err"));
-            TestAssert.succeed (Just ("LLVM emission failed: " ++ diagnostics))
-          };
+        };
         let {
           errors = S.catMaybes [interpreter, llvm]
         };
@@ -2437,8 +2506,78 @@ module Tests.CompilerTests where {
           ])
       }
     };
+  -- A preparation-only adapter lets shell fixtures use the same checked store.
+  -- The shell still owns its case selection, executions and output assertions.
+  fixtureNativeFlags :: TestContext -> IO ((,) ([] String) ([] String));
+  fixtureNativeFlags c = do {
+    cflags <- query c ["pkg-config", "--cflags", "gmp"];
+    libraries <- query c ["pkg-config", "--libs", "gmp"];
+    prefix <- getEnv "MLF_GC_PREFIX";
+    gc <- if eqString prefix "" then do {
+      includes <- query c ["pkg-config", "--cflags", "bdw-gc"];
+      libs <- query c ["pkg-config", "--libs", "bdw-gc"];
+      return ((,) (B.flags includes) (B.flags libs))
+    } else do {
+      actual <- canonicalPath prefix;
+      return ((,) ["-I" ++ actual ++ "/include"] [actual ++ "/lib/libgc.a"])
+    };
+    return ((,) (S.append (B.flags cflags) (S.fst gc))
+      (S.append (B.flags libraries) (S.snd gc)))
+  };
+  prepareFixture :: [] String -> IO ();
+  prepareFixture args = do {
+    (,) settings rest <- C.options J.empty args;
+    O.require (J.has "compiler" settings && J.has "build-dir" settings)
+      "compiler-tests prepare-fixture --compiler TOOL --build-dir DIR [--cache-dir DIR] checked|native SOURCE";
+    case rest of {
+      [stage, source] -> do {
+        O.require (S.elem eqString stage ["checked", "native"]) "unknown fixture preparation stage";
+        root <- canonicalPath ".";
+        O.mkdir (J.getText "build-dir" "" settings);
+        directory <- canonicalPath (J.getText "build-dir" "" settings);
+        producer <- O.which (J.getText "compiler" "" settings);
+        entry <- canonicalPath source;
+        let { cache = J.getText "cache-dir" (root ++ "/.mlf-build/cache") settings;
+              context = TestContext root directory producer [] cache "" };
+        service <- TC.openWith root (J.set "cache-dir" (J.str cache) settings)
+          (directory ++ "/compilation");
+        let { builder = TC.builder service };
+        checked <- TC.checkedSource service [] entry;
+        O.copy (checked ++ "/target.xmlf") (directory ++ "/program.xmlf");
+        diagnostic <- readFile (checked ++ "/source.stderr");
+        putErr diagnostic;
+        if eqString stage "checked" then return () else do {
+          emission <- TC.emittedLLVM service producer "--xmlf-to-llvm-io-gc" []
+            (checked ++ "/target.xmlf") 1800;
+          emitted <- case emission of {
+            Left ((,,) code _ error) -> O.fatal ("fixture LLVM emission failed (" ++ showInt code ++ "): " ++ error);
+            Right artifact -> return artifact
+          };
+          O.copy (emitted ++ "/program.ll") (directory ++ "/program.ll");
+          (,) cflags libraries <- fixtureNativeFlags context;
+          native <- TC.nativeIdentity service (S.append libraries ["-lm"]);
+          runtime <- TC.cObject service native (root ++ "/runtime/mlf_runtime.c")
+            (J.get "runtime" (B.tools builder))
+            (S.append (O.words "-O2 -std=c11") cflags);
+          O.copy (runtime ++ "/object.o") (directory ++ "/runtime.o");
+          extra <- stack context;
+          linked <- TC.nativeLLVM service (emitted ++ "/program.ll") [runtime ++ "/object.o"]
+            (S.append libraries ((:) "-lm" extra));
+          O.copy (B.executable builder (linked ++ "/program")) (B.executable builder (directory ++ "/program"));
+          B.copyWindowsFiles builder directory
+        };
+        TC.finish service
+      };
+      _ -> O.fatal "fixture preparation requires checked|native and one source file"
+    }
+  };
   main :: [] String -> IO ();
-  main args =
+  main args = case args of {
+    (:) "prepare-fixture" rest -> prepareFixture rest;
+    _ -> campaignMain args
+  };
+  campaignMain :: [] String -> IO ();
+  campaignMain args =
     let {
       matchValueShared11 = args
     } in

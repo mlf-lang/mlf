@@ -75,7 +75,7 @@ because rerunning the child in the campaign directory replaces matrix files.
 matrix="$PWD/.mlf-build/phase2/backends"
 suite="$matrix/suite-build/bin/backends"
 "$suite" --list --format json
-env MLF_TEST_WORK="$matrix" MLF_TEST_ROOT="$matrix" MLF_TEST_HOST_SUPPORT="$matrix/host-support" MLF_TEST_BINARY_FILES="$matrix/binary-files" MLF_TEST_LINK_FLAGS_FILE="$matrix/link-flags.bin" MLF_BOOTSTRAP_INTERPRETER="$matrix/RuntimeDriver" MLF_BOOTSTRAP_LLVM="$matrix/LLVMDriver" MLF_BOOTSTRAP_COMPILER="$phase2_tools/emlf" "$suite" --exact backends/strict-wrappers/strict_32_unary_32_representation_58__32_evaluated_32_recursive_32_producer --format json --report .mlf-build/phase2/backend-exact.jsonl
+env MLF_TEST_SOURCE_ROOT="$PWD" MLF_TEST_COMPILATION_CACHE="$PWD/.mlf-build/phase2/cache" MLF_TEST_WORK="$matrix" MLF_TEST_ROOT="$matrix" MLF_TEST_HOST_SUPPORT="$matrix/host-support" MLF_TEST_BINARY_FILES="$matrix/binary-files" MLF_TEST_LINK_FLAGS_FILE="$matrix/link-flags.bin" MLF_BOOTSTRAP_INTERPRETER="$matrix/RuntimeDriver" MLF_BOOTSTRAP_LLVM="$matrix/LLVMDriver" MLF_BOOTSTRAP_COMPILER="$phase2_tools/emlf" "$suite" --exact backends/strict-wrappers/strict_32_unary_32_representation_58__32_evaluated_32_recursive_32_producer --format json --report .mlf-build/phase2/backend-exact.jsonl
 ```
 
 In a disposable Phase 2 checkout, change one strict-wrapper literal output
@@ -121,7 +121,7 @@ port="$PWD/.mlf-build/phase2/port-cold"
 "$port/suite-build/bin/port" --list --format json
 targets="$port/prepared-port.json"
 target_sha=$(shasum -a 256 "$targets" | awk '{print $1}')
-env MLF_TEST_WORK="$port" MLF_TEST_ROOT="$port" MLF_TEST_HOST_SUPPORT="$port/host-support" MLF_TEST_BINARY_FILES="$port/binary-files" MLF_TEST_LINK_FLAGS_FILE="$port/link-flags.bin" MLF_BOOTSTRAP_LLVM="$port/LLVMDriver" MLF_TEST_REFERENCES="$port/suite-build/bin/references" MLF_TEST_PORT_TARGETS="$targets" MLF_TEST_PORT_TARGETS_SHA256="$target_sha" "$port/suite-build/bin/port" --exact port/InferenceConformance --format json --report .mlf-build/phase2/port-exact.jsonl
+env MLF_TEST_SOURCE_ROOT="$PWD" MLF_TEST_COMPILATION_CACHE="$PWD/.mlf-build/phase2/port-cache-$USER" MLF_BOOTSTRAP_COMPILER="$MLF_COMPILER" MLF_TEST_WORK="$port" MLF_TEST_ROOT="$port" MLF_TEST_HOST_SUPPORT="$port/host-support" MLF_TEST_BINARY_FILES="$port/binary-files" MLF_TEST_LINK_FLAGS_FILE="$port/link-flags.bin" MLF_BOOTSTRAP_LLVM="$port/LLVMDriver" MLF_TEST_REFERENCES="$port/suite-build/bin/references" MLF_TEST_PORT_TARGETS="$targets" MLF_TEST_PORT_TARGETS_SHA256="$target_sha" "$port/suite-build/bin/port" --exact port/InferenceConformance --format json --report .mlf-build/phase2/port-exact.jsonl
 ```
 
 Use an empty cache for the first pass and the same cache for the second.

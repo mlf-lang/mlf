@@ -759,6 +759,11 @@
       "role": "implementation"
     },
     {
+      "module": "Tests.TestCompilation",
+      "path": "tests/Tests/TestCompilation.hs",
+      "role": "implementation"
+    },
+    {
       "module": "Tests.TestDrivers",
       "path": "tests/Tests/TestDrivers.hs",
       "role": "implementation"

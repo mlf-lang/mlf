@@ -836,7 +836,8 @@
         "test_regex_redux_measured_native_source_matches_independent_oracle",
         "test_regex_redux_measured_interpreter_source_matches_independent_oracle",
         "test_source_dependency_cache_controls",
-        "test_checked_native_driver_cache"
+        "test_checked_native_driver_cache",
+        "test_unified_test_compilation_cache"
       ],
       "aliases": {},
       "metrics": {

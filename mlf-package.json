@@ -99,6 +99,7 @@
         "Tests.CorePartitions": "tests/Tests/CorePartitions.hs",
         "Tests.Coverage": "tests/Tests/Coverage.hs",
         "Tests.TestDrivers": "tests/Tests/TestDrivers.hs",
+        "Tests.TestCompilation": "tests/Tests/TestCompilation.hs",
         "Tests.TestSources": "tests/Tests/TestSources.hs",
         "Tests.Catalog": "tests/Tests/Catalog.hs",
         "Tests.ReportJournal": "tests/Tests/ReportJournal.hs",
@@ -135,7 +136,8 @@
     },
     "tuple-list-native": {
       "requires": [
-        "emlf"
+        "emlf",
+        "compiler-tests"
       ],
       "command": [
         "python3",

@@ -20,7 +20,9 @@ LLVM execution parity or a self-hosting fixed point.
 The POSIX root `tuple-list-native` target builds the checkout compiler and runs
 the actual interpreter/native fixture. Run
 `./mlfpkg --timeout 21600 test --target tuple-list-native`, or use an already
-built compiler with `bash tools/release/test-tuple-list.sh /absolute/path/to/emlf`. With
+built toolset with `bash tools/release/test-tuple-list.sh /absolute/path/to/emlf`.
+The script uses the sibling `compiler-tests` executable, or the executable selected
+by `MLF_TEST_COMPILATION_SERVICE`; the package target builds both required tools. With
 Clang, GMP and BDWGC configured, it checks nine independently specified output
 lines on both paths, including recursion, tuple arities, do patterns and lazy
 fields. Its source and expected output are `fixtures/tuple-list-runtime.*`;
@@ -145,7 +147,7 @@ artifact directly.
 Driver LLVM objects, native links, runtime objects and trace objects also share
 checked artifacts. Their keys include actual native inputs, resolved C headers,
 library bytes, compiler/environment identities and ordered flags. Group reports
-identify each reused artifact and its checksums. The two new cache regressions
+identify each reused artifact and its checksums. The cache regressions
 exercise source resolution, cross-group reuse, invalidation, corruption repair
 and traced runtime behavior with small programs; every selected matrix still runs.
 `compiler-tests backend-prepare` prepares only these two drivers and records
@@ -155,8 +157,18 @@ artifacts named in its completed, hashed build report with
 Import validates artifact stamps and bytes, and ordinary build-key validation
 still decides reuse. Missing or damaged entries are rebuilt. The full backend
 invocation runs independently, including after a failed preparation attempt.
-The matrix also reuses the checked traced runtime object already prepared for
-RuntimeDriver, while Port retains its own runtime preparation.
+`Tests.TestCompilation` is the common preparation service for checked source,
+serialized-target LLVM, native links and C objects. Backend and Port matrices
+share successful LLVM/native products across output directories; each matrix
+retains its own compilation report, runtime processes, traces and assertions.
+Port's runtime preparation uses the same checked C object store as RuntimeDriver.
+Parity executes and emits the exact xMLF already produced by its source batch
+and independently checked, avoiding two additional source compilations for each
+runtime row. Source CLI diagnostic controls still exercise the source route.
+The tuple/list native fixture uses `compiler-tests prepare-fixture`; selecting
+only its interpreter still requires no native toolchain. See
+[Test Compilation Service](../docs/test-compilation-service.md) for stage keys,
+failure behavior, fresh-store boundaries and regression commands.
 Self-host selects the candidate artifact from its actual package build report,
 checks that report's source snapshot and retains a copy. Equal native binary
 hashes elsewhere in the shared store do not identify the producing LLVM input.
@@ -183,7 +195,7 @@ wrapper chooses 4 for port on hosts with at most 8 GiB RAM, while preserving the
 
 | Root group | MLF entry | Preserved coverage |
 | --- | --- | --- |
-| unit | CoreCratesMain, CoreSolverMain, CoreLanguageMain, CoreModulesMain, Figure12SuiteMain, HarnessMain, TestFrameworkMain, RegexMain | framework API/CLI contracts; 746 compiler checks; 6712 Algorithm W cases represented by 6703 executions; annotations, crate resolution, SCC queries and codegen caching, POSIX/Windows crate paths and native cache commands, indexed optimizer and legacy differential checks; all 43 Figure 12 labels with 41 distinct executions and 36 controls; 69 benchmark/bootstrap/release/cache harness methods including two cache regressions; 56 regex actions |
+| unit | CoreCratesMain, CoreSolverMain, CoreLanguageMain, CoreModulesMain, Figure12SuiteMain, HarnessMain, TestFrameworkMain, RegexMain | framework API/CLI contracts; 746 compiler checks; 6712 Algorithm W cases represented by 6703 executions; annotations, crate resolution, SCC queries and codegen caching, POSIX/Windows crate paths and native cache commands, indexed optimizer and legacy differential checks; all 43 Figure 12 labels with 41 distinct executions and 36 controls; 73 benchmark/bootstrap/release/cache harness observations including three cache regression families; 56 regex actions |
 | packages | PackagesMain | 79 completed cases: 22 resolver checks; 29 compiler integration cases, including native PGO isolation, shared cache survival, corruption recovery and source invalidation; 28 checked-release cases covering source-free builds, relocation, shared dependencies, compatibility, pins, damaged artifacts, GitHub fetching, offline cache repair and packed asset validation; target dependency/instance selection; scheduler diamond and variant deduplication, jobs 1/2/4 equivalence, concurrent cache publication, failure recovery, empty graphs and target-name collisions; 22 native runner lifecycle and protocol checks |
 | backends | BackendSuiteMain | 541 fixtures and 593 execution rows on interpreter and LLVM, compact-GC layout |
 | port | PortMain, ReferencesMain | 25 LLVM fixtures with compact-GC, six reference programs, generated inference input equality |

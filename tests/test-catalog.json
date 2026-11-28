@@ -2110,6 +2110,36 @@
       }
     },
     {
+      "id": "harness/test-compilation-cache",
+      "unit": "harness",
+      "name": "Shared test compilation products and fresh runtime observations",
+      "group": "packages-build",
+      "level": "integration",
+      "inputs": [
+        "fixed",
+        "transformed",
+        "fault-injected"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "contract",
+        "metamorphic"
+      ],
+      "purposes": [
+        "regression",
+        "conformance",
+        "robustness"
+      ],
+      "evidence": {
+        "kind": "coverage",
+        "executions": [
+          "test_unified_test_compilation_cache"
+        ],
+        "aliases": {},
+        "metrics": {}
+      }
+    },
+    {
       "id": "harness/release-evidence",
       "unit": "harness",
       "name": "Complete, fresh and measured release evidence",

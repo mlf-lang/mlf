@@ -104,7 +104,7 @@ jq -se --arg group pr-smoke --arg driver_hash "$driver_hash" '
         ($receipt.cached | type == "boolean") and
         $receipt.directory == ($b.cache_directory + "/" + $receipt.key) and
         $receipt.kind ==
-          (if $stage == "llvm" then $driver.frontend + " " + $name + " LLVM" elif $stage == "object" then "LLVM object" elif $stage == "linked" then "test driver native link" else "test driver C object" end) and
+          (if $stage == "llvm" then $driver.frontend + " " + $name + " LLVM" elif $stage == "object" then "LLVM object" elif $stage == "linked" then "test native link" else "test driver C object" end) and
         any($b.builds[]; . == ($receipt | {kind,key,cached})) and
         ($receipt.files | keys) ==
           [if $stage == "llvm" then "program.ll" elif $stage == "object" then "program.o" elif $stage == "linked" then "program" else "object.o" end] and
