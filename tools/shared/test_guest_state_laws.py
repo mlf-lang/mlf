@@ -8,6 +8,7 @@ LLVM emission, copied state implementation, or full native/unit qualification.
 import argparse
 import json
 import os
+import re
 from pathlib import Path
 import subprocess
 import sys
@@ -34,6 +35,18 @@ def require(value, message):
     if not value:
         raise ValueError(message)
 
+# The source CLI reports its dependency decisions on stderr before the program
+# runs; the watchdog merges both streams. Strip only that exact leading block
+# so the law output itself is still compared byte for byte.
+DEPENDENCY_LINE = re.compile(rb'dependency [^\r\n]+: (?:native|ir|source|unused) \([^\r\n]*\)\n')
+
+def program_output(log):
+    lines = log.splitlines(keepends=True)
+    index = 0
+    while index < len(lines) and DEPENDENCY_LINE.fullmatch(lines[index]):
+        index += 1
+    return b''.join(lines[index:])
+
 def verify_observation(resource, status, log, expected):
     require(set(LIMITS) <= set(resource.get('limits', {})) and resource['limits'] == LIMITS,
             'resource contract changed')
@@ -52,9 +65,10 @@ def verify_observation(resource, status, log, expected):
                 sample.get('group_rss', LIMITS['process_tree_rss_bytes']+1) <= LIMITS['process_tree_rss_bytes'] and
                 sample.get('output_bytes', LIMITS['max_output_bytes']+1) <= LIMITS['max_output_bytes'],
                 'resource sample exceeds bounds')
-    require(log == expected, 'law output differs from exact oracle')
+    output = program_output(log)
+    require(output == expected, 'law output differs from exact oracle')
     if status == 1:
-        require(b'PASS' not in log and log.startswith(b'FAIL '), 'invalid negative control output')
+        require(b'PASS' not in output and output.startswith(b'FAIL '), 'invalid negative control output')
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
